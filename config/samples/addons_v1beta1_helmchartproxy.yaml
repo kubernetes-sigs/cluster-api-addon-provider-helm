@@ -3,4 +3,8 @@ kind: HelmChartProxy
 metadata:
   name: helmchartproxy-sample
 spec:
-  # TODO(user): Add fields here
+  chartName: my-chart-name
+  version: v0.0.1
+  chartReference: my-chart-reference
+  repoName: my-repo-name
+  repoURL: https://my-repo-url.com

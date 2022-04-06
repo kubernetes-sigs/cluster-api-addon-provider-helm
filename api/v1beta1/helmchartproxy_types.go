@@ -28,8 +28,20 @@ type HelmChartProxySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of HelmChartProxy. Edit helmchartproxy_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// ChartName is the name of the installed Helm chart.
+	ChartName string `json:"chartName,omitempty"`
+
+	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
+	Version string `json:"version,omitempty"`
+
+	// ChartReference is the reference name of the Helm chart.
+	ChartReference string `json:"chartReference,omitempty"`
+
+	// RepoName is the name of the Helm chart repository.
+	RepoName string `json:"repoName,omitempty"`
+
+	// RepoURL is the URL of the Helm chart repository.
+	RepoURL string `json:"repoURL,omitempty"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy
