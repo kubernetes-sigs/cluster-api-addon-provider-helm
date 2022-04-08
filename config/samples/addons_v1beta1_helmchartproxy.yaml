@@ -1,10 +1,10 @@
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: HelmChartProxy
 metadata:
-  name: helmchartproxy-sample
+  name: calico-helmchartproxy
 spec:
-  chartName: my-chart-name
-  version: v0.0.1
-  chartReference: my-chart-reference
-  repoName: my-repo-name
-  repoURL: https://my-repo-url.com
+  chartName: calico-chart
+  repoURL: https://projectcalico.docs.tigera.io/charts
+  chartReference: tigera-operator
+  # version: v0.0.1
+  # repoName: my-repo-name
