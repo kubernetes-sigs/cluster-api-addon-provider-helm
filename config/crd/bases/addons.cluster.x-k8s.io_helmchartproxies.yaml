@@ -35,14 +35,12 @@ spec:
           spec:
             description: HelmChartProxySpec defines the desired state of HelmChartProxy
             properties:
-              chartName:
-                description: ChartName is the name of the installed Helm chart.
-                type: string
               chartReference:
                 description: ChartReference is the reference name of the Helm chart.
                 type: string
-              repoName:
-                description: RepoName is the name of the Helm chart repository.
+              releaseName:
+                description: ReleaseName is the release name of the installed Helm
+                  chart.
                 type: string
               repoURL:
                 description: RepoURL is the URL of the Helm chart repository.

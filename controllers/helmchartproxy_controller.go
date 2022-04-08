@@ -18,9 +18,8 @@ package controllers
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os"
-	"time"
 
 	helmAction "helm.sh/helm/v3/pkg/action"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
@@ -56,8 +55,8 @@ type HelmChartProxyReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrlLog.FromContext(ctx)
-	// log := ctrl.LoggerFrom(ctx)
+	_ = ctrlLog.FromContext(ctx)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// Fetch the HelmChartProxy instance.
 	helmChartProxy := &addonsv1beta1.HelmChartProxy{}
@@ -68,47 +67,12 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	log.Info(fmt.Sprintf("Got a new HelmChartProxy: %s", helmChartProxy.Name))
-	log.Info(fmt.Sprintf("HelmChartProxy spec is %+v", helmChartProxy.Spec))
-
-	settings := helmCli.New()
-	actionConfig := new(helmAction.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), "default", os.Getenv("HELM_DRIVER"), Logf); err != nil {
-		return ctrl.Result{}, err
-	}
-	i := helmAction.NewInstall(actionConfig)
-	i.RepoURL = helmChartProxy.Spec.RepoURL
-	i.ReleaseName = helmChartProxy.Spec.ChartName
-	cp, err := i.ChartPathOptions.LocateChart(helmChartProxy.Spec.ChartReference, settings)
-	log.Info(fmt.Sprintf("Chart path is %s", cp))
+	log.Println("Got HelmChartProxy:", helmChartProxy.Name)
+	err := installChartWithHelm(ctx, helmChartProxy.Spec)
 	if err != nil {
+		log.Println("Error installing chart with Helm:", err)
 		return ctrl.Result{}, err
 	}
-	p := helmGetter.All(settings)
-	valueOpts := &helmVals.Options{}
-	// valueOpts.Values = []string{fmt.Sprintf("infra.clusterName=%s", input.ClusterProxy.GetName())}
-	vals, err := valueOpts.MergeValues(p)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	chartRequested, err := helmLoader.Load(cp)
-	chartRequested.Metadata.Name = helmChartProxy.Spec.ChartName
-	log.Info(fmt.Sprintf("Requested chart is %+v", *chartRequested))
-	log.Info(fmt.Sprintf("Chart name is %s", chartRequested.Name()))
-	log.Info(fmt.Sprintf("Values are is %+v", vals))
-
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	log.Info("Running with context")
-	release, err := i.RunWithContext(ctx, chartRequested, vals)
-	if err != nil {
-		log.Info("Error running with context")
-		return ctrl.Result{}, err
-	}
-
-	log.Info(fmt.Sprintf("Release %s is %+v", release.Name, release))
-	log.Info(fmt.Sprintf("Release chart is %+v", *release.Chart))
 
 	return ctrl.Result{}, nil
 }
@@ -120,15 +84,56 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func nowStamp() string {
-	return time.Now().Format(time.StampMilli)
-}
+func installChartWithHelm(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) error {
+	log.Println("Prepared to install chart spec", spec)
+	settings := helmCli.New()
+	actionConfig := new(helmAction.Configuration)
+	if err := actionConfig.Init(settings.RESTClientGetter(), "default", os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
+		return err
+	}
+	installer := helmAction.NewInstall(actionConfig)
+	installer.RepoURL = spec.RepoURL
+	installer.ReleaseName = spec.ReleaseName
+	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartReference, settings)
+	log.Println("Located chart at path", cp)
+	if err != nil {
+		return err
+	}
+	p := helmGetter.All(settings)
+	valueOpts := &helmVals.Options{}
+	// valueOpts.Values = []string{fmt.Printf("infra.clusterName=%s", input.ClusterProxy.GetName())
+	vals, err := valueOpts.MergeValues(p)
+	if err != nil {
+		return err
+	}
+	chartRequested, err := helmLoader.Load(cp)
+	chartRequested.Metadata.Name = spec.ReleaseName // TODO: remove this if not needed
+	// log.Printf("Requested chart is %+v\n", *chartRequested)
+	// log.Printf("Chart name is %s\n", chartRequested.Name())
+	// log.Printf("Values are is %+v\n", vals)
 
-func logf_helper(level string, format string, args ...interface{}) {
-	fmt.Printf(nowStamp()+": "+level+": "+format+"\n", args...)
-}
+	if err != nil {
+		return err
+	}
+	log.Println("Installing with Helm...")
+	release, err := installer.RunWithContext(ctx, chartRequested, vals)
+	if err != nil {
+		log.Println("Error installing with Helm")
+		return err
+	}
 
-// Logf prints info logs with a timestamp and formatting.
-func Logf(format string, args ...interface{}) {
-	logf_helper("INFO", format, args...)
+	log.Printf("Release %s is %+v\n", release.Name, release)
+	ls := helmAction.NewList(actionConfig)
+	releases, err := ls.Run()
+	if err != nil {
+		log.Println("Error listing releases with Helm")
+		return nil
+	}
+	for _, release := range releases {
+		log.Printf("Release %s is %+v\n", release.Name, release)
+	}
+
+	// helmAction.NewUninstall()
+
+	return nil
 }

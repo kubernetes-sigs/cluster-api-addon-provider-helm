@@ -3,8 +3,7 @@ kind: HelmChartProxy
 metadata:
   name: calico-helmchartproxy
 spec:
-  chartName: calico-chart
+  releaseName: calico-chart
   repoURL: https://projectcalico.docs.tigera.io/charts
   chartReference: tigera-operator
   # version: v0.0.1
-  # repoName: my-repo-name
