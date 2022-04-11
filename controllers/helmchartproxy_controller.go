@@ -120,32 +120,39 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // reconcileNormal...
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
-	if _, err := getHelmRelease(ctx, helmChartProxy.Spec); err != nil {
-		log.Println("Error getting chart:", err)
-	}
-
-	// TODO: Handle error when it's run on an existing release.
-	if _, err := installHelmRelease(ctx, helmChartProxy.Spec); err != nil {
-		log.Println("Error installing chart with Helm:", err)
-		return err
-	}
-
 	releases, err := listHelmReleases(ctx)
 	if err != nil {
-		log.Println("Error listing charts with Helm:", err)
+		log.Println("Error listing releases:", err)
+	}
+	log.Println("Querying existing releases:")
+	for _, release := range releases {
+		log.Printf("- %s\n", release.Name)
+	}
+
+	existing, err := getHelmRelease(ctx, helmChartProxy.Spec)
+	if err != nil {
+		if err.Error() == "not found" {
+			// Go ahead and create chart
+			log.Println("Error getting chart:", err)
+			release, err := installHelmRelease(ctx, helmChartProxy.Spec)
+			if err != nil {
+				log.Println("Error installing chart with Helm:", err)
+				return err
+			}
+			if release != nil {
+				log.Printf("Release '%s' successfully installed\n", release.Name)
+			}
+
+			return nil
+		}
+
+		log.Println("Error getting chart:", err)
 		return err
 	}
 
-	log.Println("Helm releases:")
-	limit := 200
-	for i, release := range releases {
-		log.Printf("%d. %s:\n", i, release.Name)
-		if len(release.Manifest) > limit {
-			log.Printf("%s\n...\n", release.Manifest[0:limit])
-		} else {
-			log.Println(release.Manifest)
-		}
-
+	if existing != nil {
+		// TODO: add logic for updating an existing release
+		log.Printf("Release '%s' already installed, nothing to do\n", existing.Name)
 	}
 
 	return nil
