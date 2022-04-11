@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"log"
-	"os"
 
 	helmAction "helm.sh/helm/v3/pkg/action"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
@@ -131,7 +130,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	existing, err := getHelmRelease(ctx, helmChartProxy.Spec)
 	if err != nil {
-		if err.Error() == "not found" {
+		if err.Error() == "release: not found" {
 			// Go ahead and create chart
 			log.Println("Error getting chart:", err)
 			release, err := installHelmRelease(ctx, helmChartProxy.Spec)
@@ -177,7 +176,7 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 func helmInit() (*helmCli.EnvSettings, *helmAction.Configuration, error) {
 	settings := helmCli.New()
 	actionConfig := new(helmAction.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), "default", os.Getenv("HELM_DRIVER"), log.Printf); err != nil {
+	if err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", log.Printf); err != nil {
 		return nil, nil, err
 	}
 
