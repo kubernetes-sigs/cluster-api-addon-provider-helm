@@ -29,16 +29,19 @@ type HelmChartProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// ReleaseName is the release name of the installed Helm chart.
-	ReleaseName string `json:"releaseName,omitempty"`
+	ReleaseName string `json:"releaseName"`
 
 	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
 	Version string `json:"version,omitempty"`
 
-	// ChartReference is the reference name of the Helm chart.
-	ChartReference string `json:"chartReference,omitempty"`
+	// ChartName is the name of the Helm chart in the repository.
+	ChartName string `json:"chartName,omitempty"`
 
 	// RepoURL is the URL of the Helm chart repository.
 	RepoURL string `json:"repoURL,omitempty"`
+
+	// Values is the set of key/value pair values that we pass to helm
+	Values map[string]string `json:"values,omitempty"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy
