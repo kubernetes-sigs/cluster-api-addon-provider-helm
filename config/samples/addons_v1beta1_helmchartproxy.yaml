@@ -5,5 +5,5 @@ metadata:
 spec:
   releaseName: calico-chart
   repoURL: https://projectcalico.docs.tigera.io/charts
-  chartReference: tigera-operator
+  chartName: tigera-operator
   # version: v0.0.1

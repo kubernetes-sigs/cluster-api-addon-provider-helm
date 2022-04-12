@@ -201,14 +201,20 @@ func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	installer := helmAction.NewInstall(actionConfig)
 	installer.RepoURL = spec.RepoURL
 	installer.ReleaseName = spec.ReleaseName
-	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartReference, settings)
+	installer.Namespace = "default"
+	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartName, settings)
 	log.Info("Located chart at path", "path", cp)
 	if err != nil {
 		return nil, err
 	}
 	p := helmGetter.All(settings)
-	valueOpts := &helmVals.Options{}
-	// valueOpts.Values = []string{fmt.Info(fmt.Sprintf("infra.clusterName=%s", input.ClusterProxy.GetName()))
+	specValues := make([]string, len(spec.Values))
+	for k, v := range spec.Values {
+		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
+	}
+	valueOpts := &helmVals.Options{
+		Values: specValues,
+	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
 		return nil, err
