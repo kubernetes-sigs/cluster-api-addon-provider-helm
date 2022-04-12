@@ -40,7 +40,7 @@ type HelmChartProxySpec struct {
 	// RepoURL is the URL of the Helm chart repository.
 	RepoURL string `json:"repoURL,omitempty"`
 
-	// Values is the set of key/value pair values that we pass to helm
+	// Values is the set of key/value pair values that we pass to Helm. This field is currently used for testing and is subject to change.
 	Values map[string]string `json:"values,omitempty"`
 }
 

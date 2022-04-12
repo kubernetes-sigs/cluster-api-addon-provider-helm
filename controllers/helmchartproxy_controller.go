@@ -152,7 +152,15 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	if existing != nil {
 		// TODO: add logic for updating an existing release
-		log.Info(fmt.Sprintf("Release '%s' already installed, nothing to do\n", existing.Name))
+		log.Info(fmt.Sprintf("Release '%s' already installed, running upgrade\n", existing.Name))
+		release, err := upgradeHelmRelease(ctx, helmChartProxy.Spec)
+		if err != nil {
+			log.Info("Error upgrading chart with Helm:", err)
+			return err
+		}
+		if release != nil {
+			log.Info(fmt.Sprintf("Release '%s' successfully upgraded\n", release.Name))
+		}
 	}
 
 	return nil
@@ -201,6 +209,7 @@ func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	installer := helmAction.NewInstall(actionConfig)
 	installer.RepoURL = spec.RepoURL
 	installer.ReleaseName = spec.ReleaseName
+	installer.Version = spec.Version
 	installer.Namespace = "default"
 	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartName, settings)
 	log.Info("Located chart at path", "path", cp)
@@ -231,6 +240,49 @@ func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	}
 
 	log.Info("Released", "name", release.Name)
+
+	return release, nil
+}
+
+// This function will be refactored to differentiate from installHelmRelease()
+func upgradeHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	settings, actionConfig, err := helmInit(ctx)
+	if err != nil {
+		return nil, err
+	}
+	upgrader := helmAction.NewUpgrade(actionConfig)
+	upgrader.RepoURL = spec.RepoURL
+	upgrader.Version = spec.Version
+	upgrader.Namespace = "default"
+	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
+	log.Info("Located chart at path", "path", cp)
+	if err != nil {
+		return nil, err
+	}
+	p := helmGetter.All(settings)
+	specValues := make([]string, len(spec.Values))
+	for k, v := range spec.Values {
+		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
+	}
+	valueOpts := &helmVals.Options{
+		Values: specValues,
+	}
+	vals, err := valueOpts.MergeValues(p)
+	if err != nil {
+		return nil, err
+	}
+	chartRequested, err := helmLoader.Load(cp)
+
+	if err != nil {
+		return nil, err
+	}
+	log.Info("Upgrading with Helm...")
+	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
+	if err != nil {
+		return nil, err
+	}
 
 	return release, nil
 }
