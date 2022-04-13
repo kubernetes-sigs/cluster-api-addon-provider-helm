@@ -72,22 +72,25 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return ctrl.Result{}, err
 	}
+	labels := helmChartProxy.GetLabels()
+	log.V(2).Info("HelmChartProxy labels are", "labels", labels)
 
-	log.Info("Getting list of clusters")
+	log.V(2).Info("Getting list of clusters")
 	clusterList, err := listClusters(ctx, r.Client)
 	if err != nil {
 		log.Error(err, "Failed to get list of clusters")
 	}
 	if clusterList == nil {
-		log.Info("No clusters found")
+		log.V(2).Info("No clusters found")
 	}
 	for _, cluster := range clusterList.Items {
-		log.Info("Found cluster", "name", cluster.Name)
+		log.V(2).Info("Found cluster", "name", cluster.Name)
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmChartProxy.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("ENTERING DELETION TIMESTAMP")
+		// TODO: this is entering when it shouldn't
+		log.V(2).Info("ENTERING DELETION TIMESTAMP")
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
@@ -118,7 +121,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
+	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -152,44 +155,44 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	releases, err := listHelmReleases(ctx)
 	if err != nil {
-		log.Info("Error listing releases", "err", err)
+		log.V(2).Info("Error listing releases", "err", err)
 	}
-	log.Info("Querying existing releases:")
+	log.V(2).Info("Querying existing releases:")
 	for _, release := range releases {
-		log.Info("Release name", "name", release.Name)
+		log.V(2).Info("Release name", "name", release.Name)
 	}
 
 	existing, err := getHelmRelease(ctx, helmChartProxy.Spec)
 	if err != nil {
 		if err.Error() == "release: not found" {
 			// Go ahead and create chart
-			log.Info("Error getting chart:", err)
+			log.V(2).Info("Error getting chart:", err)
 			release, err := installHelmRelease(ctx, helmChartProxy.Spec)
 			if err != nil {
-				log.Info("Error installing chart with Helm:", err)
+				log.V(2).Info("Error installing chart with Helm:", err)
 				return err
 			}
 			if release != nil {
-				log.Info(fmt.Sprintf("Release '%s' successfully installed\n", release.Name))
+				log.V(2).Info(fmt.Sprintf("Release '%s' successfully installed\n", release.Name))
 			}
 
 			return nil
 		}
 
-		log.Info("Error getting chart:", err)
+		log.V(2).Info("Error getting chart:", err)
 		return err
 	}
 
 	if existing != nil {
 		// TODO: add logic for updating an existing release
-		log.Info(fmt.Sprintf("Release '%s' already installed, running upgrade\n", existing.Name))
+		log.V(2).Info(fmt.Sprintf("Release '%s' already installed, running upgrade\n", existing.Name))
 		release, err := upgradeHelmRelease(ctx, helmChartProxy.Spec)
 		if err != nil {
-			log.Info("Error upgrading chart with Helm:", err)
+			log.V(2).Info("Error upgrading chart with Helm:", err)
 			return err
 		}
 		if release != nil {
-			log.Info(fmt.Sprintf("Release '%s' successfully upgraded\n", release.Name))
+			log.V(2).Info(fmt.Sprintf("Release '%s' successfully upgraded\n", release.Name))
 		}
 	}
 
@@ -211,15 +214,15 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.Info("Prepared to uninstall chart spec", helmChartProxy.Spec)
+	log.V(2).Info("Prepared to uninstall chart spec", helmChartProxy.Spec)
 
 	response, err := uninstallHelmRelease(ctx, helmChartProxy.Spec)
 	if err != nil {
-		log.Info("Error uninstalling chart with Helm:", err)
+		log.V(2).Info("Error uninstalling chart with Helm:", err)
 	}
 
 	if response != nil && response.Info != "" {
-		log.Info(fmt.Sprintf("Response is %s\n", response.Info))
+		log.V(2).Info(fmt.Sprintf("Response is %s\n", response.Info))
 	}
 
 	return nil
@@ -228,7 +231,7 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 func helmInit(ctx context.Context) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
 	log := ctrl.LoggerFrom(ctx)
 	logf := func(format string, v ...interface{}) {
-		log.Info(fmt.Sprintf(format, v...))
+		log.V(4).Info(fmt.Sprintf(format, v...))
 	}
 
 	settings := helmCli.New()
@@ -253,7 +256,7 @@ func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	installer.Version = spec.Version
 	installer.Namespace = "default"
 	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.Info("Located chart at path", "path", cp)
+	log.V(2).Info("Located chart at path", "path", cp)
 	if err != nil {
 		return nil, err
 	}
@@ -274,13 +277,13 @@ func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Installing with Helm...")
+	log.V(2).Info("Installing with Helm...")
 	release, err := installer.RunWithContext(ctx, chartRequested, vals)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info("Released", "name", release.Name)
+	log.V(2).Info("Released", "name", release.Name)
 
 	return release, nil
 }
@@ -298,7 +301,7 @@ func upgradeHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	upgrader.Version = spec.Version
 	upgrader.Namespace = "default"
 	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.Info("Located chart at path", "path", cp)
+	log.V(2).Info("Located chart at path", "path", cp)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +322,7 @@ func upgradeHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Upgrading with Helm...")
+	log.V(2).Info("Upgrading with Helm...")
 	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
 	if err != nil {
 		return nil, err
