@@ -33,6 +33,8 @@ import (
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 	"cluster-api-addon-helm/controllers"
+
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -72,10 +74,12 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	scheme := mgr.GetScheme()
+	_ = clusterv1.AddToScheme(scheme)
 
 	if err = (&controllers.HelmChartProxyReconciler{
 		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Scheme: scheme,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChartProxy")
 		os.Exit(1)

@@ -29,10 +29,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
+
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
+	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 )
 
 // HelmChartProxyReconciler reconciles a HelmChartProxy object
@@ -68,8 +73,21 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
+	log.Info("Getting list of clusters")
+	clusterList, err := listClusters(ctx, r.Client)
+	if err != nil {
+		log.Error(err, "Failed to get list of clusters")
+	}
+	if clusterList == nil {
+		log.Info("No clusters found")
+	}
+	for _, cluster := range clusterList.Items {
+		log.Info("Found cluster", "name", cluster.Name)
+	}
+
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmChartProxy.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("ENTERING DELETION TIMESTAMP")
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
@@ -101,7 +119,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	log.Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
-	err := r.reconcileNormal(ctx, helmChartProxy)
+	err = r.reconcileNormal(ctx, helmChartProxy)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -114,6 +132,18 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonsv1beta1.HelmChartProxy{}).
 		Complete(r)
+}
+
+func listClusters(ctx context.Context, c client.Client) (*clusterv1.ClusterList, error) {
+	clusterList := &clusterv1.ClusterList{}
+	// labels := map[string]string{clusterv1.ClusterLabelName: name}
+
+	if err := c.List(ctx, clusterList); err != nil {
+		// if err := c.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+
+	return clusterList, nil
 }
 
 // reconcileNormal...
@@ -165,6 +195,17 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	return nil
 }
+
+// func shouldUpdateHelmRelease(existing *release.Release, spec *addonsv1beta1.HelmChartProxySpec) bool {
+// 	if existing == nil {
+// 		return false
+// 	}
+
+// 	// if spec.RepoURL != existing.Chart.Repo {
+// 	// 	return true
+// 	// }
+// 	return true
+// }
 
 // reconcileDelete...
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
