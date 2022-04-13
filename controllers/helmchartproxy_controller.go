@@ -72,11 +72,12 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return ctrl.Result{}, err
 	}
+
 	labels := helmChartProxy.GetLabels()
 	log.V(2).Info("HelmChartProxy labels are", "labels", labels)
 
-	log.V(2).Info("Getting list of clusters")
-	clusterList, err := listClusters(ctx, r.Client)
+	log.V(2).Info("Getting list of clusters with labels")
+	clusterList, err := listClustersWithLabels(ctx, r.Client, labels)
 	if err != nil {
 		log.Error(err, "Failed to get list of clusters")
 	}
@@ -137,11 +138,11 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func listClusters(ctx context.Context, c client.Client) (*clusterv1.ClusterList, error) {
+func listClustersWithLabels(ctx context.Context, c client.Client, labels map[string]string) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
 	// labels := map[string]string{clusterv1.ClusterLabelName: name}
 
-	if err := c.List(ctx, clusterList); err != nil {
+	if err := c.List(ctx, clusterList, client.MatchingLabels(labels)); err != nil {
 		// if err := c.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
