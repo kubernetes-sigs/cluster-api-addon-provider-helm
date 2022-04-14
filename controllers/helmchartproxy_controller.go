@@ -146,7 +146,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	log := ctrl.LoggerFrom(ctx)
 
 	for _, cluster := range clusters {
-		kubeconfigPath, err := getClusterKubeconfig(ctx, &cluster)
+		kubeconfigPath, err := writeClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
 			return err
@@ -217,7 +217,7 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	log := ctrl.LoggerFrom(ctx)
 
 	for _, cluster := range clusters {
-		kubeconfigPath, err := getClusterKubeconfig(ctx, &cluster)
+		kubeconfigPath, err := writeClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
 			return err

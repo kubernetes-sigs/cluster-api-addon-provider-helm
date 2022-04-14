@@ -35,7 +35,7 @@ import (
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 )
 
-func getClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
+func writeClusterKubeconfigToFile(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	c, err := client.New("")
 	if err != nil {
@@ -56,10 +56,17 @@ func getClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (stri
 	}
 	log.V(4).Info("cluster", "cluster", cluster.Name, "kubeconfig is:", kubeconfig)
 
-	path := "tmp/" + cluster.Name
-	f, err := os.Create(path)
+	path := "tmp"
+	filePath := path + "/" + cluster.Name
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir(path, os.ModePerm)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to create directory %s", path)
+		}
+	}
+	f, err := os.Create(filePath)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "failed to create file %s", filePath)
 	}
 
 	log.V(4).Info("Writing kubeconfig to file", "cluster", cluster.Name)
@@ -74,7 +81,7 @@ func getClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (stri
 	}
 
 	log.V(4).Info("Path is", "path", path)
-	return path, nil
+	return filePath, nil
 }
 
 func helmInit(ctx context.Context, kubeconfigPath string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
