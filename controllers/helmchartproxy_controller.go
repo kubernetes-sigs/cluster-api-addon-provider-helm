@@ -23,20 +23,19 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 )
 
 // HelmChartProxyReconciler reconciles a HelmChartProxy object
 type HelmChartProxyReconciler struct {
-	client.Client
+	ctrlClient.Client
 	Scheme *runtime.Scheme
 }
 
@@ -84,8 +83,6 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmChartProxy.ObjectMeta.DeletionTimestamp.IsZero() {
-		// TODO: this is entering when it shouldn't
-		log.V(2).Info("ENTERING DELETION TIMESTAMP")
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
@@ -99,7 +96,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmChartProxy, finalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.reconcileDelete(ctx, helmChartProxy); err != nil {
+			if err := r.reconcileDelete(ctx, helmChartProxy, clusterList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				return ctrl.Result{}, err
@@ -117,7 +114,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
-	err = r.reconcileNormal(ctx, helmChartProxy)
+	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -132,12 +129,12 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func listClustersWithLabels(ctx context.Context, c client.Client, labels map[string]string) (*clusterv1.ClusterList, error) {
+func listClustersWithLabels(ctx context.Context, c ctrlClient.Client, labels map[string]string) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
 	// labels := map[string]string{clusterv1.ClusterLabelName: name}
 
-	if err := c.List(ctx, clusterList, client.MatchingLabels(labels)); err != nil {
-		// if err := c.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
+	if err := c.List(ctx, clusterList, ctrlClient.MatchingLabels(labels)); err != nil {
+		// if err := c.List(ctx, clusterList, ctrlClient.InNamespace(namespace), ctrlClient.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 
@@ -145,49 +142,70 @@ func listClustersWithLabels(ctx context.Context, c client.Client, labels map[str
 }
 
 // reconcileNormal...
-func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
+func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	releases, err := listHelmReleases(ctx)
+	for _, cluster := range clusters {
+		kubeconfigPath, err := getClusterKubeconfig(ctx, &cluster)
+		if err != nil {
+			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
+			return err
+		}
+		err = r.reconcileCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
+		if err != nil {
+			log.Error(err, "failed to reconcile chart on cluster", "cluster", cluster.Name)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, kubeconfigPath string) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Reconciling HelmChartProxy", "proxy", helmChartProxy.Name, "on cluster", "name", cluster.Name)
+
+	releases, err := listHelmReleases(ctx, kubeconfigPath)
 	if err != nil {
 		log.V(2).Info("Error listing releases", "err", err)
 	}
 	log.V(2).Info("Querying existing releases:")
 	for _, release := range releases {
-		log.V(2).Info("Release name", "name", release.Name)
+		log.V(2).Info("Release name", "name", release.Name, "installed on", "cluster", cluster.Name)
 	}
 
-	existing, err := getHelmRelease(ctx, helmChartProxy.Spec)
+	existing, err := getHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 	if err != nil {
+		log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
+
 		if err.Error() == "release: not found" {
 			// Go ahead and create chart
-			log.V(2).Info("Error getting chart:", err)
-			release, err := installHelmRelease(ctx, helmChartProxy.Spec)
+			release, err := installHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 			if err != nil {
-				log.V(2).Info("Error installing chart with Helm:", err)
+				log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", cluster.Name)
 				return err
 			}
 			if release != nil {
-				log.V(2).Info(fmt.Sprintf("Release '%s' successfully installed\n", release.Name))
+				log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s\n", release.Name, cluster.Name)))
 			}
 
 			return nil
 		}
 
-		log.V(2).Info("Error getting chart:", err)
 		return err
 	}
 
 	if existing != nil {
 		// TODO: add logic for updating an existing release
-		log.V(2).Info(fmt.Sprintf("Release '%s' already installed, running upgrade\n", existing.Name))
-		release, err := upgradeHelmRelease(ctx, helmChartProxy.Spec)
+		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade\n", existing.Name, cluster.Name))
+		release, err := upgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 		if err != nil {
-			log.V(2).Info("Error upgrading chart with Helm:", err)
+			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
 			return err
 		}
 		if release != nil {
-			log.V(2).Info(fmt.Sprintf("Release '%s' successfully upgraded\n", release.Name))
+			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s\n", release.Name, cluster.Name)))
 		}
 	}
 
@@ -195,16 +213,36 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 }
 
 // reconcileDelete...
-func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
+func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Prepared to uninstall chart spec", helmChartProxy.Spec)
+	for _, cluster := range clusters {
+		kubeconfigPath, err := getClusterKubeconfig(ctx, &cluster)
+		if err != nil {
+			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
+			return err
+		}
+		err = r.reconcileDeleteCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
+		if err != nil {
+			log.Error(err, "failed to delete chart on cluster", "cluster", cluster.Name)
+			return err
+		}
+	}
 
-	response, err := uninstallHelmRelease(ctx, helmChartProxy.Spec)
+	return nil
+}
+
+func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters *clusterv1.Cluster, kubeconfigPath string) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Prepared to uninstall chart spec", "spec", helmChartProxy.Name, "on cluster", "name", clusters.Name)
+
+	response, err := uninstallHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 	if err != nil {
 		log.V(2).Info("Error uninstalling chart with Helm:", err)
 	}
 
+	log.V(2).Info("Successfully uninstalled chart spec", "spec", helmChartProxy.Name, "on cluster", "name", clusters.Name)
 	if response != nil && response.Info != "" {
 		log.V(2).Info(fmt.Sprintf("Response is %s\n", response.Info))
 	}

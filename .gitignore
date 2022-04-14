@@ -23,3 +23,7 @@ testbin/*
 *.swp
 *.swo
 *~
+`
+
+# Temp files
+tmp/

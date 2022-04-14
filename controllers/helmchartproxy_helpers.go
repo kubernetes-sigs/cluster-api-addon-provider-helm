@@ -19,25 +19,72 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/pkg/errors"
 	helmAction "helm.sh/helm/v3/pkg/action"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/release"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 )
 
-func helmInit(ctx context.Context) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
+func getClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	c, err := client.New("")
+	if err != nil {
+		return "", err
+	}
+
+	options := client.GetKubeconfigOptions{
+		Kubeconfig: client.Kubeconfig{},
+		// Kubeconfig:          client.Kubeconfig{Path: gk.kubeconfig, Context: gk.kubeconfigContext},
+		WorkloadClusterName: cluster.Name,
+		Namespace:           cluster.Namespace,
+	}
+
+	log.V(4).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
+	kubeconfig, err := c.GetKubeconfig(options)
+	if err != nil {
+		return "", err
+	}
+	log.V(4).Info("cluster", "cluster", cluster.Name, "kubeconfig is:", kubeconfig)
+
+	path := "tmp/" + cluster.Name
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+
+	log.V(4).Info("Writing kubeconfig to file", "cluster", cluster.Name)
+	_, err = f.WriteString(kubeconfig)
+	if err != nil {
+		f.Close()
+		return "", errors.Wrapf(err, "failed to close kubeconfig file")
+	}
+	err = f.Close()
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to close kubeconfig file")
+	}
+
+	log.V(4).Info("Path is", "path", path)
+	return path, nil
+}
+
+func helmInit(ctx context.Context, kubeconfigPath string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
 	log := ctrl.LoggerFrom(ctx)
 	logf := func(format string, v ...interface{}) {
 		log.V(4).Info(fmt.Sprintf(format, v...))
 	}
 
 	settings := helmCli.New()
+	settings.KubeConfig = kubeconfigPath
 	actionConfig := new(helmAction.Configuration)
 	if err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", logf); err != nil {
 		return nil, nil, err
@@ -46,10 +93,10 @@ func helmInit(ctx context.Context) (*helmCli.EnvSettings, *helmAction.Configurat
 	return settings, actionConfig, nil
 }
 
-func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+func installHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := helmInit(ctx)
+	settings, actionConfig, err := helmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -92,10 +139,10 @@ func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 }
 
 // This function will be refactored to differentiate from installHelmRelease()
-func upgradeHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+func upgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := helmInit(ctx)
+	settings, actionConfig, err := helmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +181,8 @@ func upgradeHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySp
 	return release, nil
 }
 
-func getHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
-	_, actionConfig, err := helmInit(ctx)
+func getHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+	_, actionConfig, err := helmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +195,8 @@ func getHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) 
 	return release, nil
 }
 
-func listHelmReleases(ctx context.Context) ([]*release.Release, error) {
-	_, actionConfig, err := helmInit(ctx)
+func listHelmReleases(ctx context.Context, kubeconfigPath string) ([]*release.Release, error) {
+	_, actionConfig, err := helmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +209,8 @@ func listHelmReleases(ctx context.Context) ([]*release.Release, error) {
 	return releases, nil
 }
 
-func uninstallHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.UninstallReleaseResponse, error) {
-	_, actionConfig, err := helmInit(ctx)
+func uninstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.UninstallReleaseResponse, error) {
+	_, actionConfig, err := helmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
