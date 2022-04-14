@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,6 +30,7 @@ import (
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 
+	unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
@@ -151,6 +154,26 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
 			return err
 		}
+
+		bytes, err := json.MarshalIndent(cluster, "", "  ")
+		if err != nil {
+			log.Error(err, "failed to marshal cluster", "cluster", cluster.Name)
+		}
+		log.V(2).Info("JSON cluster:")
+		fmt.Println(string(bytes))
+		objectMap := map[string]interface{}{}
+		json.Unmarshal(bytes, &objectMap)
+		log.V(2).Info("JSON cluster:", "objectMap", objectMap)
+
+		clusterName, found, err := unstructured.NestedString(objectMap, "metadata", "name")
+		if err != nil {
+			return errors.Wrapf(err, "failed to get cluster name from cluster object")
+		}
+		if !found {
+			return errors.New("failed to get cluster name from cluster object")
+		}
+		log.V(2).Info("Cluster Field metadata.name is", "name", clusterName)
+
 		err = r.reconcileCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
 		if err != nil {
 			log.Error(err, "failed to reconcile chart on cluster", "cluster", cluster.Name)
