@@ -10,4 +10,5 @@ spec:
   chartName: ingress-nginx
   values:
     "controller.scope.namespace": "default"
+    # "controller.scope.namespace": "{{ Cluster.Namespace }}"
     # "infra.clusterName": "{{Cluster.Name}}"

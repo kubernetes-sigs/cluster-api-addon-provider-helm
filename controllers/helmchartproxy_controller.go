@@ -20,12 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	helmAction "helm.sh/helm/v3/pkg/action"
-	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
-	helmCli "helm.sh/helm/v3/pkg/cli"
-	helmVals "helm.sh/helm/v3/pkg/cli/values"
-	helmGetter "helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/release"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -200,17 +194,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	return nil
 }
 
-// func shouldUpdateHelmRelease(existing *release.Release, spec *addonsv1beta1.HelmChartProxySpec) bool {
-// 	if existing == nil {
-// 		return false
-// 	}
-
-// 	// if spec.RepoURL != existing.Chart.Repo {
-// 	// 	return true
-// 	// }
-// 	return true
-// }
-
 // reconcileDelete...
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
 	log := ctrl.LoggerFrom(ctx)
@@ -227,150 +210,4 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	}
 
 	return nil
-}
-
-func helmInit(ctx context.Context) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
-	log := ctrl.LoggerFrom(ctx)
-	logf := func(format string, v ...interface{}) {
-		log.V(4).Info(fmt.Sprintf(format, v...))
-	}
-
-	settings := helmCli.New()
-	actionConfig := new(helmAction.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", logf); err != nil {
-		return nil, nil, err
-	}
-
-	return settings, actionConfig, nil
-}
-
-func installHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	settings, actionConfig, err := helmInit(ctx)
-	if err != nil {
-		return nil, err
-	}
-	installer := helmAction.NewInstall(actionConfig)
-	installer.RepoURL = spec.RepoURL
-	installer.ReleaseName = spec.ReleaseName
-	installer.Version = spec.Version
-	installer.Namespace = "default"
-	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.V(2).Info("Located chart at path", "path", cp)
-	if err != nil {
-		return nil, err
-	}
-	p := helmGetter.All(settings)
-	specValues := make([]string, len(spec.Values))
-	for k, v := range spec.Values {
-		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
-	}
-	valueOpts := &helmVals.Options{
-		Values: specValues,
-	}
-	vals, err := valueOpts.MergeValues(p)
-	if err != nil {
-		return nil, err
-	}
-	chartRequested, err := helmLoader.Load(cp)
-
-	if err != nil {
-		return nil, err
-	}
-	log.V(2).Info("Installing with Helm...")
-	release, err := installer.RunWithContext(ctx, chartRequested, vals)
-	if err != nil {
-		return nil, err
-	}
-
-	log.V(2).Info("Released", "name", release.Name)
-
-	return release, nil
-}
-
-// This function will be refactored to differentiate from installHelmRelease()
-func upgradeHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
-	log := ctrl.LoggerFrom(ctx)
-
-	settings, actionConfig, err := helmInit(ctx)
-	if err != nil {
-		return nil, err
-	}
-	upgrader := helmAction.NewUpgrade(actionConfig)
-	upgrader.RepoURL = spec.RepoURL
-	upgrader.Version = spec.Version
-	upgrader.Namespace = "default"
-	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.V(2).Info("Located chart at path", "path", cp)
-	if err != nil {
-		return nil, err
-	}
-	p := helmGetter.All(settings)
-	specValues := make([]string, len(spec.Values))
-	for k, v := range spec.Values {
-		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
-	}
-	valueOpts := &helmVals.Options{
-		Values: specValues,
-	}
-	vals, err := valueOpts.MergeValues(p)
-	if err != nil {
-		return nil, err
-	}
-	chartRequested, err := helmLoader.Load(cp)
-
-	if err != nil {
-		return nil, err
-	}
-	log.V(2).Info("Upgrading with Helm...")
-	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
-	if err != nil {
-		return nil, err
-	}
-
-	return release, nil
-}
-
-func getHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
-	_, actionConfig, err := helmInit(ctx)
-	if err != nil {
-		return nil, err
-	}
-	getter := helmAction.NewGet(actionConfig)
-	release, err := getter.Run(spec.ReleaseName)
-	if err != nil {
-		return nil, err
-	}
-
-	return release, nil
-}
-
-func listHelmReleases(ctx context.Context) ([]*release.Release, error) {
-	_, actionConfig, err := helmInit(ctx)
-	if err != nil {
-		return nil, err
-	}
-	lister := helmAction.NewList(actionConfig)
-	releases, err := lister.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	return releases, nil
-}
-
-func uninstallHelmRelease(ctx context.Context, spec addonsv1beta1.HelmChartProxySpec) (*release.UninstallReleaseResponse, error) {
-	_, actionConfig, err := helmInit(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	uninstaller := helmAction.NewUninstall(actionConfig)
-	response, err := uninstaller.Run(spec.ReleaseName)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
 }
