@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	helmAction "helm.sh/helm/v3/pkg/action"
@@ -28,11 +30,16 @@ import (
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/release"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	"sigs.k8s.io/cluster-api/controllers/external"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func writeClusterKubeconfigToFile(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
@@ -84,6 +91,72 @@ func writeClusterKubeconfigToFile(ctx context.Context, cluster *clusterv1.Cluste
 	return filePath, nil
 }
 
+func parseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) ([]string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	specValues := make([]string, len(spec.Values))
+	for k, v := range spec.Values {
+		r := regexp.MustCompile(`{{(.+?)}}`)
+		matches := r.FindAllStringSubmatch(v, -1)
+		for _, match := range matches {
+			log.V(3).Info("Match is", "match", match)
+			token := match[0]
+			fieldPath := strings.Split(strings.TrimSpace(match[1]), ".")
+			if len(fieldPath) > 1 && fieldPath[0] == "cluster" {
+				log.V(3).Info("Getting cluster field", "fieldpath", fieldPath)
+				field, err := getClusterField(ctx, c, cluster, fieldPath[1:])
+				if err != nil {
+					log.Error(err, "Failed to get cluster field", "fieldpath", fieldPath)
+					return nil, err
+				}
+				log.V(3).Info("Field is", "field", field)
+				v = strings.Replace(v, token, field, 1)
+				log.V(3).Info("Resolved field", "field", fieldPath[1:], "to value", field)
+				log.V(3).Info("Value is now", "value", v)
+			}
+
+		}
+
+		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return specValues, nil
+}
+
+func getCustomResource(ctx context.Context, c ctrlClient.Client, kind string, apiVersion string, namespace string, name string) (*unstructured.Unstructured, error) {
+	objectRef := corev1.ObjectReference{
+		Kind:       kind,
+		Namespace:  namespace,
+		Name:       name,
+		APIVersion: apiVersion,
+	}
+	object, err := external.Get(context.TODO(), c, &objectRef, namespace)
+	if err != nil {
+		return nil, nil
+	}
+
+	return object, nil
+}
+
+func getClusterField(ctx context.Context, c ctrlClient.Client, cluster *clusterv1.Cluster, fields []string) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	object, err := getCustomResource(ctx, c, cluster.Kind, cluster.APIVersion, cluster.Namespace, cluster.Name)
+	if err != nil {
+		return "", err
+	}
+	objectMap := object.UnstructuredContent()
+	field, found, err := unstructured.NestedString(objectMap, fields...)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get cluster name from cluster object")
+	}
+	if !found {
+		return "", errors.New("failed to get cluster name from cluster object")
+	}
+	log.V(2).Info("Resolved cluster field to", "field", fields, "value", field)
+
+	return field, nil
+}
+
 func helmInit(ctx context.Context, kubeconfigPath string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
 	log := ctrl.LoggerFrom(ctx)
 	logf := func(format string, v ...interface{}) {
@@ -100,7 +173,7 @@ func helmInit(ctx context.Context, kubeconfigPath string) (*helmCli.EnvSettings,
 	return settings, actionConfig, nil
 }
 
-func installHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+func installHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, parsedValues []string) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := helmInit(ctx, kubeconfigPath)
@@ -118,12 +191,12 @@ func installHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 		return nil, err
 	}
 	p := helmGetter.All(settings)
-	specValues := make([]string, len(spec.Values))
-	for k, v := range spec.Values {
-		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
-	}
+	// specValues := make([]string, len(spec.Values))
+	// for k, v := range spec.Values {
+	// 	specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
+	// }
 	valueOpts := &helmVals.Options{
-		Values: specValues,
+		Values: parsedValues,
 	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
@@ -146,7 +219,7 @@ func installHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 }
 
 // This function will be refactored to differentiate from installHelmRelease()
-func upgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+func upgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, parsedValues []string) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := helmInit(ctx, kubeconfigPath)
@@ -163,12 +236,12 @@ func upgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 		return nil, err
 	}
 	p := helmGetter.All(settings)
-	specValues := make([]string, len(spec.Values))
-	for k, v := range spec.Values {
-		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
-	}
+	// specValues := make([]string, len(spec.Values))
+	// for k, v := range spec.Values {
+	// 	specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
+	// }
 	valueOpts := &helmVals.Options{
-		Values: specValues,
+		Values: parsedValues,
 	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {

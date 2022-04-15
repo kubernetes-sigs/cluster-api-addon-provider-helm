@@ -18,10 +18,8 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,7 +28,6 @@ import (
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 
-	unstructured "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
@@ -73,7 +70,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(2).Info("HelmChartProxy labels are", "labels", labels)
 
 	log.V(2).Info("Getting list of clusters with labels")
-	clusterList, err := listClustersWithLabels(ctx, r.Client, labels)
+	clusterList, err := r.listClustersWithLabels(ctx, labels)
 	if err != nil {
 		log.Error(err, "Failed to get list of clusters")
 	}
@@ -132,18 +129,6 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func listClustersWithLabels(ctx context.Context, c ctrlClient.Client, labels map[string]string) (*clusterv1.ClusterList, error) {
-	clusterList := &clusterv1.ClusterList{}
-	// labels := map[string]string{clusterv1.ClusterLabelName: name}
-
-	if err := c.List(ctx, clusterList, ctrlClient.MatchingLabels(labels)); err != nil {
-		// if err := c.List(ctx, clusterList, ctrlClient.InNamespace(namespace), ctrlClient.MatchingLabels(labels)); err != nil {
-		return nil, err
-	}
-
-	return clusterList, nil
-}
-
 // reconcileNormal...
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
@@ -154,25 +139,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
 			return err
 		}
-
-		bytes, err := json.MarshalIndent(cluster, "", "  ")
-		if err != nil {
-			log.Error(err, "failed to marshal cluster", "cluster", cluster.Name)
-		}
-		log.V(2).Info("JSON cluster:")
-		fmt.Println(string(bytes))
-		objectMap := map[string]interface{}{}
-		json.Unmarshal(bytes, &objectMap)
-		log.V(2).Info("JSON cluster:", "objectMap", objectMap)
-
-		clusterName, found, err := unstructured.NestedString(objectMap, "metadata", "name")
-		if err != nil {
-			return errors.Wrapf(err, "failed to get cluster name from cluster object")
-		}
-		if !found {
-			return errors.New("failed to get cluster name from cluster object")
-		}
-		log.V(2).Info("Cluster Field metadata.name is", "name", clusterName)
 
 		err = r.reconcileCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
 		if err != nil {
@@ -198,13 +164,18 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 		log.V(2).Info("Release name", "name", release.Name, "installed on", "cluster", cluster.Name)
 	}
 
+	values, err := parseValues(ctx, r.Client, kubeconfigPath, helmChartProxy.Spec, cluster)
+	if err != nil {
+		log.Error(err, "failed to parse values", "cluster", cluster.Name)
+	}
+
 	existing, err := getHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 	if err != nil {
 		log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
 
 		if err.Error() == "release: not found" {
 			// Go ahead and create chart
-			release, err := installHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
+			release, err := installHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
 			if err != nil {
 				log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", cluster.Name)
 				return err
@@ -222,7 +193,7 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 	if existing != nil {
 		// TODO: add logic for updating an existing release
 		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade\n", existing.Name, cluster.Name))
-		release, err := upgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
+		release, err := upgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
 		if err != nil {
 			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
 			return err
@@ -272,3 +243,50 @@ func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, h
 
 	return nil
 }
+
+func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, labels map[string]string) (*clusterv1.ClusterList, error) {
+	clusterList := &clusterv1.ClusterList{}
+	// labels := map[string]string{clusterv1.ClusterLabelName: name}
+
+	if err := r.Client.List(ctx, clusterList, ctrlClient.MatchingLabels(labels)); err != nil {
+		// if err := r.Client.List(ctx, clusterList, ctrlClient.InNamespace(namespace), ctrlClient.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+
+	return clusterList, nil
+}
+
+// func (r *HelmChartProxyReconciler) getCustomResource(ctx context.Context, kind string, apiVersion string, namespace string, name string) (*unstructured.Unstructured, error) {
+// 	objectRef := corev1.ObjectReference{
+// 		Kind:       kind,
+// 		Namespace:  namespace,
+// 		Name:       name,
+// 		APIVersion: apiVersion,
+// 	}
+// 	object, err := external.Get(context.TODO(), r.Client, &objectRef, namespace)
+// 	if err != nil {
+// 		return nil, nil
+// 	}
+
+// 	return object, nil
+// }
+
+// func (r *HelmChartProxyReconciler) getClusterField(ctx context.Context, cluster *clusterv1.Cluster, fields []string) (string, error) {
+// 	log := ctrl.LoggerFrom(ctx)
+
+// 	object, err := r.getCustomResource(ctx, cluster.Kind, cluster.APIVersion, cluster.Namespace, cluster.Name)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	objectMap := object.UnstructuredContent()
+// 	field, found, err := unstructured.NestedString(objectMap, fields...)
+// 	if err != nil {
+// 		return "", errors.Wrapf(err, "failed to get cluster name from cluster object")
+// 	}
+// 	if !found {
+// 		return "", errors.New("failed to get cluster name from cluster object")
+// 	}
+// 	log.V(2).Info("Cluster Field metadata.name is", "name", field)
+
+// 	return field, nil
+// }
