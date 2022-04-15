@@ -1,0 +1,14 @@
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: HelmChartProxy
+metadata:
+  name: cloud-provider-azure-helmchartproxy
+  labels: 
+    cloudProviderAzure: "true"
+spec:
+  releaseName: cloud-provider-azure
+  repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
+  chartName: cloud-provider-azure
+  values:
+    "infra.clusterName": "{{ Cluster.metadata.name }}"
+    # "controller.scope.namespace": "default"
+    # "controller.scope.namespace": "{{ Cluster.Namespace }}"

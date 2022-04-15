@@ -97,29 +97,54 @@ func parseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string
 	for k, v := range spec.Values {
 		r := regexp.MustCompile(`{{(.+?)}}`)
 		matches := r.FindAllStringSubmatch(v, -1)
-		for _, match := range matches {
-			log.V(3).Info("Match is", "match", match)
-			token := match[0]
-			fieldPath := strings.Split(strings.TrimSpace(match[1]), ".")
-			if len(fieldPath) > 1 && fieldPath[0] == "cluster" {
-				log.V(3).Info("Getting cluster field", "fieldpath", fieldPath)
-				field, err := getClusterField(ctx, c, cluster, fieldPath[1:])
-				if err != nil {
-					log.Error(err, "Failed to get cluster field", "fieldpath", fieldPath)
-					return nil, err
-				}
-				log.V(3).Info("Field is", "field", field)
-				v = strings.Replace(v, token, field, 1)
-				log.V(3).Info("Resolved field", "field", fieldPath[1:], "to value", field)
-				log.V(3).Info("Value is now", "value", v)
+		substitutions := make([]string, len(matches))
+		for i, match := range matches {
+			log.V(3).Info("Found match", "match", match)
+			// For {{ cluster.metadata.name }}, match[0] is {{ cluster.metadata.name }} and match[1] is ` cluster.metadata.name ` (including whitespace)
+			innerField := match[1]
+			substitution, err := lookUpSubstitution(ctx, c, cluster, innerField)
+			if err != nil {
+				return nil, err
 			}
-
+			substitutions[i] = substitution
 		}
-
-		specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
+		substitutedValue := substituteValues(ctx, v, matches, substitutions)
+		specValues = append(specValues, fmt.Sprintf("%s=%s", k, substitutedValue))
 	}
 
 	return specValues, nil
+}
+
+func lookUpSubstitution(ctx context.Context, c ctrlClient.Client, cluster *clusterv1.Cluster, field string) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	tokens := strings.Split(strings.TrimSpace(field), ".")
+	if len(tokens) < 2 {
+		return "", errors.Errorf("invalid field path %s, only kind identifier found", field)
+	}
+	kind := tokens[0]
+	fieldPath := tokens[1:]
+	switch kind {
+	case "Cluster":
+		fieldValue, err := getClusterField(ctx, c, cluster, fieldPath)
+		if err != nil {
+			log.Error(err, "Failed to get cluster field", "fieldpath", fieldPath)
+			return "", err
+		}
+		return fieldValue, nil
+	default:
+		return "", errors.Errorf("invalid field path %s, kind %s not supported", field, kind)
+	}
+
+}
+
+func substituteValues(ctx context.Context, value string, matches [][]string, substitutions []string) string {
+	for i, match := range matches {
+		toReplace := match[0]
+		value = strings.Replace(value, toReplace, substitutions[i], 1)
+	}
+
+	return value
 }
 
 func getCustomResource(ctx context.Context, c ctrlClient.Client, kind string, apiVersion string, namespace string, name string) (*unstructured.Unstructured, error) {

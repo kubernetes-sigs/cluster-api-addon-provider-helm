@@ -9,6 +9,6 @@ spec:
   repoURL: https://kubernetes.github.io/ingress-nginx
   chartName: ingress-nginx
   values:
-    "controller.scope.namespace": "{{ cluster.metadata.namespace }}"
+    "controller.scope.namespace": "{{ Cluster.metadata.namespace }}"
     # "controller.scope.namespace": "{{ Cluster.Namespace }}"
     # "infra.clusterName": "{{Cluster.Name}}"
