@@ -19,8 +19,11 @@ package internal
 import (
 	"context"
 	"fmt"
+	"reflect"
 
+	"github.com/pkg/errors"
 	helmAction "helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
@@ -65,10 +68,6 @@ func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 		return nil, err
 	}
 	p := helmGetter.All(settings)
-	// specValues := make([]string, len(spec.Values))
-	// for k, v := range spec.Values {
-	// 	specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
-	// }
 	valueOpts := &helmVals.Options{
 		Values: parsedValues,
 	}
@@ -93,12 +92,12 @@ func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 }
 
 // This function will be refactored to differentiate from installHelmRelease()
-func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, parsedValues []string) (*release.Release, error) {
+func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, parsedValues []string) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, kubeconfigPath)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	upgrader := helmAction.NewUpgrade(actionConfig)
 	upgrader.RepoURL = spec.RepoURL
@@ -107,32 +106,68 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
 	log.V(2).Info("Located chart at path", "path", cp)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	p := helmGetter.All(settings)
-	// specValues := make([]string, len(spec.Values))
-	// for k, v := range spec.Values {
-	// 	specValues = append(specValues, fmt.Sprintf("%s=%s", k, v))
-	// }
 	valueOpts := &helmVals.Options{
 		Values: parsedValues,
 	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	chartRequested, err := helmLoader.Load(cp)
-
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	log.V(2).Info("Upgrading with Helm...")
+	if chartRequested == nil {
+		return nil, false, errors.Errorf("failed to load request chart %s", spec.ChartName)
+	}
+
+	existing, err := GetHelmRelease(ctx, kubeconfigPath, spec)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to get existing release")
+	}
+
+	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, *chartRequested)
+	if err != nil {
+		return nil, false, err
+	}
+	if !shouldUpgrade {
+		log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried", spec.ReleaseName))
+		return existing, false, nil
+	}
+
+	log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
 	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return release, nil
+	return release, true, nil
+}
+
+func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, chartRequested chart.Chart) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	if existing.Chart == nil || existing.Chart.Metadata == nil {
+		return false, errors.New("Failed to resolve chart version of existing release")
+	}
+	if chartRequested.Metadata == nil {
+		return false, errors.New("Failed to resolve chart version of from helm repo")
+	}
+
+	log.V(3).Info("[TESTING] Comparing releases", "releasesAreEqual", reflect.DeepEqual(existing.Chart, chartRequested))
+
+	if existing.Chart.Metadata.Version != chartRequested.Metadata.Version {
+		log.V(3).Info("Values are different, upgrading")
+		return true, nil
+	}
+
+	log.V(3).Info("Existing chart values are", "values", existing.Chart.Values)
+	log.V(3).Info("Requested chart values are", "values", chartRequested.Values)
+
+	return !reflect.DeepEqual(existing.Chart.Values, chartRequested.Values), nil
 }
 
 func GetHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
@@ -177,14 +212,3 @@ func UninstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addon
 
 	return response, nil
 }
-
-// func ShouldUpdateHelmRelease(existing *release.Release, spec *addonsv1beta1.HelmChartProxySpec) bool {
-// 	if existing == nil {
-// 		return false
-// 	}
-
-// 	// if spec.RepoURL != existing.Chart.Repo {
-// 	// 	return true
-// 	// }
-// 	return true
-// }

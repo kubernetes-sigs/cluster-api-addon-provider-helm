@@ -194,12 +194,12 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 	if existing != nil {
 		// TODO: add logic for updating an existing release
 		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade\n", existing.Name, cluster.Name))
-		release, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
+		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
 		if err != nil {
 			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
 			return err
 		}
-		if release != nil {
+		if release != nil && upgraded {
 			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s\n", release.Name, cluster.Name)))
 		}
 	}
