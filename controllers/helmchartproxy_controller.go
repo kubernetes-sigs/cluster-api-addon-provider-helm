@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,7 +57,7 @@ const finalizer = "addons.cluster.x-k8s.io"
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
-func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Fetch the HelmChartProxy instance.
@@ -68,11 +69,15 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	labels := helmChartProxy.GetLabels()
-	log.V(2).Info("HelmChartProxy labels are", "labels", labels)
+	defer func() {
+		reterr = r.Status().Update(context.TODO(), helmChartProxy)
+	}()
+
+	labelSelector := helmChartProxy.Spec.Selector
+	log.V(2).Info("HelmChartProxy labels are", "labels", labelSelector)
 
 	log.V(2).Info("Getting list of clusters with labels")
-	clusterList, err := r.listClustersWithLabels(ctx, labels)
+	clusterList, err := r.listClustersWithLabels(ctx, labelSelector)
 	if err != nil {
 		// helmChartProxy.Status.FailureReason = errors.Wrapf(err, "failed to get list of clusters")
 		return ctrl.Result{}, err
@@ -102,10 +107,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.reconcileDelete(ctx, helmChartProxy, clusterList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
-				// helmChartProxy.Status.FailureReason = errors.Wrapf(err, "failed to get list of clusters")
+				helmChartProxy.Status.Ready = false
 				return ctrl.Result{}, err
 			}
 
+			helmChartProxy.Status.Ready = true
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmChartProxy, finalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
@@ -120,10 +126,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
 	if err != nil {
-		// helmChartProxy.Status.FailureReason = err
+		helmChartProxy.Status.Ready = false
 		return ctrl.Result{}, err
 	}
 
+	helmChartProxy.Status.Ready = true
 	return ctrl.Result{}, nil
 }
 
@@ -138,7 +145,6 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	helmChartProxy.Status.Ready = false
 	for _, cluster := range clusters {
 		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
@@ -152,8 +158,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			return err
 		}
 	}
-
-	helmChartProxy.Status.Ready = true
 
 	return nil
 }
@@ -220,7 +224,6 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	helmChartProxy.Status.Ready = false
 	for _, cluster := range clusters {
 		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
@@ -233,8 +236,6 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 			return err
 		}
 	}
-
-	helmChartProxy.Status.Ready = true
 
 	return nil
 }
@@ -258,12 +259,16 @@ func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, h
 	return nil
 }
 
-func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, labels map[string]string) (*clusterv1.ClusterList, error) {
+func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, labelSelector metav1.LabelSelector) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
-	// labels := map[string]string{clusterv1.ClusterLabelName: name}
+	labels := labelSelector.MatchLabels
+	// Empty labels should match nothing, not everything
+	if len(labels) == 0 {
+		return nil, nil
+	}
 
+	// TODO: should we use ctrlClient.MatchingLabels or try to use the labelSelector itself?
 	if err := r.Client.List(ctx, clusterList, ctrlClient.MatchingLabels(labels)); err != nil {
-		// if err := r.Client.List(ctx, clusterList, ctrlClient.InNamespace(namespace), ctrlClient.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 

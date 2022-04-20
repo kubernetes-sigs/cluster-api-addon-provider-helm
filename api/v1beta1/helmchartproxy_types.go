@@ -25,8 +25,10 @@ import (
 
 // HelmChartProxySpec defines the desired state of HelmChartProxy
 type HelmChartProxySpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Selector is a label selector for clusters. Existing Clusters selected by this will have the Helm chart installed.
+	Selector metav1.LabelSelector `json:"selector"`
 
 	// ReleaseName is the release name of the installed Helm chart.
 	ReleaseName string `json:"releaseName"`
