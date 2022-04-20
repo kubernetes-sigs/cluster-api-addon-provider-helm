@@ -61,6 +61,10 @@ spec:
             type: object
           status:
             description: HelmChartProxyStatus defines the observed state of HelmChartProxy
+            properties:
+              ready:
+                description: Ready is true when the provider resource is ready.
+                type: boolean
             type: object
         type: object
     served: true

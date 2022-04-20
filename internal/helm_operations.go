@@ -19,9 +19,10 @@ package internal
 import (
 	"context"
 	"fmt"
-	"reflect"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 	helmAction "helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
@@ -129,7 +130,7 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 		return nil, false, errors.Wrapf(err, "failed to get existing release")
 	}
 
-	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, *chartRequested)
+	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)
 	if err != nil {
 		return nil, false, err
 	}
@@ -139,7 +140,9 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 	}
 
 	log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
+	// upgrader.DryRun = true
 	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
+	fmt.Printf("DryRun config diff: %s", cmp.Diff(release.Config, existing.Config))
 	if err != nil {
 		return nil, false, err
 	}
@@ -147,27 +150,30 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 	return release, true, nil
 }
 
-func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, chartRequested chart.Chart) (bool, error) {
+func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	if existing.Chart == nil || existing.Chart.Metadata == nil {
 		return false, errors.New("Failed to resolve chart version of existing release")
 	}
-	if chartRequested.Metadata == nil {
-		return false, errors.New("Failed to resolve chart version of from helm repo")
-	}
-
-	log.V(3).Info("[TESTING] Comparing releases", "releasesAreEqual", reflect.DeepEqual(existing.Chart, chartRequested))
-
 	if existing.Chart.Metadata.Version != chartRequested.Metadata.Version {
-		log.V(3).Info("Values are different, upgrading")
+		log.V(3).Info("Versions are different, upgrading")
 		return true, nil
 	}
+	fmt.Printf("Got diff: %s", cmp.Diff(existing.Config, values))
 
-	log.V(3).Info("Existing chart values are", "values", existing.Chart.Values)
-	log.V(3).Info("Requested chart values are", "values", chartRequested.Values)
+	// TODO: Comparing yaml is not ideal, but it's the best we can do since DeepEquals fails. This is because int64 types
+	// are converted to float64 when returned from the helm API.
+	oldValues, err := yaml.Marshal(existing.Config)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to marshal existing release values")
+	}
+	newValues, err := yaml.Marshal(values)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to new release values")
+	}
 
-	return !reflect.DeepEqual(existing.Chart.Values, chartRequested.Values), nil
+	return !cmp.Equal(oldValues, newValues), nil
 }
 
 func GetHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {

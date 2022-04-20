@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -73,7 +74,8 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(2).Info("Getting list of clusters with labels")
 	clusterList, err := r.listClustersWithLabels(ctx, labels)
 	if err != nil {
-		log.Error(err, "Failed to get list of clusters")
+		// helmChartProxy.Status.FailureReason = errors.Wrapf(err, "failed to get list of clusters")
+		return ctrl.Result{}, err
 	}
 	if clusterList == nil {
 		log.V(2).Info("No clusters found")
@@ -100,6 +102,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.reconcileDelete(ctx, helmChartProxy, clusterList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
+				// helmChartProxy.Status.FailureReason = errors.Wrapf(err, "failed to get list of clusters")
 				return ctrl.Result{}, err
 			}
 
@@ -117,6 +120,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
 	if err != nil {
+		// helmChartProxy.Status.FailureReason = err
 		return ctrl.Result{}, err
 	}
 
@@ -134,6 +138,7 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
+	helmChartProxy.Status.Ready = false
 	for _, cluster := range clusters {
 		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
@@ -147,6 +152,8 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			return err
 		}
 	}
+
+	helmChartProxy.Status.Ready = true
 
 	return nil
 }
@@ -179,10 +186,11 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 			release, err := internal.InstallHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
 			if err != nil {
 				log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", cluster.Name)
-				return err
+				return errors.Wrapf(err, "failed to install chart on cluster %s", cluster.Name)
 			}
 			if release != nil {
 				log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s\n", release.Name, cluster.Name)))
+				// addClusterRefToStatusList(ctx, helmChartProxy, cluster)
 			}
 
 			return nil
@@ -197,10 +205,11 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
 		if err != nil {
 			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
-			return err
+			return errors.Wrapf(err, "error upgrading chart with Helm on cluster %s", cluster.Name)
 		}
 		if release != nil && upgraded {
 			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s\n", release.Name, cluster.Name)))
+			// addClusterRefToStatusList(ctx, helmChartProxy, cluster)
 		}
 	}
 
@@ -211,11 +220,12 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
+	helmChartProxy.Status.Ready = false
 	for _, cluster := range clusters {
 		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
-			return err
+			return errors.Wrapf(err, "failed to get kubeconfig for cluster %s", cluster.Name)
 		}
 		err = r.reconcileDeleteCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
 		if err != nil {
@@ -223,6 +233,8 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 			return err
 		}
 	}
+
+	helmChartProxy.Status.Ready = true
 
 	return nil
 }
@@ -235,6 +247,7 @@ func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, h
 	response, err := internal.UninstallHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 	if err != nil {
 		log.V(2).Info("Error uninstalling chart with Helm:", err)
+		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", clusters.Name)
 	}
 
 	log.V(2).Info("Successfully uninstalled chart spec", "spec", helmChartProxy.Name, "on cluster", "name", clusters.Name)
@@ -256,3 +269,16 @@ func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, l
 
 	return clusterList, nil
 }
+
+// func addClusterRefToStatusList(ctx context.Context, proxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster) {
+// 	if proxy.Status.InstalledClusters == nil {
+// 		proxy.Status.InstalledClusters = make([]corev1.ObjectReference, 1)
+// 	}
+
+// 	proxy.Status.InstalledClusters = append(proxy.Status.InstalledClusters, corev1.ObjectReference{
+// 		Kind:       cluster.Kind,
+// 		APIVersion: cluster.APIVersion,
+// 		Name:       cluster.Name,
+// 		Namespace:  cluster.Namespace,
+// 	})
+// }

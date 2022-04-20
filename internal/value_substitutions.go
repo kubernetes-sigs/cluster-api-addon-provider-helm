@@ -50,6 +50,7 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string
 		substitutedValue := SubstituteValues(ctx, v, matches, substitutions)
 		specValues = append(specValues, fmt.Sprintf("%s=%s", k, substitutedValue))
 	}
+	log.V(3).Info("Values", "values", specValues)
 
 	return specValues, nil
 }
