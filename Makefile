@@ -1,6 +1,7 @@
 
+REGISTRY ?= jont828
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= helmchartproxy-controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 
@@ -71,11 +72,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker build -t ${REGISTRY}/${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	docker push ${REGISTRY}/${IMG}
 
 ##@ Deployment
 

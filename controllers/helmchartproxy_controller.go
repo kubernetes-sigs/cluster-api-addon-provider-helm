@@ -127,6 +127,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
 	if err != nil {
 		helmChartProxy.Status.Ready = false
+		// helmChartProxy.Status.FailureReason = err.Error()
 		return ctrl.Result{}, err
 	}
 

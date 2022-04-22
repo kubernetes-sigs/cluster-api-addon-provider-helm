@@ -54,6 +54,10 @@ type HelmChartProxyStatus struct {
 	// Ready is true when the provider resource is ready.
 	// +optional
 	Ready bool `json:"ready"`
+
+	// FailureReason will be set in the event that there is a an error reconciling the HelmChartProxy.
+	// +optional
+	FailureReason *string `json:"failureReason,omitempty"`
 }
 
 //+kubebuilder:object:root=true

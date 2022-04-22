@@ -108,6 +108,10 @@ spec:
           status:
             description: HelmChartProxyStatus defines the observed state of HelmChartProxy
             properties:
+              failureReason:
+                description: FailureReason will be set in the event that there is
+                  a an error reconciling the HelmChartProxy.
+                type: string
               ready:
                 description: Ready is true when the provider resource is ready.
                 type: boolean
