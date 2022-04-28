@@ -12,5 +12,3 @@ spec:
   values:
     "infra.clusterName": "{{ Cluster.metadata.name }}"
     "cloudControllerManager.containerResourceManagement.limitsCPU": "6"
-    # "controller.scope.namespace": "default"
-    # "controller.scope.namespace": "{{ Cluster.Namespace }}"

@@ -135,7 +135,7 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 		return nil, false, err
 	}
 	if !shouldUpgrade {
-		log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried", spec.ReleaseName))
+		log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried, revision = %d", existing.Name, existing.Version))
 		return existing, false, nil
 	}
 

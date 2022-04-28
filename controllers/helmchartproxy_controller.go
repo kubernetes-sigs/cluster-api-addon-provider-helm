@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,6 +71,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	defer func() {
+		// TODO: this is probably running after a delete and getting a not found error
 		reterr = r.Status().Update(context.TODO(), helmChartProxy)
 	}()
 
@@ -79,7 +81,9 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	log.V(2).Info("Getting list of clusters with labels")
 	clusterList, err := r.listClustersWithLabels(ctx, labelSelector)
 	if err != nil {
-		// helmChartProxy.Status.FailureReason = errors.Wrapf(err, "failed to get list of clusters")
+		helmChartProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", labelSelector.MatchLabels).Error()))
+		helmChartProxy.Status.Ready = false
+
 		return ctrl.Result{}, err
 	}
 	if clusterList == nil {
@@ -97,6 +101,8 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if !controllerutil.ContainsFinalizer(helmChartProxy, finalizer) {
 			controllerutil.AddFinalizer(helmChartProxy, finalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
+				helmChartProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to add finalizer").Error())
+				helmChartProxy.Status.Ready = false
 				return ctrl.Result{}, err
 			}
 		}
@@ -107,6 +113,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.reconcileDelete(ctx, helmChartProxy, clusterList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
+				helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
 				helmChartProxy.Status.Ready = false
 				return ctrl.Result{}, err
 			}
@@ -115,6 +122,9 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmChartProxy, finalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
+				helmChartProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to remove finalizer").Error())
+				helmChartProxy.Status.Ready = false
+
 				return ctrl.Result{}, err
 			}
 		}
@@ -127,10 +137,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
 	if err != nil {
 		helmChartProxy.Status.Ready = false
-		// helmChartProxy.Status.FailureReason = err.Error()
+		helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
 		return ctrl.Result{}, err
 	}
 
+	helmChartProxy.Status.FailureReason = nil
 	helmChartProxy.Status.Ready = true
 	return ctrl.Result{}, nil
 }
@@ -156,7 +167,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		err = r.reconcileCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
 		if err != nil {
 			log.Error(err, "failed to reconcile chart on cluster", "cluster", cluster.Name)
-			return err
+			return errors.Wrapf(err, "failed to reconcile HelmChartProxy %s on cluster %s", helmChartProxy.Name, cluster.Name)
 		}
 	}
 
@@ -166,20 +177,20 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, kubeconfigPath string) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Reconciling HelmChartProxy", "proxy", helmChartProxy.Name, "on cluster", "name", cluster.Name)
+	log.V(2).Info("Reconciling HelmChartProxy on cluster", "HelmChartProxy", helmChartProxy.Name, "cluster", cluster.Name)
 
 	releases, err := internal.ListHelmReleases(ctx, kubeconfigPath)
 	if err != nil {
-		log.V(2).Info("Error listing releases", "err", err)
+		log.Error(err, "failed to list releases")
 	}
 	log.V(2).Info("Querying existing releases:")
 	for _, release := range releases {
-		log.V(2).Info("Release name", "name", release.Name, "installed on", "cluster", cluster.Name)
+		log.V(2).Info("Release found on cluster", "releaseName", release.Name, "cluster", cluster.Name, "revision", release.Version)
 	}
 
 	values, err := internal.ParseValues(ctx, r.Client, kubeconfigPath, helmChartProxy.Spec, cluster)
 	if err != nil {
-		log.Error(err, "failed to parse values", "cluster", cluster.Name)
+		log.Error(err, "failed to parse values on cluster", "cluster", cluster.Name)
 	}
 
 	existing, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
@@ -194,7 +205,7 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 				return errors.Wrapf(err, "failed to install chart on cluster %s", cluster.Name)
 			}
 			if release != nil {
-				log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s\n", release.Name, cluster.Name)))
+				log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s, revision = %d", release.Name, cluster.Name, release.Version)))
 				// addClusterRefToStatusList(ctx, helmChartProxy, cluster)
 			}
 
@@ -206,14 +217,14 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 
 	if existing != nil {
 		// TODO: add logic for updating an existing release
-		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade\n", existing.Name, cluster.Name))
+		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade", existing.Name, cluster.Name))
 		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec, values)
 		if err != nil {
 			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
 			return errors.Wrapf(err, "error upgrading chart with Helm on cluster %s", cluster.Name)
 		}
 		if release != nil && upgraded {
-			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s\n", release.Name, cluster.Name)))
+			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s, revision = %d", release.Name, cluster.Name, release.Version)))
 			// addClusterRefToStatusList(ctx, helmChartProxy, cluster)
 		}
 	}
@@ -234,27 +245,28 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 		err = r.reconcileDeleteCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
 		if err != nil {
 			log.Error(err, "failed to delete chart on cluster", "cluster", cluster.Name)
-			return err
+			return errors.Wrapf(err, "failed to delete HelmChartProxy %s on cluster %s", helmChartProxy.Name, cluster.Name)
 		}
 	}
 
 	return nil
 }
 
-func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters *clusterv1.Cluster, kubeconfigPath string) error {
+func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, kubeconfigPath string) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Prepared to uninstall chart spec", "spec", helmChartProxy.Name, "on cluster", "name", clusters.Name)
+	log.V(2).Info("Preparing to uninstall release on cluster", "releaseName", helmChartProxy.Spec.ReleaseName, "clusterName", cluster.Name)
 
 	response, err := internal.UninstallHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
 	if err != nil {
 		log.V(2).Info("Error uninstalling chart with Helm:", err)
-		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", clusters.Name)
+		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", cluster.Name)
 	}
 
-	log.V(2).Info("Successfully uninstalled chart spec", "spec", helmChartProxy.Name, "on cluster", "name", clusters.Name)
+	log.V(2).Info((fmt.Sprintf("Chart '%s' successfully uninstalled on cluster %s", helmChartProxy.Spec.ChartName, cluster.Name)))
+
 	if response != nil && response.Info != "" {
-		log.V(2).Info(fmt.Sprintf("Response is %s\n", response.Info))
+		log.V(2).Info(fmt.Sprintf("Response is %s", response.Info))
 	}
 
 	return nil
