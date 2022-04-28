@@ -69,11 +69,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return ctrl.Result{}, err
 	}
-
-	defer func() {
-		// TODO: this is probably running after a delete and getting a not found error
-		reterr = r.Status().Update(context.TODO(), helmChartProxy)
-	}()
+	// defer func() {
+	// 	// TODO: this is probably running after a delete and getting a not found error
+	// 	reterr = r.Status().Update(ctx, helmChartProxy)
+	// 	log.Error(reterr, "unable to update HelmChartProxy status")
+	// }()
 
 	labelSelector := helmChartProxy.Spec.Selector
 	log.V(2).Info("HelmChartProxy labels are", "labels", labelSelector)
@@ -83,6 +83,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		helmChartProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", labelSelector.MatchLabels).Error()))
 		helmChartProxy.Status.Ready = false
+
+		if err := r.Status().Update(ctx, helmChartProxy); err != nil {
+			log.Error(err, "unable to update HelmChartProxy status")
+			return ctrl.Result{}, err
+		}
 
 		return ctrl.Result{}, err
 	}
@@ -103,6 +108,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.Update(ctx, helmChartProxy); err != nil {
 				helmChartProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to add finalizer").Error())
 				helmChartProxy.Status.Ready = false
+				if err := r.Status().Update(ctx, helmChartProxy); err != nil {
+					log.Error(err, "unable to update HelmChartProxy status")
+					return ctrl.Result{}, err
+				}
+
 				return ctrl.Result{}, err
 			}
 		}
@@ -115,6 +125,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				// so that it can be retried
 				helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
 				helmChartProxy.Status.Ready = false
+				if err := r.Status().Update(ctx, helmChartProxy); err != nil {
+					log.Error(err, "unable to update HelmChartProxy status")
+					return ctrl.Result{}, err
+				}
+
 				return ctrl.Result{}, err
 			}
 
@@ -124,6 +139,10 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.Update(ctx, helmChartProxy); err != nil {
 				helmChartProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to remove finalizer").Error())
 				helmChartProxy.Status.Ready = false
+				if err := r.Status().Update(ctx, helmChartProxy); err != nil {
+					log.Error(err, "unable to update HelmChartProxy status")
+					return ctrl.Result{}, err
+				}
 
 				return ctrl.Result{}, err
 			}
@@ -138,11 +157,21 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		helmChartProxy.Status.Ready = false
 		helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
+		if err := r.Status().Update(ctx, helmChartProxy); err != nil {
+			log.Error(err, "unable to update HelmChartProxy status")
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, err
 	}
 
 	helmChartProxy.Status.FailureReason = nil
 	helmChartProxy.Status.Ready = true
+	if err := r.Status().Update(ctx, helmChartProxy); err != nil {
+		log.Error(err, "unable to update HelmChartProxy status")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -254,6 +283,18 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 
 func (r *HelmChartProxyReconciler) reconcileDeleteCluster(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, kubeconfigPath string) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	_, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
+	if err != nil {
+		log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
+
+		if err.Error() == "release: not found" {
+			log.V(2).Info(fmt.Sprintf("Release '%s' not found on cluster %s, nothing to do for uninstall", helmChartProxy.Spec.ReleaseName, cluster.Name))
+			return nil
+		}
+
+		return err
+	}
 
 	log.V(2).Info("Preparing to uninstall release on cluster", "releaseName", helmChartProxy.Spec.ReleaseName, "clusterName", cluster.Name)
 

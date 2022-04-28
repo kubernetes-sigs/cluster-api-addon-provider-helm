@@ -9,6 +9,7 @@ spec:
   releaseName: cloud-provider-azure
   repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
   chartName: cloud-provider-azure
+  version: 1.23.8
   values:
     "infra.clusterName": "{{ Cluster.metadata.name }}"
     "cloudControllerManager.containerResourceManagement.limitsCPU": "6"
