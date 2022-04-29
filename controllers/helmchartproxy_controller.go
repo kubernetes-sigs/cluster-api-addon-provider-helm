@@ -33,6 +33,7 @@ import (
 	"cluster-api-addon-helm/internal"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/patch"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 )
@@ -58,7 +59,7 @@ const finalizer = "addons.cluster.x-k8s.io"
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
-func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, reterr error) {
+func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	// Fetch the HelmChartProxy instance.
@@ -69,11 +70,18 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return ctrl.Result{}, err
 	}
-	// defer func() {
-	// 	// TODO: this is probably running after a delete and getting a not found error
-	// 	reterr = r.Status().Update(ctx, helmChartProxy)
-	// 	log.Error(reterr, "unable to update HelmChartProxy status")
-	// }()
+
+	// TODO: should patch helper return an error when the object has been deleted?
+	patchHelper, err := patch.NewHelper(helmChartProxy, r.Client)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to init patch helper")
+	}
+
+	defer func() {
+		if err := patchHelper.Patch(ctx, helmChartProxy); err != nil && reterr == nil {
+			reterr = err
+		}
+	}()
 
 	labelSelector := helmChartProxy.Spec.Selector
 	log.V(2).Info("HelmChartProxy labels are", "labels", labelSelector)
@@ -83,11 +91,6 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		helmChartProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", labelSelector.MatchLabels).Error()))
 		helmChartProxy.Status.Ready = false
-
-		if err := r.Status().Update(ctx, helmChartProxy); err != nil {
-			log.Error(err, "unable to update HelmChartProxy status")
-			return ctrl.Result{}, err
-		}
 
 		return ctrl.Result{}, err
 	}
@@ -156,11 +159,6 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
 	if err != nil {
 		helmChartProxy.Status.Ready = false
-		helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
-		if err := r.Status().Update(ctx, helmChartProxy); err != nil {
-			log.Error(err, "unable to update HelmChartProxy status")
-			return ctrl.Result{}, err
-		}
 
 		return ctrl.Result{}, err
 	}
@@ -179,8 +177,37 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonsv1beta1.HelmChartProxy{}).
+		// Watches(
+		// 	&source.Kind{Type: &v1beta1.HelmChartProxy{}},
+		// 	handler.EnqueueRequestsFromMapFunc(r.findProxyForSecret),
+		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		// ).
 		Complete(r)
 }
+
+// func (r *HelmChartProxyReconciler) findProxyForSecret(obj client.Object) []reconcile.Request {
+// 	log := ctrl.LoggerFrom(context.TODO())
+// 	// helmChartProxies := &v1beta1.HelmChartProxyList{}
+// 	log.V(2).Info("Finding HelmChartProxy for object", "object", obj.GetName())
+// 	// log.V(2).Info("Finding HelmChartProxy for secret", "secret", secret.GetName())
+// 	return []reconcile.Request{}
+// 	// labels := secret.GetLabels()
+// 	// err := r.List(context.TODO(), helmChartProxies, ctrlClient.MatchingLabels(labels))
+// 	// if err != nil {
+// 	// 	return []reconcile.Request{}
+// 	// }
+
+// 	// requests := make([]reconcile.Request, len(helmChartProxies.Items))
+// 	// for i, item := range helmChartProxies.Items {
+// 	// 	requests[i] = reconcile.Request{
+// 	// 		NamespacedName: types.NamespacedName{
+// 	// 			Name:      item.GetName(),
+// 	// 			Namespace: item.GetNamespace(),
+// 	// 		},
+// 	// 	}
+// 	// }
+// 	// return requests
+// }
 
 // reconcileNormal...
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
