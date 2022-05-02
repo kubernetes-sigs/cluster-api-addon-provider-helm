@@ -185,30 +185,6 @@ func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// func (r *HelmChartProxyReconciler) findProxyForSecret(obj client.Object) []reconcile.Request {
-// 	log := ctrl.LoggerFrom(context.TODO())
-// 	// helmChartProxies := &v1beta1.HelmChartProxyList{}
-// 	log.V(2).Info("Finding HelmChartProxy for object", "object", obj.GetName())
-// 	// log.V(2).Info("Finding HelmChartProxy for secret", "secret", secret.GetName())
-// 	return []reconcile.Request{}
-// 	// labels := secret.GetLabels()
-// 	// err := r.List(context.TODO(), helmChartProxies, ctrlClient.MatchingLabels(labels))
-// 	// if err != nil {
-// 	// 	return []reconcile.Request{}
-// 	// }
-
-// 	// requests := make([]reconcile.Request, len(helmChartProxies.Items))
-// 	// for i, item := range helmChartProxies.Items {
-// 	// 	requests[i] = reconcile.Request{
-// 	// 		NamespacedName: types.NamespacedName{
-// 	// 			Name:      item.GetName(),
-// 	// 			Namespace: item.GetNamespace(),
-// 	// 		},
-// 	// 	}
-// 	// }
-// 	// return requests
-// }
-
 // reconcileNormal...
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
