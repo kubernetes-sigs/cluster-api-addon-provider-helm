@@ -38,6 +38,7 @@ import (
 	"cluster-api-addon-helm/controllers"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -83,8 +84,11 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	// Any type we want the client to know about has to be added in the scheme.
 	scheme := mgr.GetScheme()
 	_ = clusterv1.AddToScheme(scheme)
+	_ = kcpv1.AddToScheme(scheme)
 
 	if err = (&controllers.HelmChartProxyReconciler{
 		Client: mgr.GetClient(),

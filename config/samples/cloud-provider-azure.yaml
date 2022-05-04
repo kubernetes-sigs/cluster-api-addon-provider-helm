@@ -11,5 +11,6 @@ spec:
   chartName: cloud-provider-azure
   version: 1.23.8
   values:
-    "infra.clusterName": "{{ Cluster.metadata.name }}"
-    "cloudControllerManager.containerResourceManagement.limitsCPU": "6"
+    infra.clusterName: "{{ .Cluster.Name }}"
+    cloudControllerManager.containerResourceManagement.limitsCPU: "{{ .ControlPlane.Spec.Replicas }}"
+    # cloudControllerManager.containerResourceManagement.limitsCPU: "{{if lt (DerefInt32 .ControlPlane.Spec.Replicas) 5 }}10{{else}}20{{end}}"

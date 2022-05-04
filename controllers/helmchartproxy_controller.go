@@ -222,7 +222,7 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 
 	values, err := internal.ParseValues(ctx, r.Client, kubeconfigPath, helmChartProxy.Spec, cluster)
 	if err != nil {
-		log.Error(err, "failed to parse values on cluster", "cluster", cluster.Name)
+		return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
 	}
 
 	existing, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmChartProxy.Spec)
