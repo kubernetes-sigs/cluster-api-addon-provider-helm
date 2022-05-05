@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/Azure/go-autorest/autorest/to v0.4.0
+	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/google/go-cmp v0.5.6
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
@@ -30,6 +31,7 @@ require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
+	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/Masterminds/squirrel v1.5.2 // indirect

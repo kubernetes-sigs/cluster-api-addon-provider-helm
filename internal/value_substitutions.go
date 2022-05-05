@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/Masterminds/sprig"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -89,10 +90,7 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string
 		}
 
 		tmpl, err := template.New(cluster.GetName() + "-" + k).
-			// Use this function to dereference *int32 for comparisons
-			// Funcs(template.FuncMap{
-			// 	"DerefInt32": func(i *int32) int32 { return *i },
-			// }).
+			Funcs(sprig.TxtFuncMap()).
 			Parse(v)
 		if err != nil {
 			return nil, err
