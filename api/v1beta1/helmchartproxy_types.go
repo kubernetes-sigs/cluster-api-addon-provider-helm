@@ -27,8 +27,11 @@ import (
 type HelmChartProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Selector is a label selector for clusters. Existing Clusters selected by this will have the Helm chart installed.
-	Selector metav1.LabelSelector `json:"selector"`
+	// ClusterSelector is a label selector for clusters. Existing Clusters selected by this will have the Helm chart installed.
+	ClusterSelector metav1.LabelSelector `json:"clusterSelector"`
+
+	// CustomSelectors...
+	CustomSelectors map[string]CustomSelectorSpec `json:"customSelectors"`
 
 	// ReleaseName is the release name of the installed Helm chart.
 	ReleaseName string `json:"releaseName"`
@@ -44,6 +47,14 @@ type HelmChartProxySpec struct {
 
 	// Values is the set of key/value pair values that we pass to Helm. This field is currently used for testing and is subject to change.
 	Values map[string]string `json:"values,omitempty"`
+}
+
+type CustomSelectorSpec struct {
+	// Kind...
+	Kind string `json:"kind"`
+
+	// Selector...
+	Selector metav1.LabelSelector `json:"selector"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy

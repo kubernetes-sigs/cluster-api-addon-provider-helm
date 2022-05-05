@@ -32,7 +32,7 @@ import (
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 )
 
-func initializeBuiltins(ctx context.Context, c ctrlClient.Client, cluster *clusterv1.Cluster) (*BuiltinTypes, error) {
+func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (*BuiltinTypes, error) {
 	kubeadmControlPlane := &kcpv1.KubeadmControlPlane{}
 	key := types.NamespacedName{
 		Name:      cluster.Spec.ControlPlaneRef.Name,
@@ -43,22 +43,47 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, cluster *clust
 		return nil, errors.Wrapf(err, "failed to get kubeadm control plane %s", key)
 	}
 
-	return &BuiltinTypes{
-		Cluster:      cluster,
-		ControlPlane: kubeadmControlPlane,
-	}, nil
+	builtInTypes := BuiltinTypes{
+		Cluster:            cluster,
+		ControlPlane:       kubeadmControlPlane,
+		MachineDeployments: map[string]clusterv1.MachineDeployment{},
+	}
+
+	for key, selectorSpec := range spec.CustomSelectors {
+		labels := selectorSpec.Selector.MatchLabels
+		switch selectorSpec.Kind {
+		case "MachineDeployment":
+			mdList := &clusterv1.MachineDeploymentList{}
+			if err := c.List(ctx, mdList, ctrlClient.MatchingLabels(labels)); err != nil {
+				return nil, errors.Wrapf(err, "failed to list machine deployments with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			if len(mdList.Items) == 0 {
+				return nil, errors.Errorf("no machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			if len(mdList.Items) > 1 {
+				return nil, errors.Errorf("multiple machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			builtInTypes.MachineDeployments[key] = mdList.Items[0]
+			break
+		default:
+			return nil, errors.Errorf("unsupported selector kind %s", selectorSpec.Kind)
+		}
+	}
+
+	return &builtInTypes, nil
 }
 
 type BuiltinTypes struct {
-	Cluster      *clusterv1.Cluster
-	ControlPlane *kcpv1.KubeadmControlPlane
+	Cluster            *clusterv1.Cluster
+	ControlPlane       *kcpv1.KubeadmControlPlane
+	MachineDeployments map[string]clusterv1.MachineDeployment
 }
 
 func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) ([]string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	specValues := make([]string, len(spec.Values))
 	for k, v := range spec.Values {
-		builtin, err := initializeBuiltins(ctx, c, cluster)
+		builtin, err := initializeBuiltins(ctx, c, spec, cluster)
 		if err != nil {
 			return nil, err
 		}

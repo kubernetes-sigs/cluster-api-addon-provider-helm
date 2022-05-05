@@ -62,10 +62,13 @@ const finalizer = "addons.cluster.x-k8s.io"
 func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
+	log.V(2).Info("Beginning reconcilation for HelmChartProxy", "requestNamespace", req.Namespace, "requestName", req.Name)
+
 	// Fetch the HelmChartProxy instance.
 	helmChartProxy := &addonsv1beta1.HelmChartProxy{}
 	if err := r.Client.Get(ctx, req.NamespacedName, helmChartProxy); err != nil {
 		if apierrors.IsNotFound(err) {
+			log.V(2).Info("HelmChartProxy resource not found, skipping reconciliation", "helmChartProxy", req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
@@ -78,12 +81,16 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	defer func() {
+		log.V(2).Info("Preparing to patch HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 		if err := patchHelper.Patch(ctx, helmChartProxy); err != nil && reterr == nil {
 			reterr = err
+			log.Error(err, "failed to patch HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
+			return
 		}
+		log.V(2).Info("Successfully patched HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	}()
 
-	labelSelector := helmChartProxy.Spec.Selector
+	labelSelector := helmChartProxy.Spec.ClusterSelector
 	log.V(2).Info("HelmChartProxy labels are", "labels", labelSelector)
 
 	log.V(2).Info("Getting list of clusters with labels")
