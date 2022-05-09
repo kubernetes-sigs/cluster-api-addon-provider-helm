@@ -30,7 +30,10 @@ type HelmChartProxySpec struct {
 	// ClusterSelector is a label selector for clusters. Existing Clusters selected by this will have the Helm chart installed.
 	ClusterSelector metav1.LabelSelector `json:"clusterSelector"`
 
-	// CustomSelectors...
+	// CustomSelectors is a map from a key to a CustomSelectorSpec. The CustomSelectorSpec is used to select an instance of a
+	// Cluster API resource that have multiple instances on the target cluster, i.e. Machines. The selector must resolve to a
+	// unique resource on each target cluster selected by the ClusterSelector. The key can then be used to reference the resource
+	// on the target cluster.
 	CustomSelectors map[string]CustomSelectorSpec `json:"customSelectors"`
 
 	// ReleaseName is the release name of the installed Helm chart.
@@ -49,11 +52,13 @@ type HelmChartProxySpec struct {
 	Values map[string]string `json:"values,omitempty"`
 }
 
+// CustomSelectorSpec defines a label selector for a given Cluster API resource. The kind and selector must resolve to a
+// unique Cluster resource.
 type CustomSelectorSpec struct {
-	// Kind...
+	// Kind is the kind of Cluster API resource to select.
 	Kind string `json:"kind"`
 
-	// Selector...
+	// Selector is the label selector to use for selecting the Cluster API resource.
 	Selector metav1.LabelSelector `json:"selector"`
 }
 

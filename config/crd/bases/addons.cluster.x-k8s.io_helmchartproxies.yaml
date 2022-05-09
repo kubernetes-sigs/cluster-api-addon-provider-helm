@@ -85,12 +85,16 @@ spec:
                 type: object
               customSelectors:
                 additionalProperties:
+                  description: CustomSelectorSpec defines a label selector for a given
+                    Cluster API resource. The kind and selector must resolve to a
+                    unique Cluster resource.
                   properties:
                     kind:
-                      description: Kind...
+                      description: Kind is the kind of Cluster API resource to select.
                       type: string
                     selector:
-                      description: Selector...
+                      description: Selector is the label selector to use for selecting
+                        the Cluster API resource.
                       properties:
                         matchExpressions:
                           description: matchExpressions is a list of label selector
@@ -137,7 +141,12 @@ spec:
                   - kind
                   - selector
                   type: object
-                description: CustomSelectors...
+                description: CustomSelectors is a map from a key to a CustomSelectorSpec.
+                  The CustomSelectorSpec is used to select an instance of a Cluster
+                  API resource that have multiple instances on the target cluster,
+                  i.e. Machines. The selector must resolve to a unique resource on
+                  each target cluster selected by the ClusterSelector. The key can
+                  then be used to reference the resource on the target cluster.
                 type: object
               releaseName:
                 description: ReleaseName is the release name of the installed Helm

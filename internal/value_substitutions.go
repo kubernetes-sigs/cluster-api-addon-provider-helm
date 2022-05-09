@@ -48,23 +48,51 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1b
 		Cluster:            cluster,
 		ControlPlane:       kubeadmControlPlane,
 		MachineDeployments: map[string]clusterv1.MachineDeployment{},
+		MachineSets:        map[string]clusterv1.MachineSet{},
+		Machines:           map[string]clusterv1.Machine{},
 	}
 
 	for key, selectorSpec := range spec.CustomSelectors {
 		labels := selectorSpec.Selector.MatchLabels
 		switch selectorSpec.Kind {
 		case "MachineDeployment":
-			mdList := &clusterv1.MachineDeploymentList{}
-			if err := c.List(ctx, mdList, ctrlClient.MatchingLabels(labels)); err != nil {
+			machineDeployments := &clusterv1.MachineDeploymentList{}
+			if err := c.List(ctx, machineDeployments, ctrlClient.MatchingLabels(labels)); err != nil {
 				return nil, errors.Wrapf(err, "failed to list machine deployments with selector %v", selectorSpec.Selector.MatchLabels)
 			}
-			if len(mdList.Items) == 0 {
+			if len(machineDeployments.Items) == 0 {
 				return nil, errors.Errorf("no machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
 			}
-			if len(mdList.Items) > 1 {
+			if len(machineDeployments.Items) > 1 {
 				return nil, errors.Errorf("multiple machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
 			}
-			builtInTypes.MachineDeployments[key] = mdList.Items[0]
+			builtInTypes.MachineDeployments[key] = machineDeployments.Items[0]
+			break
+		case "MachineSet":
+			machineSets := &clusterv1.MachineSetList{}
+			if err := c.List(ctx, machineSets, ctrlClient.MatchingLabels(labels)); err != nil {
+				return nil, errors.Wrapf(err, "failed to list machine sets with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			if len(machineSets.Items) == 0 {
+				return nil, errors.Errorf("no machine sets found with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			if len(machineSets.Items) > 1 {
+				return nil, errors.Errorf("multiple machine sets found with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			builtInTypes.MachineSets[key] = machineSets.Items[0]
+			break
+		case "Machine":
+			machines := &clusterv1.MachineList{}
+			if err := c.List(ctx, machines, ctrlClient.MatchingLabels(labels)); err != nil {
+				return nil, errors.Wrapf(err, "failed to list machines with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			if len(machines.Items) == 0 {
+				return nil, errors.Errorf("no machines found with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			if len(machines.Items) > 1 {
+				return nil, errors.Errorf("multiple machines found with selector %v", selectorSpec.Selector.MatchLabels)
+			}
+			builtInTypes.Machines[key] = machines.Items[0]
 			break
 		default:
 			return nil, errors.Errorf("unsupported selector kind %s", selectorSpec.Kind)
@@ -78,6 +106,8 @@ type BuiltinTypes struct {
 	Cluster            *clusterv1.Cluster
 	ControlPlane       *kcpv1.KubeadmControlPlane
 	MachineDeployments map[string]clusterv1.MachineDeployment
+	MachineSets        map[string]clusterv1.MachineSet
+	Machines           map[string]clusterv1.Machine
 }
 
 func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) ([]string, error) {
