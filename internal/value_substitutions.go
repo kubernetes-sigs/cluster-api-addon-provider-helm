@@ -54,6 +54,7 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1b
 
 	for key, selectorSpec := range spec.CustomSelectors {
 		labels := selectorSpec.Selector.MatchLabels
+		labels[clusterv1.ClusterLabelName] = cluster.Name
 		switch selectorSpec.Kind {
 		case "MachineDeployment":
 			machineDeployments := &clusterv1.MachineDeploymentList{}
