@@ -52,53 +52,54 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1b
 		Machines:           map[string]clusterv1.Machine{},
 	}
 
-	for key, selectorSpec := range spec.CustomSelectors {
-		labels := selectorSpec.Selector.MatchLabels
-		labels[clusterv1.ClusterLabelName] = cluster.Name
-		switch selectorSpec.Kind {
-		case "MachineDeployment":
-			machineDeployments := &clusterv1.MachineDeploymentList{}
-			if err := c.List(ctx, machineDeployments, ctrlClient.MatchingLabels(labels)); err != nil {
-				return nil, errors.Wrapf(err, "failed to list machine deployments with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			if len(machineDeployments.Items) == 0 {
-				return nil, errors.Errorf("no machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			if len(machineDeployments.Items) > 1 {
-				return nil, errors.Errorf("multiple machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			builtInTypes.MachineDeployments[key] = machineDeployments.Items[0]
-			break
-		case "MachineSet":
-			machineSets := &clusterv1.MachineSetList{}
-			if err := c.List(ctx, machineSets, ctrlClient.MatchingLabels(labels)); err != nil {
-				return nil, errors.Wrapf(err, "failed to list machine sets with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			if len(machineSets.Items) == 0 {
-				return nil, errors.Errorf("no machine sets found with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			if len(machineSets.Items) > 1 {
-				return nil, errors.Errorf("multiple machine sets found with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			builtInTypes.MachineSets[key] = machineSets.Items[0]
-			break
-		case "Machine":
-			machines := &clusterv1.MachineList{}
-			if err := c.List(ctx, machines, ctrlClient.MatchingLabels(labels)); err != nil {
-				return nil, errors.Wrapf(err, "failed to list machines with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			if len(machines.Items) == 0 {
-				return nil, errors.Errorf("no machines found with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			if len(machines.Items) > 1 {
-				return nil, errors.Errorf("multiple machines found with selector %v", selectorSpec.Selector.MatchLabels)
-			}
-			builtInTypes.Machines[key] = machines.Items[0]
-			break
-		default:
-			return nil, errors.Errorf("unsupported selector kind %s", selectorSpec.Kind)
-		}
-	}
+	// Comment out the custom selectors until we can define a use case
+	// for key, selectorSpec := range spec.CustomSelectors {
+	// 	labels := selectorSpec.Selector.MatchLabels
+	// 	labels[clusterv1.ClusterLabelName] = cluster.Name
+	// 	switch selectorSpec.Kind {
+	// 	case "MachineDeployment":
+	// 		machineDeployments := &clusterv1.MachineDeploymentList{}
+	// 		if err := c.List(ctx, machineDeployments, ctrlClient.MatchingLabels(labels)); err != nil {
+	// 			return nil, errors.Wrapf(err, "failed to list machine deployments with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		if len(machineDeployments.Items) == 0 {
+	// 			return nil, errors.Errorf("no machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		if len(machineDeployments.Items) > 1 {
+	// 			return nil, errors.Errorf("multiple machine deployments found with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		builtInTypes.MachineDeployments[key] = machineDeployments.Items[0]
+	// 		break
+	// 	case "MachineSet":
+	// 		machineSets := &clusterv1.MachineSetList{}
+	// 		if err := c.List(ctx, machineSets, ctrlClient.MatchingLabels(labels)); err != nil {
+	// 			return nil, errors.Wrapf(err, "failed to list machine sets with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		if len(machineSets.Items) == 0 {
+	// 			return nil, errors.Errorf("no machine sets found with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		if len(machineSets.Items) > 1 {
+	// 			return nil, errors.Errorf("multiple machine sets found with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		builtInTypes.MachineSets[key] = machineSets.Items[0]
+	// 		break
+	// 	case "Machine":
+	// 		machines := &clusterv1.MachineList{}
+	// 		if err := c.List(ctx, machines, ctrlClient.MatchingLabels(labels)); err != nil {
+	// 			return nil, errors.Wrapf(err, "failed to list machines with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		if len(machines.Items) == 0 {
+	// 			return nil, errors.Errorf("no machines found with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		if len(machines.Items) > 1 {
+	// 			return nil, errors.Errorf("multiple machines found with selector %v", selectorSpec.Selector.MatchLabels)
+	// 		}
+	// 		builtInTypes.Machines[key] = machines.Items[0]
+	// 		break
+	// 	default:
+	// 		return nil, errors.Errorf("unsupported selector kind %s", selectorSpec.Kind)
+	// 	}
+	// }
 
 	return &builtInTypes, nil
 }

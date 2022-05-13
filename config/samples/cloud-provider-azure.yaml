@@ -6,12 +6,12 @@ spec:
   clusterSelector:
     matchLabels:
       cloudProviderAzure: "true"
-  customSelectors:
-    mdKey:
-      kind: MachineDeployment
-      selector:
-        matchLabels:
-          cloudProviderAzureMD: "true"
+  # customSelectors:
+  #   mdKey:
+  #     kind: MachineDeployment
+  #     selector:
+  #       matchLabels:
+  #         cloudProviderAzureMD: "true"
   releaseName: cloud-provider-azure
   repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
   chartName: cloud-provider-azure
@@ -19,5 +19,5 @@ spec:
   values:
     infra.clusterName: "{{ .Cluster.Name }}"
     cloudControllerManager.containerResourceManagement.limitsCPU: "{{ add .ControlPlane.Spec.Replicas 10 }}"
-    cloudNodeManager.containerResourceManagement.limitsCPU: "{{ (index .MachineDeployments \"mdKey\").Spec.Replicas }}"
+    # cloudNodeManager.containerResourceManagement.limitsCPU: "{{ (index .MachineDeployments \"mdKey\").Spec.Replicas }}"
     # cloudControllerManager.containerResourceManagement.limitsCPU: "{{if lt (DerefInt32 .ControlPlane.Spec.Replicas) 5 }}10{{else}}20{{end}}"
