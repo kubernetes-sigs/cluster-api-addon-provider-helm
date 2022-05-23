@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -33,6 +34,7 @@ import (
 	"cluster-api-addon-helm/internal"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
@@ -45,6 +47,7 @@ type HelmChartProxyReconciler struct {
 }
 
 const finalizer = "addons.cluster.x-k8s.io"
+const selectorKey = "helmChartProxySelector"
 
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/status,verbs=get;update;patch
@@ -108,6 +111,17 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		log.V(2).Info("Found cluster", "name", cluster.Name)
 	}
 
+	labels := map[string]string{
+		selectorKey: helmChartProxy.Name,
+	}
+	releaseList, err := r.listInstalledReleases(ctx, labels)
+	if releaseList == nil {
+		log.V(2).Info("No releases found")
+	}
+	for _, release := range releaseList.Items {
+		log.V(2).Info("Found release", "name", release.Name)
+	}
+
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmChartProxy.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
@@ -130,7 +144,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmChartProxy, finalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.reconcileDelete(ctx, helmChartProxy, clusterList.Items); err != nil {
+			if err := r.reconcileDeleteChart(ctx, helmChartProxy, releaseList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
@@ -163,7 +177,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
-	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items)
+	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items, releaseList.Items)
 	if err != nil {
 		helmChartProxy.Status.Ready = false
 
@@ -277,11 +291,11 @@ func (r *HelmChartProxyReconciler) reconcileCluster(ctx context.Context, helmCha
 	return nil
 }
 
-// reconcileDelete...
-func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, clusters []clusterv1.Cluster) error {
+// reconcileDeleteChart...
+func (r *HelmChartProxyReconciler) reconcileDeleteChart(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, releases []addonsv1beta1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	for _, cluster := range clusters {
+	for _, release := range releases {
 		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
@@ -345,6 +359,21 @@ func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, l
 	return clusterList, nil
 }
 
+func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, labels map[string]string) (*addonsv1beta1.HelmReleaseProxyList, error) {
+	releaseList := &addonsv1beta1.HelmReleaseProxyList{}
+	// Empty labels should match nothing, not everything
+	if len(labels) == 0 {
+		return nil, nil
+	}
+
+	// TODO: should we use ctrlClient.MatchingLabels or try to use the labelSelector itself?
+	if err := r.Client.List(ctx, releaseList, ctrlClient.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+
+	return releaseList, nil
+}
+
 // func addClusterRefToStatusList(ctx context.Context, proxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster) {
 // 	if proxy.Status.InstalledClusters == nil {
 // 		proxy.Status.InstalledClusters = make([]corev1.ObjectReference, 1)
@@ -357,3 +386,56 @@ func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, l
 // 		Namespace:  cluster.Namespace,
 // 	})
 // }
+
+// createOrUpdateHelmReleaseProxy...
+func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, cluster *clusterv1.Cluster, helmChartProxy *addonsv1beta1.HelmChartProxy) (*addonsv1beta1.HelmReleaseProxy, error) {
+	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
+	helmReleaseProxyKey := client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+
+	if err := r.Client.Get(ctx, helmReleaseProxyKey, helmReleaseProxy); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+
+		helmReleaseProxy.Name = cluster.Name
+		helmReleaseProxy.Namespace = cluster.Namespace
+		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, metav1.OwnerReference{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+			Name:       cluster.Name,
+			UID:        cluster.UID,
+		})
+		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
+
+		helmReleaseProxy.Spec.ClusterName = cluster.Name
+		if err := r.Client.Create(ctx, helmReleaseProxy); err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				if err = r.Client.Get(ctx, helmReleaseProxyKey, helmReleaseProxy); err != nil {
+					return nil, err
+				}
+				return helmReleaseProxy, nil
+			}
+			return nil, errors.Wrapf(err, "failed to create helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
+		}
+	}
+
+	return helmReleaseProxy, nil
+}
+
+// deleteHelmReleaseProxy...
+func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	if err := r.Client.Delete(ctx, helmReleaseProxy); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(2).Info("HelmReleaseProxy already deleted, nothing to do", "helmReleaseProxy", helmReleaseProxy.Name)
+			return nil
+		}
+		return errors.Wrapf(err, "failed to create helmReleaseProxy: %s/%s", helmReleaseProxy.Name)
+	}
+
+	return nil
+}

@@ -51,7 +51,7 @@ func HelmInit(ctx context.Context, kubeconfigPath string) (*helmCli.EnvSettings,
 	return settings, actionConfig, nil
 }
 
-func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, parsedValues []string) (*release.Release, error) {
+func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, kubeconfigPath)
@@ -93,7 +93,7 @@ func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 }
 
 // This function will be refactored to differentiate from installHelmRelease()
-func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, parsedValues []string) (*release.Release, bool, error) {
+func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, kubeconfigPath)
@@ -176,7 +176,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 	return !cmp.Equal(oldValues, newValues), nil
 }
 
-func GetHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.Release, error) {
+func GetHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.Release, error) {
 	_, actionConfig, err := HelmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err
