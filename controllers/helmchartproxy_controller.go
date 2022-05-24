@@ -112,15 +112,16 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		log.V(2).Info("Found cluster", "name", cluster.Name)
 	}
 
+	log.V(2).Info("Getting list of HelmReleaseProxies with label matching HelmChartProxy name")
 	labels := map[string]string{
 		HelmChartProxyLabelName: helmChartProxy.Name,
 	}
 	releaseList, err := r.listInstalledReleases(ctx, labels)
 	if releaseList == nil {
-		log.V(2).Info("No releases found")
+		log.V(2).Info("No HelmReleaseProxy found")
 	}
 	for _, release := range releaseList.Items {
-		log.V(2).Info("Found release", "name", release.Name)
+		log.V(2).Info("Found HelmReleaseProxy", "name", release.Name)
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
@@ -220,7 +221,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	}
 
 	releasesToDelete := getHelmReleaseProxiesToDelete(ctx, clusters, helmReleaseProxies)
-	log.V(2).Info("Deleting releases", "releases", releasesToDelete)
+	log.V(2).Info("Deleting orphaned releases")
 	for _, release := range releasesToDelete {
 		log.V(2).Info("Deleting release", "release", release)
 		if err := r.deleteHelmReleaseProxy(ctx, &release); err != nil {
@@ -242,12 +243,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		}
 
 		r.createOrUpdateHelmReleaseProxy(ctx, helmChartProxy, &cluster, values)
-
-		// err = r.reconcileCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
-		// if err != nil {
-		// 	log.Error(err, "failed to reconcile chart on cluster", "cluster", cluster.Name)
-		// 	return errors.Wrapf(err, "failed to reconcile HelmChartProxy %s on cluster %s", helmChartProxy.Name, cluster.Name)
-		// }
 	}
 
 	return nil
@@ -255,7 +250,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 func getHelmReleaseProxiesToDelete(ctx context.Context, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1beta1.HelmReleaseProxy) []addonsv1beta1.HelmReleaseProxy {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Looking for releases to delete")
+	log.V(2).Info("Getting HelmReleaseProxies to delete")
 
 	selectedClusters := map[string]struct{}{}
 	for _, cluster := range clusters {
@@ -263,8 +258,6 @@ func getHelmReleaseProxiesToDelete(ctx context.Context, clusters []clusterv1.Clu
 		selectedClusters[key] = struct{}{}
 	}
 	log.V(2).Info("Selected clusters", "clusters", selectedClusters)
-
-	log.V(2).Info("Releases are", "releases", helmReleaseProxies)
 
 	releasesToDelete := []addonsv1beta1.HelmReleaseProxy{}
 	for _, helmReleaseProxy := range helmReleaseProxies {
@@ -277,7 +270,11 @@ func getHelmReleaseProxiesToDelete(ctx context.Context, clusters []clusterv1.Clu
 		}
 	}
 
-	log.V(2).Info("Releases to delete", "releases", releasesToDelete)
+	names := make([]string, len(releasesToDelete))
+	for _, release := range releasesToDelete {
+		names = append(names, release.Name)
+	}
+	log.V(2).Info("Releases to delete", "releases", names)
 
 	return releasesToDelete
 }
@@ -286,23 +283,14 @@ func getHelmReleaseProxiesToDelete(ctx context.Context, clusters []clusterv1.Clu
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, releases []addonsv1beta1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
+	log.V(2).Info("Deleting all HelmReleaseProxies as part of HelmChartProxy deletion", "helmChartProxy", helmChartProxy.Name)
+
 	for _, release := range releases {
-		// kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
-		// if err != nil {
-		// 	log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
-		// 	return errors.Wrapf(err, "failed to get kubeconfig for cluster %s", cluster.Name)
-		// }
 		log.V(2).Info("Deleting release", "releaseName", release.Name, "cluster", release.Spec.ClusterRef.Name)
 		if err := r.deleteHelmReleaseProxy(ctx, &release); err != nil {
 			// TODO: will this fail if clusterRef is nil
 			return errors.Wrapf(err, "failed to delete release %s from cluster %s", release.Name, release.Spec.ClusterRef.Name)
 		}
-
-		// err = r.reconcileDeleteCluster(ctx, helmChartProxy, &cluster, kubeconfigPath)
-		// if err != nil {
-		// 	log.Error(err, "failed to delete chart on cluster", "cluster", cluster.Name)
-		// 	return errors.Wrapf(err, "failed to delete HelmChartProxy %s on cluster %s", helmChartProxy.Name, cluster.Name)
-		// }
 	}
 
 	return nil
@@ -353,7 +341,7 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 		}
 
 		// TODO: fix naming
-		helmReleaseProxy.Name = cluster.Name
+		helmReleaseProxy.Name = helmChartProxy.Spec.ReleaseName + "-" + cluster.Name
 		helmReleaseProxy.Namespace = cluster.Namespace
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, metav1.OwnerReference{
 			APIVersion: clusterv1.GroupVersion.String(),
