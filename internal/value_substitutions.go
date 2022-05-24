@@ -19,7 +19,6 @@ package internal
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
@@ -112,9 +111,9 @@ type BuiltinTypes struct {
 	Machines           map[string]clusterv1.Machine
 }
 
-func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) ([]string, error) {
+func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (map[string]string, error) {
 	log := ctrl.LoggerFrom(ctx)
-	specValues := make([]string, len(spec.Values))
+	specValues := map[string]string{}
 	for k, v := range spec.Values {
 		builtin, err := initializeBuiltins(ctx, c, spec, cluster)
 		if err != nil {
@@ -134,7 +133,8 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string
 		}
 		expandedTemplate := buffer.String()
 		log.V(2).Info("Expanded template", "template", v, "result", expandedTemplate)
-		specValues = append(specValues, fmt.Sprintf("%s=%s", k, expandedTemplate))
+		specValues[k] = expandedTemplate
+		// specValues = append(specValues, fmt.Sprintf("%s=%s", k, expandedTemplate))
 	}
 	log.V(3).Info("Values", "values", specValues)
 

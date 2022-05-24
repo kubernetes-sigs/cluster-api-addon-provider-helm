@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,8 +28,8 @@ import (
 type HelmReleaseProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ClusterName is the name of the cluster to deploy to
-	ClusterName string `json:"clusterName"`
+	// ClusterRef is the name of the cluster to deploy to
+	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
 
 	// ReleaseName is the release name of the installed Helm chart.
 	ReleaseName string `json:"releaseName"`

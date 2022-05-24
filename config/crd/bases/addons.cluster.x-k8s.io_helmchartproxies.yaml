@@ -168,7 +168,6 @@ spec:
                 type: string
             required:
             - clusterSelector
-            - customSelectors
             - releaseName
             type: object
           status:

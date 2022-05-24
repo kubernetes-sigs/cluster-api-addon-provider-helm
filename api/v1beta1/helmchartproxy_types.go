@@ -34,6 +34,7 @@ type HelmChartProxySpec struct {
 	// Cluster API resource that have multiple instances on the target cluster, i.e. Machines. The selector must resolve to a
 	// unique resource on each target cluster selected by the ClusterSelector. The key can then be used to reference the resource
 	// on the target cluster.
+	// +optional
 	CustomSelectors map[string]CustomSelectorSpec `json:"customSelectors"`
 
 	// ReleaseName is the release name of the installed Helm chart.

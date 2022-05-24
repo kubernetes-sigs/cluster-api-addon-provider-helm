@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/addons.cluster.x-k8s.io_helmchartproxies.yaml
+- bases/addons.cluster.x-k8s.io_helmreleaseproxies.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

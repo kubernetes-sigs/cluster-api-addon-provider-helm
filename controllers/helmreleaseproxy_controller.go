@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
@@ -29,9 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
-	"cluster-api-addon-helm/internal"
 
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
@@ -87,23 +84,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.V(2).Info("Successfully patched HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
 	}()
 
-	labelSelector := helmReleaseProxy.Spec.ClusterSelector
-	log.V(2).Info("HelmReleaseProxy labels are", "labels", labelSelector)
-
-	log.V(2).Info("Getting list of clusters with labels")
-	clusterList, err := r.listClustersWithLabels(ctx, labelSelector)
-	if err != nil {
-		helmReleaseProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", labelSelector.MatchLabels).Error()))
-		helmReleaseProxy.Status.Ready = false
-
-		return ctrl.Result{}, err
-	}
-	if clusterList == nil {
-		log.V(2).Info("No clusters found")
-	}
-	for _, cluster := range clusterList.Items {
-		log.V(2).Info("Found cluster", "name", cluster.Name)
-	}
+	kubeconfigPath := ""
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmReleaseProxy.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -127,7 +108,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmReleaseProxy, finalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.reconcileDelete(ctx, helmReleaseProxy, clusterList.Items); err != nil {
+			if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfigPath); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				helmReleaseProxy.Status.FailureReason = to.StringPtr(err.Error())
@@ -160,7 +141,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "randomName", helmReleaseProxy.Name)
-	err = r.reconcileNormal(ctx, helmReleaseProxy, clusterList.Items)
+	err = r.reconcileNormal(ctx, helmReleaseProxy, kubeconfigPath)
 	if err != nil {
 		helmReleaseProxy.Status.Ready = false
 
@@ -190,93 +171,95 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // reconcileNormal,...
-func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, cluster *clusterv1.Cluster, kubeconfigPath string) error {
+func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, kubeconfigPath string) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", cluster.Name)
+	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
-	releases, err := internal.ListHelmReleases(ctx, kubeconfigPath)
-	if err != nil {
-		log.Error(err, "failed to list releases")
-	}
-	log.V(2).Info("Querying existing releases:")
-	for _, release := range releases {
-		log.V(2).Info("Release found on cluster", "releaseName", release.Name, "cluster", cluster.Name, "revision", release.Version)
-	}
+	// releases, err := internal.ListHelmReleases(ctx, kubeconfigPath)
+	// if err != nil {
+	// 	log.Error(err, "failed to list releases")
+	// }
+	// log.V(2).Info("Querying existing releases:")
+	// for _, release := range releases {
+	// 	log.V(2).Info("Release found on cluster", "releaseName", release.Name, "cluster", cluster.Name, "revision", release.Version)
+	// }
 
-	values, err := internal.ParseValues(ctx, r.Client, kubeconfigPath, helmReleaseProxy.Spec, cluster)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
-	}
+	// values, err := internal.ParseValues(ctx, r.Client, kubeconfigPath, helmReleaseProxy.Spec, cluster)
+	// if err != nil {
+	// 	return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
+	// }
 
-	existing, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
-	if err != nil {
-		log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
+	// existing, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
+	// if err != nil {
+	// 	log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
 
-		if err.Error() == "release: not found" {
-			// Go ahead and create chart
-			release, err := internal.InstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
-			if err != nil {
-				log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", cluster.Name)
-				return errors.Wrapf(err, "failed to install chart on cluster %s", cluster.Name)
-			}
-			if release != nil {
-				log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s, revision = %d", release.Name, cluster.Name, release.Version)))
-				// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
-			}
+	// 	if err.Error() == "release: not found" {
+	// 		// Go ahead and create chart
+	// 		release, err := internal.InstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
+	// 		if err != nil {
+	// 			log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", cluster.Name)
+	// 			return errors.Wrapf(err, "failed to install chart on cluster %s", cluster.Name)
+	// 		}
+	// 		if release != nil {
+	// 			log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s, revision = %d", release.Name, cluster.Name, release.Version)))
+	// 			// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
+	// 		}
 
-			return nil
-		}
+	// 		return nil
+	// 	}
 
-		return err
-	}
+	// 	return err
+	// }
 
-	if existing != nil {
-		// TODO: add logic for updating an existing release
-		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade", existing.Name, cluster.Name))
-		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
-		if err != nil {
-			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
-			return errors.Wrapf(err, "error upgrading chart with Helm on cluster %s", cluster.Name)
-		}
-		if release != nil && upgraded {
-			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s, revision = %d", release.Name, cluster.Name, release.Version)))
-			// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
-		}
-	}
+	// if existing != nil {
+	// 	// TODO: add logic for updating an existing release
+	// 	log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade", existing.Name, cluster.Name))
+	// 	release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
+	// 	if err != nil {
+	// 		log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", cluster.Name)
+	// 		return errors.Wrapf(err, "error upgrading chart with Helm on cluster %s", cluster.Name)
+	// 	}
+	// 	if release != nil && upgraded {
+	// 		log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s, revision = %d", release.Name, cluster.Name, release.Version)))
+	// 		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
+	// 	}
+	// }
 
 	return nil
 }
 
 // reconcileDelete...
-func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, cluster *clusterv1.Cluster, kubeconfigPath string) error {
+func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, kubeconfigPath string) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	_, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
-	if err != nil {
-		log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
+	log.V(2).Info("Deleting HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
-		if err.Error() == "release: not found" {
-			log.V(2).Info(fmt.Sprintf("Release '%s' not found on cluster %s, nothing to do for uninstall", helmReleaseProxy.Spec.ReleaseName, cluster.Name))
-			return nil
-		}
+	// _, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
+	// if err != nil {
+	// 	log.V(2).Error(err, "error getting release from cluster", "cluster", cluster.Name)
 
-		return err
-	}
+	// 	if err.Error() == "release: not found" {
+	// 		log.V(2).Info(fmt.Sprintf("Release '%s' not found on cluster %s, nothing to do for uninstall", helmReleaseProxy.Spec.ReleaseName, cluster.Name))
+	// 		return nil
+	// 	}
 
-	log.V(2).Info("Preparing to uninstall release on cluster", "releaseName", helmReleaseProxy.Spec.ReleaseName, "clusterName", cluster.Name)
+	// 	return err
+	// }
 
-	response, err := internal.UninstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
-	if err != nil {
-		log.V(2).Info("Error uninstalling chart with Helm:", err)
-		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", cluster.Name)
-	}
+	// log.V(2).Info("Preparing to uninstall release on cluster", "releaseName", helmReleaseProxy.Spec.ReleaseName, "clusterName", cluster.Name)
 
-	log.V(2).Info((fmt.Sprintf("Chart '%s' successfully uninstalled on cluster %s", helmReleaseProxy.Spec.ChartName, cluster.Name)))
+	// response, err := internal.UninstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
+	// if err != nil {
+	// 	log.V(2).Info("Error uninstalling chart with Helm:", err)
+	// 	return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", cluster.Name)
+	// }
 
-	if response != nil && response.Info != "" {
-		log.V(2).Info(fmt.Sprintf("Response is %s", response.Info))
-	}
+	// log.V(2).Info((fmt.Sprintf("Chart '%s' successfully uninstalled on cluster %s", helmReleaseProxy.Spec.ChartName, cluster.Name)))
+
+	// if response != nil && response.Info != "" {
+	// 	log.V(2).Info(fmt.Sprintf("Response is %s", response.Info))
+	// }
 
 	return nil
 }
