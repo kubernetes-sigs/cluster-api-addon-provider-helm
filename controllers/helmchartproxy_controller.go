@@ -94,13 +94,13 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		log.V(2).Info("Successfully patched HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	}()
 
-	labelSelector := helmChartProxy.Spec.ClusterSelector
-	log.V(2).Info("HelmChartProxy labels are", "labels", labelSelector)
+	label := helmChartProxy.Spec.ClusterSelector
+	log.V(2).Info("HelmChartProxy labels are", "labels", label)
 
 	log.V(2).Info("Getting list of clusters with labels")
-	clusterList, err := r.listClustersWithLabels(ctx, labelSelector)
+	clusterList, err := r.listClustersWithLabel(ctx, label)
 	if err != nil {
-		helmChartProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", labelSelector.MatchLabels).Error()))
+		helmChartProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", label).Error()))
 		helmChartProxy.Status.Ready = false
 
 		return ctrl.Result{}, err
@@ -296,16 +296,14 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	return nil
 }
 
-func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, labelSelector metav1.LabelSelector) (*clusterv1.ClusterList, error) {
+func (r *HelmChartProxyReconciler) listClustersWithLabel(ctx context.Context, label addonsv1beta1.ClusterSelectorLabel) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
-	labels := labelSelector.MatchLabels
-	// Empty labels should match nothing, not everything
-	if len(labels) == 0 {
-		return nil, nil
+	// TODO: validate empty key or empty value to make sure it doesn't match everything.
+	labelMap := map[string]string{
+		label.Key: label.Value,
 	}
 
-	// TODO: should we use ctrlClient.MatchingLabels or try to use the labelSelector itself?
-	if err := r.Client.List(ctx, clusterList, ctrlClient.MatchingLabels(labels)); err != nil {
+	if err := r.Client.List(ctx, clusterList, ctrlClient.MatchingLabels(labelMap)); err != nil {
 		return nil, err
 	}
 

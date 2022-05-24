@@ -27,15 +27,9 @@ import (
 type HelmChartProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ClusterSelector is a label selector for clusters. Existing Clusters selected by this will have the Helm chart installed.
-	ClusterSelector metav1.LabelSelector `json:"clusterSelector"`
-
-	// CustomSelectors is a map from a key to a CustomSelectorSpec. The CustomSelectorSpec is used to select an instance of a
-	// Cluster API resource that have multiple instances on the target cluster, i.e. Machines. The selector must resolve to a
-	// unique resource on each target cluster selected by the ClusterSelector. The key can then be used to reference the resource
-	// on the target cluster.
-	// +optional
-	CustomSelectors map[string]CustomSelectorSpec `json:"customSelectors"`
+	// ClusterSelector selects Clusters with a label that matches the specified key/value pair. The Helm chart will be installed on
+	// all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
+	ClusterSelector ClusterSelectorLabel `json:"clusterSelector"`
 
 	// ReleaseName is the release name of the installed Helm chart.
 	ReleaseName string `json:"releaseName"`
@@ -53,14 +47,13 @@ type HelmChartProxySpec struct {
 	Values map[string]string `json:"values,omitempty"`
 }
 
-// CustomSelectorSpec defines a label selector for a given Cluster API resource. The kind and selector must resolve to a
-// unique Cluster resource.
-type CustomSelectorSpec struct {
-	// Kind is the kind of Cluster API resource to select.
-	Kind string `json:"kind"`
+// ClusterSelectorLabel defines a key/value pair used to select Clusters with a label matching the specified key and value.
+type ClusterSelectorLabel struct {
+	// Key is the label key.
+	Key string `json:"kind"`
 
-	// Selector is the label selector to use for selecting the Cluster API resource.
-	Selector metav1.LabelSelector `json:"selector"`
+	// Value is the label value.
+	Value string `json:"value"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy

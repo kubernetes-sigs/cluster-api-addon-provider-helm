@@ -39,114 +39,20 @@ spec:
                 description: ChartName is the name of the Helm chart in the repository.
                 type: string
               clusterSelector:
-                description: ClusterSelector is a label selector for clusters. Existing
-                  Clusters selected by this will have the Helm chart installed.
+                description: ClusterSelector selects Clusters with a label that matches
+                  the specified key/value pair. The Helm chart will be installed on
+                  all selected Clusters. If a Cluster is no longer selected, the Helm
+                  release will be uninstalled.
                 properties:
-                  matchExpressions:
-                    description: matchExpressions is a list of label selector requirements.
-                      The requirements are ANDed.
-                    items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
-                      properties:
-                        key:
-                          description: key is the label key that the selector applies
-                            to.
-                          type: string
-                        operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
-                          type: string
-                        values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
-                            merge patch.
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - key
-                      - operator
-                      type: object
-                    type: array
-                  matchLabels:
-                    additionalProperties:
-                      type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
-                    type: object
-                type: object
-              customSelectors:
-                additionalProperties:
-                  description: CustomSelectorSpec defines a label selector for a given
-                    Cluster API resource. The kind and selector must resolve to a
-                    unique Cluster resource.
-                  properties:
-                    kind:
-                      description: Kind is the kind of Cluster API resource to select.
-                      type: string
-                    selector:
-                      description: Selector is the label selector to use for selecting
-                        the Cluster API resource.
-                      properties:
-                        matchExpressions:
-                          description: matchExpressions is a list of label selector
-                            requirements. The requirements are ANDed.
-                          items:
-                            description: A label selector requirement is a selector
-                              that contains values, a key, and an operator that relates
-                              the key and values.
-                            properties:
-                              key:
-                                description: key is the label key that the selector
-                                  applies to.
-                                type: string
-                              operator:
-                                description: operator represents a key's relationship
-                                  to a set of values. Valid operators are In, NotIn,
-                                  Exists and DoesNotExist.
-                                type: string
-                              values:
-                                description: values is an array of string values.
-                                  If the operator is In or NotIn, the values array
-                                  must be non-empty. If the operator is Exists or
-                                  DoesNotExist, the values array must be empty. This
-                                  array is replaced during a strategic merge patch.
-                                items:
-                                  type: string
-                                type: array
-                            required:
-                            - key
-                            - operator
-                            type: object
-                          type: array
-                        matchLabels:
-                          additionalProperties:
-                            type: string
-                          description: matchLabels is a map of {key,value} pairs.
-                            A single {key,value} in the matchLabels map is equivalent
-                            to an element of matchExpressions, whose key field is
-                            "key", the operator is "In", and the values array contains
-                            only "value". The requirements are ANDed.
-                          type: object
-                      type: object
-                  required:
-                  - kind
-                  - selector
-                  type: object
-                description: CustomSelectors is a map from a key to a CustomSelectorSpec.
-                  The CustomSelectorSpec is used to select an instance of a Cluster
-                  API resource that have multiple instances on the target cluster,
-                  i.e. Machines. The selector must resolve to a unique resource on
-                  each target cluster selected by the ClusterSelector. The key can
-                  then be used to reference the resource on the target cluster.
+                  kind:
+                    description: Key is the label key.
+                    type: string
+                  value:
+                    description: Value is the label value.
+                    type: string
+                required:
+                - kind
+                - value
                 type: object
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
