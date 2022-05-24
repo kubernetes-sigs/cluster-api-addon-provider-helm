@@ -50,7 +50,7 @@ type HelmChartProxySpec struct {
 // ClusterSelectorLabel defines a key/value pair used to select Clusters with a label matching the specified key and value.
 type ClusterSelectorLabel struct {
 	// Key is the label key.
-	Key string `json:"kind"`
+	Key string `json:"key"`
 
 	// Value is the label value.
 	Value string `json:"value"`

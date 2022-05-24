@@ -204,7 +204,7 @@ func ListHelmReleases(ctx context.Context, kubeconfigPath string) ([]*release.Re
 	return releases, nil
 }
 
-func UninstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec) (*release.UninstallReleaseResponse, error) {
+func UninstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.UninstallReleaseResponse, error) {
 	_, actionConfig, err := HelmInit(ctx, kubeconfigPath)
 	if err != nil {
 		return nil, err

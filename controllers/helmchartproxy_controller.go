@@ -229,8 +229,8 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		}
 	}
 
-	log.V(2).Info("Creating or updating on clusters", "clusters", clusters)
 	for _, cluster := range clusters {
+		log.V(2).Info("Creating or updating on cluster", "cluster", cluster.Name)
 		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
 		if err != nil {
 			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
@@ -242,6 +242,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
 		}
 
+		log.V(2).Info("Values for cluster", "cluster", cluster.Name, "values", values)
 		r.createOrUpdateHelmReleaseProxy(ctx, helmChartProxy, &cluster, values)
 	}
 
@@ -327,26 +328,32 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 
 // createOrUpdateHelmReleaseProxy...
 func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues map[string]string) (*addonsv1beta1.HelmReleaseProxy, error) {
+	log := ctrl.LoggerFrom(ctx)
+	helmReleaseProxyName := helmChartProxy.Spec.ReleaseName + "-" + cluster.Name
+	helmReleaseProxyNamespace := helmChartProxy.Namespace
+
 	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
 	helmReleaseProxyKey := client.ObjectKey{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Name,
+		Namespace: helmReleaseProxyNamespace,
+		Name:      helmReleaseProxyName,
 	}
 
+	log.V(2).Info("Getting HelmReleaseProxy", "cluster", cluster.Name)
 	if err := r.Client.Get(ctx, helmReleaseProxyKey, helmReleaseProxy); err != nil {
+		log.Error(err, "failed to get HelmReleaseProxy", "cluster", cluster.Name)
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
 
 		// TODO: fix naming
-		helmReleaseProxy.Name = helmChartProxy.Spec.ReleaseName + "-" + cluster.Name
-		helmReleaseProxy.Namespace = cluster.Namespace
-		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, metav1.OwnerReference{
-			APIVersion: clusterv1.GroupVersion.String(),
-			Kind:       "Cluster",
-			Name:       cluster.Name,
-			UID:        cluster.UID,
-		})
+		helmReleaseProxy.Name = helmReleaseProxyName
+		helmReleaseProxy.Namespace = helmReleaseProxyNamespace
+		// helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, metav1.OwnerReference{
+		// 	APIVersion: clusterv1.GroupVersion.String(),
+		// 	Kind:       "Cluster",
+		// 	Name:       cluster.Name,
+		// 	UID:        cluster.UID,
+		// })
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
 		newLabels := map[string]string{}
 		newLabels[clusterv1.ClusterLabelName] = cluster.Name
@@ -375,11 +382,13 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 			return nil, errors.Wrapf(err, "failed to create helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
 		}
 	} else {
+		log.V(2).Info("Existing HelmReleaseValues are", "releaseName", helmReleaseProxy.Name, "values", helmReleaseProxy.Spec.Values)
 		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
 		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
 		helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
 		helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 		helmReleaseProxy.Spec.Values = parsedValues
+		log.V(2).Info("Updated HelmReleaseValues are", "releaseName", helmReleaseProxy.Name, "values", helmReleaseProxy.Spec.Values)
 		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
 			return nil, errors.Wrapf(err, "failed to update helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
 		}

@@ -19,6 +19,7 @@ package internal
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
@@ -139,4 +140,13 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string
 	log.V(3).Info("Values", "values", specValues)
 
 	return specValues, nil
+}
+
+func ValueMapToArray(valueMap map[string]string) []string {
+	valueArray := make([]string, 0, len(valueMap))
+	for k, v := range valueMap {
+		valueArray = append(valueArray, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return valueArray
 }

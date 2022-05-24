@@ -44,14 +44,14 @@ spec:
                   all selected Clusters. If a Cluster is no longer selected, the Helm
                   release will be uninstalled.
                 properties:
-                  kind:
+                  key:
                     description: Key is the label key.
                     type: string
                   value:
                     description: Value is the label value.
                     type: string
                 required:
-                - kind
+                - key
                 - value
                 type: object
               releaseName:
