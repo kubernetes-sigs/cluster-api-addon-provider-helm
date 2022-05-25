@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -64,6 +65,14 @@ type HelmChartProxyStatus struct {
 	// Ready is true when the provider resource is ready.
 	// +optional
 	Ready bool `json:"ready"`
+
+	// InstalledClusters is the list of references to clusters the HelmChartProxy has installed a Helm release on.
+	// +optional
+	InstalledClusters []corev1.ObjectReference `json:"installedClusters"`
+
+	// FailedClusters is the list of references to clusters the HelmChartProxy failed to install a Helm release on.
+	// +optional
+	FailedClusters []corev1.ObjectReference `json:"failedClusters"`
 
 	// FailureReason will be set in the event that there is a an error reconciling the HelmChartProxy.
 	// +optional

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -243,7 +244,9 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		}
 
 		log.V(2).Info("Values for cluster", "cluster", cluster.Name, "values", values)
-		r.createOrUpdateHelmReleaseProxy(ctx, helmChartProxy, &cluster, values)
+		if err := r.createOrUpdateHelmReleaseProxy(ctx, helmChartProxy, &cluster, values); err != nil {
+			return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
+		}
 	}
 
 	return nil
@@ -327,27 +330,63 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 }
 
 // createOrUpdateHelmReleaseProxy...
-func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues map[string]string) (*addonsv1beta1.HelmReleaseProxy, error) {
+func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues map[string]string) error {
 	log := ctrl.LoggerFrom(ctx)
 	helmReleaseProxyName := helmChartProxy.Spec.ReleaseName + "-" + cluster.Name
 	helmReleaseProxyNamespace := helmChartProxy.Namespace
 
-	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
+	existing := &addonsv1beta1.HelmReleaseProxy{}
 	helmReleaseProxyKey := client.ObjectKey{
 		Namespace: helmReleaseProxyNamespace,
 		Name:      helmReleaseProxyName,
 	}
 
 	log.V(2).Info("Getting HelmReleaseProxy", "cluster", cluster.Name)
-	if err := r.Client.Get(ctx, helmReleaseProxyKey, helmReleaseProxy); err != nil {
+	if err := r.Client.Get(ctx, helmReleaseProxyKey, existing); err != nil {
 		log.Error(err, "failed to get HelmReleaseProxy", "cluster", cluster.Name)
 		if !apierrors.IsNotFound(err) {
-			return nil, err
+			return err
 		}
 
-		// TODO: fix naming
-		helmReleaseProxy.Name = helmReleaseProxyName
-		helmReleaseProxy.Namespace = helmReleaseProxyNamespace
+		helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, nil, helmChartProxy, parsedValues, cluster)
+
+		if err := r.Client.Create(ctx, helmReleaseProxy); err != nil {
+			return errors.Wrapf(err, "failed to create helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
+		}
+	} else {
+		log.V(2).Info("Existing HelmReleaseValues are", "releaseName", existing.Name, "values", existing.Spec.Values)
+		helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, existing, helmChartProxy, parsedValues, cluster)
+		if helmReleaseProxy == nil {
+			log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)
+		}
+		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
+			return errors.Wrapf(err, "failed to update helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
+		}
+	}
+
+	return nil
+}
+
+// deleteHelmReleaseProxy...
+func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	if err := r.Client.Delete(ctx, helmReleaseProxy); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(2).Info("HelmReleaseProxy already deleted, nothing to do", "helmReleaseProxy", helmReleaseProxy.Name)
+			return nil
+		}
+		return errors.Wrapf(err, "failed to create helmReleaseProxy: %s", helmReleaseProxy.Name)
+	}
+
+	return nil
+}
+
+func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, parsedValues map[string]string, cluster *clusterv1.Cluster) *addonsv1beta1.HelmReleaseProxy {
+	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
+	if existing == nil {
+		helmReleaseProxy.Name = name
+		helmReleaseProxy.Namespace = helmChartProxy.Namespace
 		// helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, metav1.OwnerReference{
 		// 	APIVersion: clusterv1.GroupVersion.String(),
 		// 	Kind:       "Cluster",
@@ -366,48 +405,34 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 			Name:       cluster.Name,
 			Namespace:  cluster.Namespace,
 		}
-		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
-		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
-		helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
-		helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
-		helmReleaseProxy.Spec.Values = parsedValues
-
-		if err := r.Client.Create(ctx, helmReleaseProxy); err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				if err = r.Client.Get(ctx, helmReleaseProxyKey, helmReleaseProxy); err != nil {
-					return nil, err
-				}
-				return helmReleaseProxy, nil
-			}
-			return nil, errors.Wrapf(err, "failed to create helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
-		}
 	} else {
-		log.V(2).Info("Existing HelmReleaseValues are", "releaseName", helmReleaseProxy.Name, "values", helmReleaseProxy.Spec.Values)
-		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
-		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
-		helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
-		helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
-		helmReleaseProxy.Spec.Values = parsedValues
-		log.V(2).Info("Updated HelmReleaseValues are", "releaseName", helmReleaseProxy.Name, "values", helmReleaseProxy.Spec.Values)
-		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
-			return nil, errors.Wrapf(err, "failed to update helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
+		changed := false
+		if existing.Spec.ChartName != helmChartProxy.Spec.ChartName {
+			changed = true
 		}
-	}
+		if existing.Spec.RepoURL != helmChartProxy.Spec.RepoURL {
+			changed = true
+		}
+		if existing.Spec.ReleaseName != helmChartProxy.Spec.ReleaseName {
+			changed = true
+		}
+		if existing.Spec.Version != helmChartProxy.Spec.Version {
+			changed = true
+		}
+		if !cmp.Equal(existing.Spec.Values, parsedValues) {
+			changed = true
+		}
 
-	return helmReleaseProxy, nil
-}
-
-// deleteHelmReleaseProxy...
-func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	if err := r.Client.Delete(ctx, helmReleaseProxy); err != nil {
-		if apierrors.IsNotFound(err) {
-			log.V(2).Info("HelmReleaseProxy already deleted, nothing to do", "helmReleaseProxy", helmReleaseProxy.Name)
+		if !changed {
 			return nil
 		}
-		return errors.Wrapf(err, "failed to create helmReleaseProxy: %s", helmReleaseProxy.Name)
 	}
 
-	return nil
+	helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
+	helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
+	helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
+	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
+	helmReleaseProxy.Spec.Values = parsedValues
+
+	return helmReleaseProxy
 }
