@@ -1,11 +1,11 @@
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: HelmChartProxy
 metadata:
-  name: cloud-provider-azure-helmchartproxy
+  name: cloud-provider-azure-chart
 spec:
   clusterSelector:
-    key: cloudProviderAzure
-    value: "true"
+    key: cloudProviderAzureChart
+    value: "enabled"
   releaseName: cloud-provider-azure
   repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
   chartName: cloud-provider-azure

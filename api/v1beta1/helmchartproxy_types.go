@@ -66,13 +66,9 @@ type HelmChartProxyStatus struct {
 	// +optional
 	Ready bool `json:"ready"`
 
-	// InstalledClusters is the list of references to clusters the HelmChartProxy has installed a Helm release on.
+	// MatchingClusters is the list of references to clusters selected by the ClusterSelectorLabel.
 	// +optional
-	InstalledClusters []corev1.ObjectReference `json:"installedClusters"`
-
-	// FailedClusters is the list of references to clusters the HelmChartProxy failed to install a Helm release on.
-	// +optional
-	FailedClusters []corev1.ObjectReference `json:"failedClusters"`
+	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
 
 	// FailureReason will be set in the event that there is a an error reconciling the HelmChartProxy.
 	// +optional

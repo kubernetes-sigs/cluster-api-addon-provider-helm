@@ -93,13 +93,17 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Name:      helmReleaseProxy.Spec.ClusterRef.Name,
 	}
 	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
+		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
+		setReleaseError(helmReleaseProxy, wrappedErr)
+		return ctrl.Result{}, wrappedErr
 	}
 
 	// TODO: is there a way to get around writing this to a file
 	kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, cluster)
 	if err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to write kubeconfig to file")
+		wrappedErr := errors.Wrapf(err, "failed to write kubeconfig to file")
+		setReleaseError(helmReleaseProxy, wrappedErr)
+		return ctrl.Result{}, wrappedErr
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
@@ -110,13 +114,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if !controllerutil.ContainsFinalizer(helmReleaseProxy, finalizer) {
 			controllerutil.AddFinalizer(helmReleaseProxy, finalizer)
 			if err := r.Update(ctx, helmReleaseProxy); err != nil {
-				helmReleaseProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to add finalizer").Error())
-				helmReleaseProxy.Status.Ready = false
-				if err := r.Status().Update(ctx, helmReleaseProxy); err != nil {
-					log.Error(err, "unable to update HelmReleaseProxy status")
-					return ctrl.Result{}, err
-				}
-
+				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
 		}
@@ -127,13 +125,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfigPath); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
-				helmReleaseProxy.Status.FailureReason = to.StringPtr(err.Error())
-				helmReleaseProxy.Status.Ready = false
-				if err := r.Status().Update(ctx, helmReleaseProxy); err != nil {
-					log.Error(err, "unable to update HelmReleaseProxy status")
-					return ctrl.Result{}, err
-				}
-
+				setReleaseError(helmReleaseProxy, err)
 				return ctrl.Result{}, err
 			}
 
@@ -141,13 +133,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmReleaseProxy, finalizer)
 			if err := r.Update(ctx, helmReleaseProxy); err != nil {
-				helmReleaseProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to remove finalizer").Error())
-				helmReleaseProxy.Status.Ready = false
-				if err := r.Status().Update(ctx, helmReleaseProxy); err != nil {
-					log.Error(err, "unable to update HelmReleaseProxy status")
-					return ctrl.Result{}, err
-				}
-
+				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
 		}
@@ -158,20 +144,9 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
 	err = r.reconcileNormal(ctx, helmReleaseProxy, kubeconfigPath)
-	if err != nil {
-		helmReleaseProxy.Status.Ready = false
+	setReleaseError(helmReleaseProxy, err)
 
-		return ctrl.Result{}, err
-	}
-
-	helmReleaseProxy.Status.FailureReason = nil
-	helmReleaseProxy.Status.Ready = true
-	if err := r.Status().Update(ctx, helmReleaseProxy); err != nil {
-		log.Error(err, "unable to update HelmReleaseProxy status")
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -198,6 +173,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 	if err != nil {
 		log.V(2).Error(err, "error getting release from cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
+		// TODO: use something like `apierrors.IsNotFound(err)` instead
 		if err.Error() == "release: not found" {
 			// Go ahead and create chart
 			release, err := internal.InstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
@@ -266,4 +242,14 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	}
 
 	return nil
+}
+
+func setReleaseError(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, err error) {
+	if err != nil {
+		helmReleaseProxy.Status.FailureReason = to.StringPtr(err.Error())
+		helmReleaseProxy.Status.Ready = false
+	} else {
+		helmReleaseProxy.Status.FailureReason = nil
+		helmReleaseProxy.Status.Ready = true
+	}
 }

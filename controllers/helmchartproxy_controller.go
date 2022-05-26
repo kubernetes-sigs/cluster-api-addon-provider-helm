@@ -96,33 +96,22 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}()
 
 	label := helmChartProxy.Spec.ClusterSelector
-	log.V(2).Info("HelmChartProxy labels are", "labels", label)
 
-	log.V(2).Info("Getting list of clusters with labels")
+	log.V(2).Info("Finding matching clusters for HelmChartProxy with label", "helmChartProxy", helmChartProxy.Name, "label", label)
 	clusterList, err := r.listClustersWithLabel(ctx, label)
 	if err != nil {
-		helmChartProxy.Status.FailureReason = to.StringPtr((errors.Wrapf(err, "failed to list clusters with label selector %+v", label).Error()))
-		helmChartProxy.Status.Ready = false
-
+		setChartError(helmChartProxy, errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
 		return ctrl.Result{}, err
 	}
-	if clusterList == nil {
-		log.V(2).Info("No clusters found")
-	}
-	for _, cluster := range clusterList.Items {
-		log.V(2).Info("Found cluster", "name", cluster.Name)
-	}
 
-	log.V(2).Info("Getting list of HelmReleaseProxies with label matching HelmChartProxy name")
+	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	labels := map[string]string{
 		HelmChartProxyLabelName: helmChartProxy.Name,
 	}
 	releaseList, err := r.listInstalledReleases(ctx, labels)
-	if releaseList == nil {
-		log.V(2).Info("No HelmReleaseProxy found")
-	}
-	for _, release := range releaseList.Items {
-		log.V(2).Info("Found HelmReleaseProxy", "name", release.Name)
+	if err != nil {
+		setChartError(helmChartProxy, errors.Wrapf(err, "failed to list installed releases with labels %+v", labels))
+		return ctrl.Result{}, err
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
@@ -133,13 +122,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if !controllerutil.ContainsFinalizer(helmChartProxy, finalizer) {
 			controllerutil.AddFinalizer(helmChartProxy, finalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
-				helmChartProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to add finalizer").Error())
-				helmChartProxy.Status.Ready = false
-				if err := r.Status().Update(ctx, helmChartProxy); err != nil {
-					log.Error(err, "unable to update HelmChartProxy status")
-					return ctrl.Result{}, err
-				}
-
+				// TODO: Should we try to set the error here? If we can't add the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
 		}
@@ -150,51 +133,28 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.reconcileDelete(ctx, helmChartProxy, releaseList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
-				helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
-				helmChartProxy.Status.Ready = false
-				if err := r.Status().Update(ctx, helmChartProxy); err != nil {
-					log.Error(err, "unable to update HelmChartProxy status")
-					return ctrl.Result{}, err
-				}
-
+				setChartError(helmChartProxy, err)
 				return ctrl.Result{}, err
 			}
 
-			helmChartProxy.Status.Ready = true
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmChartProxy, finalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
-				helmChartProxy.Status.FailureReason = to.StringPtr(errors.Wrapf(err, "failed to remove finalizer").Error())
-				helmChartProxy.Status.Ready = false
-				if err := r.Status().Update(ctx, helmChartProxy); err != nil {
-					log.Error(err, "unable to update HelmChartProxy status")
-					return ctrl.Result{}, err
-				}
-
+				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
 		}
 
 		// Stop reconciliation as the item is being deleted
+		setChartError(helmChartProxy, nil)
 		return ctrl.Result{}, nil
 	}
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items, releaseList.Items)
-	if err != nil {
-		helmChartProxy.Status.Ready = false
 
-		return ctrl.Result{}, err
-	}
-
-	helmChartProxy.Status.FailureReason = nil
-	helmChartProxy.Status.Ready = true
-	if err := r.Status().Update(ctx, helmChartProxy); err != nil {
-		log.Error(err, "unable to update HelmChartProxy status")
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
+	setChartError(helmChartProxy, err)
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -387,12 +347,6 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 	if existing == nil {
 		helmReleaseProxy.Name = name
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
-		// helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, metav1.OwnerReference{
-		// 	APIVersion: clusterv1.GroupVersion.String(),
-		// 	Kind:       "Cluster",
-		// 	Name:       cluster.Name,
-		// 	UID:        cluster.UID,
-		// })
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
 		newLabels := map[string]string{}
 		newLabels[clusterv1.ClusterLabelName] = cluster.Name
@@ -435,4 +389,28 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 	helmReleaseProxy.Spec.Values = parsedValues
 
 	return helmReleaseProxy
+}
+
+func setMatchingClusters(helmChartProxy *addonsv1beta1.HelmChartProxy, clusterList []clusterv1.Cluster) {
+	matchingClusters := make([]corev1.ObjectReference, 0, len(clusterList))
+	for _, cluster := range clusterList {
+		matchingClusters = append(matchingClusters, corev1.ObjectReference{
+			Kind:       cluster.Kind,
+			APIVersion: cluster.APIVersion,
+			Name:       cluster.Name,
+			Namespace:  cluster.Namespace,
+		})
+	}
+
+	helmChartProxy.Status.MatchingClusters = matchingClusters
+}
+
+func setChartError(helmChartProxy *addonsv1beta1.HelmChartProxy, err error) {
+	if err != nil {
+		helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
+		helmChartProxy.Status.Ready = false
+	} else {
+		helmChartProxy.Status.FailureReason = nil
+		helmChartProxy.Status.Ready = true
+	}
 }
