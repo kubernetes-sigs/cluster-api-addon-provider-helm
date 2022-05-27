@@ -103,6 +103,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		setChartError(helmChartProxy, errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
 		return ctrl.Result{}, err
 	}
+	setMatchingClusters(helmChartProxy, clusterList.Items)
 
 	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	labels := map[string]string{
@@ -318,6 +319,7 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 		helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, existing, helmChartProxy, parsedValues, cluster)
 		if helmReleaseProxy == nil {
 			log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)
+			return nil
 		}
 		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
 			return errors.Wrapf(err, "failed to update helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
