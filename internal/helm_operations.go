@@ -142,10 +142,10 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 	log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
 	// upgrader.DryRun = true
 	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
-	fmt.Printf("DryRun config diff: %s", cmp.Diff(release.Config, existing.Config))
 	if err != nil {
 		return nil, false, err
 	}
+	fmt.Printf("DryRun config diff: %s", cmp.Diff(release.Config, existing.Config))
 
 	return release, true, nil
 }
