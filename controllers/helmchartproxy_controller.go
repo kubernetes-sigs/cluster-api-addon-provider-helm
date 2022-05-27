@@ -312,17 +312,18 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 		helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, nil, helmChartProxy, parsedValues, cluster)
 
 		if err := r.Client.Create(ctx, helmReleaseProxy); err != nil {
-			return errors.Wrapf(err, "failed to create helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
+			return errors.Wrapf(err, "failed to create HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
 	} else {
-		log.V(2).Info("Existing HelmReleaseValues are", "releaseName", existing.Name, "values", existing.Spec.Values)
+		log.V(2).Info("Existing HelmReleaseProxy values are", "helmReleaseProxy", existing.Name, "values", existing.Spec.Values)
+		log.V(2).Info("Existing HelmReleaseProxy struct is", "helmReleaseProxy", existing)
 		helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, existing, helmChartProxy, parsedValues, cluster)
 		if helmReleaseProxy == nil {
 			log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)
 			return nil
 		}
 		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
-			return errors.Wrapf(err, "failed to update helmReleaseProxy for cluster: %s/%s", cluster.Namespace, cluster.Name)
+			return errors.Wrapf(err, "failed to update HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
 	}
 
@@ -362,6 +363,7 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 			Namespace:  cluster.Namespace,
 		}
 	} else {
+		helmReleaseProxy = existing
 		changed := false
 		if existing.Spec.ChartName != helmChartProxy.Spec.ChartName {
 			changed = true
