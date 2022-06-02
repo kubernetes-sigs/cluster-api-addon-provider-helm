@@ -193,13 +193,13 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	for _, cluster := range clusters {
 		log.V(2).Info("Creating or updating on cluster", "cluster", cluster.Name)
-		kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, &cluster)
-		if err != nil {
-			log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
-			return err
-		}
+		// kubeconfig, err := internal.GetClusterKubeconfig(ctx, &cluster)
+		// if err != nil {
+		// 	log.Error(err, "failed to get kubeconfig for cluster", "cluster", cluster.Name)
+		// 	return err
+		// }
 
-		values, err := internal.ParseValues(ctx, r.Client, kubeconfigPath, helmChartProxy.Spec, &cluster)
+		values, err := internal.ParseValues(ctx, r.Client, helmChartProxy.Spec, &cluster)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
 		}

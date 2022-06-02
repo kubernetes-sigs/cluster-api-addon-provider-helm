@@ -5,13 +5,11 @@ metadata:
 spec:
   clusterSelector:
     key: cloudProviderAzureChart
-    value: "enabled"
-  releaseName: cloud-provider-azure
+    value: enabled
   repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
   chartName: cloud-provider-azure
   version: 1.23.8
+  releaseName: cloud-provider-azure
   values:
     infra.clusterName: "{{ .Cluster.Name }}"
     cloudControllerManager.containerResourceManagement.limitsCPU: "{{ add .ControlPlane.Spec.Replicas 10 }}"
-    # cloudNodeManager.containerResourceManagement.limitsCPU: "{{ (index .MachineDeployments \"mdKey\").Spec.Replicas }}"
-    # cloudControllerManager.containerResourceManagement.limitsCPU: "{{if lt (DerefInt32 .ControlPlane.Spec.Replicas) 5 }}10{{else}}20{{end}}"

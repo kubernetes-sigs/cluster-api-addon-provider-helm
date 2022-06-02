@@ -31,6 +31,29 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+func GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	c, err := client.New("")
+	if err != nil {
+		return "", err
+	}
+
+	options := client.GetKubeconfigOptions{
+		Kubeconfig: client.Kubeconfig{},
+		// Kubeconfig:          client.Kubeconfig{Path: gk.kubeconfig, Context: gk.kubeconfigContext},
+		WorkloadClusterName: cluster.Name,
+		Namespace:           cluster.Namespace,
+	}
+
+	log.V(4).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
+	kubeconfig, err := c.GetKubeconfig(options)
+	if err != nil {
+		return "", err
+	}
+
+	return kubeconfig, nil
+}
+
 func WriteClusterKubeconfigToFile(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	c, err := client.New("")

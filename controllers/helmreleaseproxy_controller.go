@@ -99,7 +99,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// TODO: is there a way to get around writing this to a file
-	kubeconfigPath, err := internal.WriteClusterKubeconfigToFile(ctx, cluster)
+	kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to write kubeconfig to file")
 		setReleaseError(helmReleaseProxy, wrappedErr)
@@ -122,7 +122,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmReleaseProxy, finalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfigPath); err != nil {
+			if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfig); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				setReleaseError(helmReleaseProxy, err)
@@ -143,7 +143,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
-	err = r.reconcileNormal(ctx, helmReleaseProxy, kubeconfigPath)
+	err = r.reconcileNormal(ctx, helmReleaseProxy, kubeconfig)
 	setReleaseError(helmReleaseProxy, err)
 
 	return ctrl.Result{}, err
@@ -162,21 +162,21 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // reconcileNormal,...
-func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, kubeconfigPath string) error {
+func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, kubeconfig string) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
 	values := internal.ValueMapToArray(helmReleaseProxy.Spec.Values)
 
-	existing, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
+	existing, err := internal.GetHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
 	if err != nil {
 		log.V(2).Error(err, "error getting release from cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
 		// TODO: use something like `apierrors.IsNotFound(err)` instead
 		if err.Error() == "release: not found" {
 			// Go ahead and create chart
-			release, err := internal.InstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
+			release, err := internal.InstallHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec, values)
 			if err != nil {
 				log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 				return errors.Wrapf(err, "failed to install chart on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
@@ -195,7 +195,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 	if existing != nil {
 		// TODO: add logic for updating an existing release
 		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade", existing.Name, helmReleaseProxy.Spec.ClusterRef.Name))
-		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec, values)
+		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec, values)
 		if err != nil {
 			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 			return errors.Wrapf(err, "error upgrading chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
@@ -210,12 +210,12 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 }
 
 // reconcileDelete...
-func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, kubeconfigPath string) error {
+func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, kubeconfig string) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Deleting HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
-	_, err := internal.GetHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
+	_, err := internal.GetHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
 	if err != nil {
 		log.V(2).Error(err, "error getting release from cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
@@ -229,7 +229,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 
 	log.V(2).Info("Preparing to uninstall release on cluster", "releaseName", helmReleaseProxy.Spec.ReleaseName, "clusterName", helmReleaseProxy.Spec.ClusterRef.Name)
 
-	response, err := internal.UninstallHelmRelease(ctx, kubeconfigPath, helmReleaseProxy.Spec)
+	response, err := internal.UninstallHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
 	if err != nil {
 		log.V(2).Info("Error uninstalling chart with Helm:", err)
 		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)

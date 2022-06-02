@@ -112,7 +112,7 @@ type BuiltinTypes struct {
 	Machines           map[string]clusterv1.Machine
 }
 
-func ParseValues(ctx context.Context, c ctrlClient.Client, kubeconfigPath string, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (map[string]string, error) {
+func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (map[string]string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	specValues := map[string]string{}
 	for k, v := range spec.Values {

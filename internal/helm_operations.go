@@ -30,31 +30,78 @@ import (
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/release"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
 )
 
-func HelmInit(ctx context.Context, kubeconfigPath string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
+func GetActionConfig(ctx context.Context, namespace string, config *rest.Config) (*helmAction.Configuration, error) {
 	log := ctrl.LoggerFrom(ctx)
 	logf := func(format string, v ...interface{}) {
 		log.V(4).Info(fmt.Sprintf(format, v...))
 	}
 
-	settings := helmCli.New()
-	settings.KubeConfig = kubeconfigPath
 	actionConfig := new(helmAction.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", logf); err != nil {
+	// var cliConfig *genericclioptions.ConfigFlags
+	// cliConfig := &genericclioptions.ConfigFlags{
+	// 	Namespace:        &env.namespace,
+	// 	Context:          &env.KubeContext,
+	// 	BearerToken:      &env.KubeToken,
+	// 	APIServer:        &env.KubeAPIServer,
+	// 	CAFile:           &env.KubeCaFile,
+	// 	KubeConfig:       &env.KubeConfig,
+	// 	Impersonate:      &env.KubeAsUser,
+	// 	ImpersonateGroup: &env.KubeAsGroups,
+	// }
+	// insecure := true
+	cliConfig := genericclioptions.NewConfigFlags(false)
+	cliConfig.APIServer = &config.Host
+	cliConfig.BearerToken = &config.BearerToken
+	cliConfig.Namespace = &namespace
+	// Drop their rest.Config and just return inject own
+	wrapper := func(*rest.Config) *rest.Config {
+		return config
+	}
+	cliConfig.WithWrapConfigFn(wrapper)
+	// cliConfig.Insecure = &insecure
+	if err := actionConfig.Init(cliConfig, namespace, "secret", logf); err != nil {
+		return nil, err
+	}
+	return actionConfig, nil
+}
+
+func HelmInit(ctx context.Context, kubeconfig string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
+	// log := ctrl.LoggerFrom(ctx)
+
+	settings := helmCli.New()
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
+	if err != nil {
 		return nil, nil, err
 	}
+
+	namespace := "default"
+	actionConfig, err := GetActionConfig(ctx, namespace, restConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// settings.KubeConfig = kubeconfig
+	// actionConfig := new(helmAction.Configuration)
+	// if err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", logf); err != nil {
+	// 	return nil, nil, err
+	// }
 
 	return settings, actionConfig, nil
 }
 
-func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, error) {
+func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, kubeconfigPath)
+	settings, actionConfig, err := HelmInit(ctx, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +140,10 @@ func InstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 }
 
 // This function will be refactored to differentiate from installHelmRelease()
-func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, bool, error) {
+func UpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, kubeconfigPath)
+	settings, actionConfig, err := HelmInit(ctx, kubeconfig)
 	if err != nil {
 		return nil, false, err
 	}
@@ -125,7 +172,7 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv
 		return nil, false, errors.Errorf("failed to load request chart %s", spec.ChartName)
 	}
 
-	existing, err := GetHelmRelease(ctx, kubeconfigPath, spec)
+	existing, err := GetHelmRelease(ctx, kubeconfig, spec)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to get existing release")
 	}
@@ -176,8 +223,8 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 	return !cmp.Equal(oldValues, newValues), nil
 }
 
-func GetHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.Release, error) {
-	_, actionConfig, err := HelmInit(ctx, kubeconfigPath)
+func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.Release, error) {
+	_, actionConfig, err := HelmInit(ctx, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +237,8 @@ func GetHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1bet
 	return release, nil
 }
 
-func ListHelmReleases(ctx context.Context, kubeconfigPath string) ([]*release.Release, error) {
-	_, actionConfig, err := HelmInit(ctx, kubeconfigPath)
+func ListHelmReleases(ctx context.Context, kubeconfig string) ([]*release.Release, error) {
+	_, actionConfig, err := HelmInit(ctx, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -204,8 +251,8 @@ func ListHelmReleases(ctx context.Context, kubeconfigPath string) ([]*release.Re
 	return releases, nil
 }
 
-func UninstallHelmRelease(ctx context.Context, kubeconfigPath string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.UninstallReleaseResponse, error) {
-	_, actionConfig, err := HelmInit(ctx, kubeconfigPath)
+func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.UninstallReleaseResponse, error) {
+	_, actionConfig, err := HelmInit(ctx, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
