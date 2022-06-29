@@ -56,11 +56,12 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	// 	Impersonate:      &env.KubeAsUser,
 	// 	ImpersonateGroup: &env.KubeAsGroups,
 	// }
-	// insecure := true
+	insecure := true
 	cliConfig := genericclioptions.NewConfigFlags(false)
 	cliConfig.APIServer = &config.Host
 	cliConfig.BearerToken = &config.BearerToken
 	cliConfig.Namespace = &namespace
+	cliConfig.Insecure = &insecure
 	// Drop their rest.Config and just return inject own
 	wrapper := func(*rest.Config) *rest.Config {
 		return config
