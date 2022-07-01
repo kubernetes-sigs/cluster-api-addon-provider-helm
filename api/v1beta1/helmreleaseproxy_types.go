@@ -64,7 +64,7 @@ type HelmReleaseProxyStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// HelmReleaseProxy is the Schema for the helmchartproxies API
+// HelmReleaseProxy is the Schema for the helmreleaseproxies API
 type HelmReleaseProxy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
