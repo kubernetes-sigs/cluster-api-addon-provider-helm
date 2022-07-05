@@ -79,6 +79,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	defer func() {
 		log.V(2).Info("Preparing to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
+		log.V(2).Info("HelmReleaseProxy return error is", "reterr", reterr)
 		if err := patchHelper.Patch(ctx, helmReleaseProxy); err != nil && reterr == nil {
 			reterr = err
 			log.Error(err, "failed to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
@@ -169,41 +170,15 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 
 	values := internal.ValueMapToArray(helmReleaseProxy.Spec.Values)
 
-	existing, err := internal.GetHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
+	log.V(2).Info(fmt.Sprintf("Preparing to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
+	release, changed, err := internal.InstallOrUpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec, values)
 	if err != nil {
-		log.V(2).Error(err, "error getting release from cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
-
-		// TODO: use something like `apierrors.IsNotFound(err)` instead
-		if err.Error() == "release: not found" {
-			// Go ahead and create chart
-			release, err := internal.InstallHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec, values)
-			if err != nil {
-				log.V(2).Error(err, "error installing chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
-				return errors.Wrapf(err, "failed to install chart on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
-			}
-			if release != nil {
-				log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
-				// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
-			}
-
-			return nil
-		}
-
-		return err
+		log.V(2).Error(err, "error installing or updating chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
+		return errors.Wrapf(err, "error installing or updating chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
 	}
-
-	if existing != nil {
-		// TODO: add logic for updating an existing release
-		log.V(2).Info(fmt.Sprintf("Release '%s' already installed on cluster %s, running upgrade", existing.Name, helmReleaseProxy.Spec.ClusterRef.Name))
-		release, upgraded, err := internal.UpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec, values)
-		if err != nil {
-			log.V(2).Error(err, "error upgrading chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
-			return errors.Wrapf(err, "error upgrading chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
-		}
-		if release != nil && upgraded {
-			log.V(2).Info((fmt.Sprintf("Release '%s' successfully upgraded on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
-			// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
-		}
+	if release != nil && changed {
+		log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed or updated on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
+		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
 	}
 
 	return nil

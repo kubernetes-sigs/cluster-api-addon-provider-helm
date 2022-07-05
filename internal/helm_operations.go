@@ -99,6 +99,66 @@ func HelmInit(ctx context.Context, kubeconfig string) (*helmCli.EnvSettings, *he
 	return settings, actionConfig, nil
 }
 
+// Install Helm release if it doesn't exist. If it exists, check if it needs to be updated.
+func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	settings, actionConfig, err := HelmInit(ctx, kubeconfig)
+	if err != nil {
+		return nil, false, err
+	}
+	upgrader := helmAction.NewUpgrade(actionConfig)
+	upgrader.Install = true
+	upgrader.RepoURL = spec.RepoURL
+	upgrader.Version = spec.Version
+	upgrader.Namespace = "default"
+	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
+	log.V(2).Info("Located chart at path", "path", cp)
+	if err != nil {
+		return nil, false, err
+	}
+	p := helmGetter.All(settings)
+	valueOpts := &helmVals.Options{
+		Values: parsedValues,
+	}
+	vals, err := valueOpts.MergeValues(p)
+	if err != nil {
+		return nil, false, err
+	}
+	chartRequested, err := helmLoader.Load(cp)
+	if err != nil {
+		return nil, false, err
+	}
+	if chartRequested == nil {
+		return nil, false, errors.Errorf("failed to load request chart %s", spec.ChartName)
+	}
+
+	existing, err := GetHelmRelease(ctx, kubeconfig, spec)
+	if err != nil && err.Error() == "release: not found" {
+		return nil, false, errors.Wrapf(err, "error looking up release %s, not an 404 error", spec.ReleaseName)
+	}
+
+	if existing != nil {
+		shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)
+		if err != nil {
+			return nil, false, err
+		}
+		if !shouldUpgrade {
+			log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried, revision = %d", existing.Name, existing.Version))
+			return existing, false, nil
+		}
+		log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
+	} else {
+		log.V(2).Info(fmt.Sprintf("Installing release `%s` with Helm", spec.ReleaseName))
+	}
+	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return release, true, nil
+}
+
 func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
