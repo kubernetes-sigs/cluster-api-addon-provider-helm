@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
@@ -41,10 +42,7 @@ import (
 
 func GetActionConfig(ctx context.Context, namespace string, config *rest.Config) (*helmAction.Configuration, error) {
 	log := ctrl.LoggerFrom(ctx)
-	logf := func(format string, v ...interface{}) {
-		log.V(4).Info(fmt.Sprintf(format, v...))
-	}
-
+	log.V(4).Info("Getting action config")
 	actionConfig := new(helmAction.Configuration)
 	// var cliConfig *genericclioptions.ConfigFlags
 	// cliConfig := &genericclioptions.ConfigFlags{
@@ -69,7 +67,8 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	}
 	cliConfig.WithWrapConfigFn(wrapper)
 	// cliConfig.Insecure = &insecure
-	if err := actionConfig.Init(cliConfig, namespace, "secret", logf); err != nil {
+	// Note: can change this to klog.V(4) or use a debug level
+	if err := actionConfig.Init(cliConfig, namespace, "secret", klog.V(4).Infof); err != nil {
 		return nil, err
 	}
 	return actionConfig, nil
