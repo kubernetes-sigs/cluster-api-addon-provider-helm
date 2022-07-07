@@ -23,6 +23,15 @@ spec:
     - jsonPath: .status.ready
       name: Ready
       type: string
+    - jsonPath: .status.status
+      name: Status
+      type: string
+    - jsonPath: .status.revision
+      name: Revision
+      type: string
+    - jsonPath: .status.namespace
+      name: Namespace
+      type: string
     name: v1beta1
     schema:
       openAPIV3Schema:

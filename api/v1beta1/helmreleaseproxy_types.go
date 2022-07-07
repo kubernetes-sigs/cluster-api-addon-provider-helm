@@ -78,6 +78,9 @@ type HelmReleaseProxyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.clusterRef.name",description="Cluster to which this HelmReleaseProxy belongs"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status"
+// +kubebuilder:printcolumn:name="Revision",type="string",JSONPath=".status.revision"
+// +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".status.namespace"
 // +kubebuilder:subresource:status
 
 // HelmReleaseProxy is the Schema for the helmreleaseproxies API
