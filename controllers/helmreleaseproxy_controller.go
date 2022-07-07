@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
@@ -226,10 +225,10 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 
 func setReleaseError(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, err error) {
 	if err != nil {
-		helmReleaseProxy.Status.FailureReason = to.StringPtr(err.Error())
+		helmReleaseProxy.Status.FailureReason = err.Error()
 		helmReleaseProxy.Status.Ready = false
 	} else {
-		helmReleaseProxy.Status.FailureReason = nil
+		helmReleaseProxy.Status.FailureReason = ""
 		helmReleaseProxy.Status.Ready = true
 	}
 }

@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -410,10 +409,10 @@ func setMatchingClusters(helmChartProxy *addonsv1beta1.HelmChartProxy, clusterLi
 
 func setChartError(helmChartProxy *addonsv1beta1.HelmChartProxy, err error) {
 	if err != nil {
-		helmChartProxy.Status.FailureReason = to.StringPtr(err.Error())
+		helmChartProxy.Status.FailureReason = err.Error()
 		helmChartProxy.Status.Ready = false
 	} else {
-		helmChartProxy.Status.FailureReason = nil
+		helmChartProxy.Status.FailureReason = ""
 		helmChartProxy.Status.Ready = true
 	}
 }

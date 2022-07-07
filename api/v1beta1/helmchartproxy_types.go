@@ -74,7 +74,7 @@ type HelmChartProxyStatus struct {
 
 	// FailureReason will be set in the event that there is a an error reconciling the HelmChartProxy.
 	// +optional
-	FailureReason *string `json:"failureReason,omitempty"`
+	FailureReason string `json:"failureReason,omitempty"`
 }
 
 // +kubebuilder:object:root=true

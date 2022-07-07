@@ -110,9 +110,19 @@ spec:
                 description: FailureReason will be set in the event that there is
                   a an error reconciling the HelmReleaseProxy.
                 type: string
+              namespace:
+                description: Namespace is the namespace of the Helm release on the
+                  workload cluster.
+                type: string
               ready:
                 description: Ready is true when the provider resource is ready.
                 type: boolean
+              revision:
+                description: Revision is the current revision of the Helm release.
+                type: integer
+              status:
+                description: Status is the current status of the Helm release.
+                type: string
             type: object
         type: object
     served: true

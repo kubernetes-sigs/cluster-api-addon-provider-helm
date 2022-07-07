@@ -60,7 +60,7 @@ type HelmReleaseProxyStatus struct {
 
 	// FailureReason will be set in the event that there is a an error reconciling the HelmReleaseProxy.
 	// +optional
-	FailureReason *string `json:"failureReason,omitempty"`
+	FailureReason string `json:"failureReason,omitempty"`
 
 	// Status is the current status of the Helm release.
 	// +optional
