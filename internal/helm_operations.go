@@ -251,6 +251,10 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 }
 
 func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.Release, error) {
+	if spec.ReleaseName == "" {
+		return nil, helmDriver.ErrReleaseNotFound
+	}
+
 	_, actionConfig, err := HelmInit(ctx, kubeconfig)
 	if err != nil {
 		return nil, err

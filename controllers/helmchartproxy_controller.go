@@ -292,7 +292,7 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 // createOrUpdateHelmReleaseProxy...
 func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues map[string]string) error {
 	log := ctrl.LoggerFrom(ctx)
-	helmReleaseProxyName := helmChartProxy.Spec.ReleaseName + "-" + cluster.Name
+	helmReleaseProxyName := helmChartProxy.Spec.ChartName + "-" + cluster.Name
 	helmReleaseProxyNamespace := helmChartProxy.Namespace
 
 	existing := &addonsv1beta1.HelmReleaseProxy{}
