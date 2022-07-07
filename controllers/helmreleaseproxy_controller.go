@@ -22,6 +22,8 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
+	"helm.sh/helm/v3/pkg/release"
+	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -130,7 +132,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				return ctrl.Result{}, err
 			}
 
-			helmReleaseProxy.Status.Ready = true
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmReleaseProxy, finalizer)
 			if err := r.Update(ctx, helmReleaseProxy); err != nil {
@@ -174,8 +175,14 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		log.V(2).Error(err, "error installing or updating chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 		return errors.Wrapf(err, "error installing or updating chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
 	}
-	if release != nil && changed {
-		log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed or updated on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
+	if release != nil {
+		if changed {
+			log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed or updated on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
+		} else {
+			log.V(2).Info((fmt.Sprintf("Release '%s' is up to date on cluster %s, no upgrade required, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
+		}
+
+		setReleaseStatusFields(helmReleaseProxy, release)
 		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
 	}
 
@@ -192,7 +199,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	if err != nil {
 		log.V(2).Error(err, "error getting release from cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
-		if err.Error() == "release: not found" {
+		if err == helmDriver.ErrReleaseNotFound {
 			log.V(2).Info(fmt.Sprintf("Release '%s' not found on cluster %s, nothing to do for uninstall", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
 			return nil
 		}
@@ -225,4 +232,10 @@ func setReleaseError(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, err error
 		helmReleaseProxy.Status.FailureReason = nil
 		helmReleaseProxy.Status.Ready = true
 	}
+}
+
+func setReleaseStatusFields(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, release *release.Release) {
+	helmReleaseProxy.Status.Status = release.Info.Status.String() // See pkg/release/status.go in Helm for possible values
+	helmReleaseProxy.Status.Revision = release.Version
+	helmReleaseProxy.Status.Namespace = release.Namespace // TODO: Add a way to configure the namespace
 }

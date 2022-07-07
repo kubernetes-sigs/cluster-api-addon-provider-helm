@@ -61,6 +61,18 @@ type HelmReleaseProxyStatus struct {
 	// FailureReason will be set in the event that there is a an error reconciling the HelmReleaseProxy.
 	// +optional
 	FailureReason *string `json:"failureReason,omitempty"`
+
+	// Status is the current status of the Helm release.
+	// +optional
+	Status string `json:"status,omitempty"`
+
+	// Revision is the current revision of the Helm release.
+	// +optional
+	Revision int `json:"revision,omitempty"`
+
+	// Namespace is the namespace of the Helm release on the workload cluster.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // +kubebuilder:object:root=true
