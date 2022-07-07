@@ -362,6 +362,7 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 		}
 	} else {
 		helmReleaseProxy = existing
+		// TODO: Make the fields specifying the chart, repo, and release name immutable or find a way to clean up the old chart when they change.
 		changed := false
 		if existing.Spec.ChartName != helmChartProxy.Spec.ChartName {
 			changed = true
