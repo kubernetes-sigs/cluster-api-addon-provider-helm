@@ -30,6 +30,7 @@ import (
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/release"
+	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -100,66 +101,27 @@ func HelmInit(ctx context.Context, kubeconfig string) (*helmCli.EnvSettings, *he
 }
 
 // Install Helm release if it doesn't exist. If it exists, check if it needs to be updated.
-func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, bool, error) {
+func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, kubeconfig)
-	if err != nil {
-		return nil, false, err
-	}
-	upgrader := helmAction.NewUpgrade(actionConfig)
-	upgrader.Install = true
-	upgrader.RepoURL = spec.RepoURL
-	upgrader.Version = spec.Version
-	upgrader.Namespace = "default"
-	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.V(2).Info("Located chart at path", "path", cp)
-	if err != nil {
-		return nil, false, err
-	}
-	p := helmGetter.All(settings)
-	valueOpts := &helmVals.Options{
-		Values: parsedValues,
-	}
-	vals, err := valueOpts.MergeValues(p)
-	if err != nil {
-		return nil, false, err
-	}
-	chartRequested, err := helmLoader.Load(cp)
-	if err != nil {
-		return nil, false, err
-	}
-	if chartRequested == nil {
-		return nil, false, errors.Errorf("failed to load request chart %s", spec.ChartName)
-	}
+	log.V(2).Info("Installing or upgrading Helm release")
 
-	existing, err := GetHelmRelease(ctx, kubeconfig, spec)
-	if err != nil && err.Error() == "release: not found" {
-		return nil, false, errors.Wrapf(err, "error looking up release %s, not an 404 error", spec.ReleaseName)
-	}
-
-	if existing != nil {
-		shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)
+	// historyClient := helmAction.NewHistory(actionConfig)
+	// historyClient.Max = 1
+	// if _, err := historyClient.Run(spec.ReleaseName); err == helmDriver.ErrReleaseNotFound {
+	existingRelease, err := GetHelmRelease(ctx, kubeconfig, spec)
+	if err == helmDriver.ErrReleaseNotFound {
+		release, err := InstallHelmRelease(ctx, kubeconfig, spec)
 		if err != nil {
 			return nil, false, err
 		}
-		if !shouldUpgrade {
-			log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried, revision = %d", existing.Name, existing.Version))
-			return existing, false, nil
-		}
-		log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
-	} else {
-		log.V(2).Info(fmt.Sprintf("Installing release `%s` with Helm", spec.ReleaseName))
-	}
-	release, err := upgrader.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
-	if err != nil {
-		return nil, false, err
+		return release, true, nil
 	}
 
-	return release, true, nil
+	return UpgradeHelmReleaseIfChanged(ctx, kubeconfig, spec, existingRelease)
 }
 
-func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, error) {
+func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, kubeconfig)
@@ -171,14 +133,15 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 	installer.ReleaseName = spec.ReleaseName
 	installer.Version = spec.Version
 	installer.Namespace = "default"
+	log.V(2).Info("Locating chart...")
 	cp, err := installer.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.V(2).Info("Located chart at path", "path", cp)
 	if err != nil {
 		return nil, err
 	}
+	log.V(2).Info("Located chart at path", "path", cp)
 	p := helmGetter.All(settings)
 	valueOpts := &helmVals.Options{
-		Values: parsedValues,
+		Values: ValueMapToArray(spec.Values),
 	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
@@ -201,7 +164,7 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 }
 
 // This function will be refactored to differentiate from installHelmRelease()
-func UpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, parsedValues []string) (*release.Release, bool, error) {
+func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1beta1.HelmReleaseProxySpec, existing *release.Release) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, kubeconfig)
@@ -212,14 +175,15 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 	upgrader.RepoURL = spec.RepoURL
 	upgrader.Version = spec.Version
 	upgrader.Namespace = "default"
+	log.V(2).Info("Locating chart...")
 	cp, err := upgrader.ChartPathOptions.LocateChart(spec.ChartName, settings)
-	log.V(2).Info("Located chart at path", "path", cp)
 	if err != nil {
 		return nil, false, err
 	}
+	log.V(2).Info("Located chart at path", "path", cp)
 	p := helmGetter.All(settings)
 	valueOpts := &helmVals.Options{
-		Values: parsedValues,
+		Values: ValueMapToArray(spec.Values),
 	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
@@ -231,11 +195,6 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 	}
 	if chartRequested == nil {
 		return nil, false, errors.Errorf("failed to load request chart %s", spec.ChartName)
-	}
-
-	existing, err := GetHelmRelease(ctx, kubeconfig, spec)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to get existing release")
 	}
 
 	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)
@@ -253,7 +212,6 @@ func UpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 	if err != nil {
 		return nil, false, err
 	}
-	fmt.Printf("DryRun config diff: %s", cmp.Diff(release.Config, existing.Config))
 
 	return release, true, nil
 }
