@@ -32,8 +32,9 @@ type HelmChartProxySpec struct {
 	// all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
 	ClusterSelector ClusterSelectorLabel `json:"clusterSelector"`
 
-	// ReleaseName is the release name of the installed Helm chart.
-	ReleaseName string `json:"releaseName"`
+	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
+	// +optional
+	ReleaseName string `json:"releaseName,omitempty"`
 
 	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
 	// +optional

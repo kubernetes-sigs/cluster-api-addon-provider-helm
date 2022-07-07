@@ -60,7 +60,7 @@ spec:
                 type: object
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
-                  chart.
+                  chart. If it is not specified, a name will be generated.
                 type: string
               repoURL:
                 description: RepoURL is the URL of the Helm chart repository.
@@ -78,7 +78,6 @@ spec:
                 type: string
             required:
             - clusterSelector
-            - releaseName
             type: object
           status:
             description: HelmChartProxyStatus defines the observed state of HelmChartProxy

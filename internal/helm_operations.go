@@ -129,9 +129,18 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 	}
 	installClient := helmAction.NewInstall(actionConfig)
 	installClient.RepoURL = spec.RepoURL
-	installClient.ReleaseName = spec.ReleaseName
 	installClient.Version = spec.Version
 	installClient.Namespace = "default"
+
+	if spec.ReleaseName == "" {
+		installClient.GenerateName = true
+		spec.ReleaseName, _, err = installClient.NameAndChart([]string{spec.ChartName})
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to generate release name for chart %s on cluster %s", spec.ChartName, spec.ClusterRef.Name)
+		}
+	}
+	installClient.ReleaseName = spec.ReleaseName
+
 	log.V(2).Info("Locating chart...")
 	cp, err := installClient.ChartPathOptions.LocateChart(spec.ChartName, settings)
 	if err != nil {

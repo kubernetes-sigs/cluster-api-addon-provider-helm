@@ -182,6 +182,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		}
 
 		setReleaseStatusFields(helmReleaseProxy, release)
+		updateReleaseName(helmReleaseProxy, release)
 		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
 	}
 
@@ -237,4 +238,10 @@ func setReleaseStatusFields(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, re
 	helmReleaseProxy.Status.Status = release.Info.Status.String() // See pkg/release/status.go in Helm for possible values
 	helmReleaseProxy.Status.Revision = release.Version
 	helmReleaseProxy.Status.Namespace = release.Namespace // TODO: Add a way to configure the namespace
+}
+
+func updateReleaseName(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, release *release.Release) {
+	if helmReleaseProxy.Spec.ReleaseName == "" {
+		helmReleaseProxy.Spec.ReleaseName = release.Name
+	}
 }

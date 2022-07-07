@@ -31,8 +31,9 @@ type HelmReleaseProxySpec struct {
 	// ClusterRef is the name of the cluster to deploy to
 	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
 
-	// ReleaseName is the release name of the installed Helm chart.
-	ReleaseName string `json:"releaseName"`
+	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
+	// +optional
+	ReleaseName string `json:"releaseName,omitempty"`
 
 	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
 	// +optional
