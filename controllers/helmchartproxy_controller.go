@@ -316,7 +316,6 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 		}
 	} else {
 		log.V(2).Info("Existing HelmReleaseProxy values are", "helmReleaseProxy", existing.Name, "values", existing.Spec.Values)
-		log.V(2).Info("Existing HelmReleaseProxy struct is", "helmReleaseProxy", existing)
 		helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, existing, helmChartProxy, parsedValues, cluster)
 		if helmReleaseProxy == nil {
 			log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)

@@ -225,7 +225,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 		log.V(3).Info("Versions are different, upgrading")
 		return true, nil
 	}
-	fmt.Printf("Got diff: %s", cmp.Diff(existing.Config, values))
+	klog.V(2).Infof("Diff between values is:\n%s", cmp.Diff(existing.Config, values))
 
 	// TODO: Comparing yaml is not ideal, but it's the best we can do since DeepEquals fails. This is because int64 types
 	// are converted to float64 when returned from the helm API.
