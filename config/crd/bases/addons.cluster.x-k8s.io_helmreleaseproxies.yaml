@@ -15,7 +15,15 @@ spec:
     singular: helmreleaseproxy
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - description: Cluster to which this HelmReleaseProxy belongs
+      jsonPath: .spec.clusterRef.name
+      name: Cluster
+      type: string
+    - jsonPath: .status.ready
+      name: Ready
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: HelmReleaseProxy is the Schema for the helmreleaseproxies API

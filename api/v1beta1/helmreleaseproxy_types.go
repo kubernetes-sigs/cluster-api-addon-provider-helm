@@ -35,6 +35,7 @@ type HelmReleaseProxySpec struct {
 	ReleaseName string `json:"releaseName"`
 
 	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
+	// +optional
 	Version string `json:"version,omitempty"`
 
 	// ChartName is the name of the Helm chart in the repository.
@@ -44,6 +45,7 @@ type HelmReleaseProxySpec struct {
 	RepoURL string `json:"repoURL,omitempty"`
 
 	// Values is the set of key/value pair values that we pass to Helm. This field is currently used for testing and is subject to change.
+	// +optional
 	Values map[string]string `json:"values,omitempty"`
 }
 
@@ -61,8 +63,10 @@ type HelmReleaseProxyStatus struct {
 	FailureReason *string `json:"failureReason,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.clusterRef.name",description="Cluster to which this HelmReleaseProxy belongs"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
+// +kubebuilder:subresource:status
 
 // HelmReleaseProxy is the Schema for the helmreleaseproxies API
 type HelmReleaseProxy struct {
