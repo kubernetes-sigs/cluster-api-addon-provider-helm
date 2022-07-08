@@ -3,7 +3,6 @@ module cluster-api-addon-helm
 go 1.17
 
 require (
-	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/google/go-cmp v0.5.6
 	github.com/onsi/ginkgo v1.16.5

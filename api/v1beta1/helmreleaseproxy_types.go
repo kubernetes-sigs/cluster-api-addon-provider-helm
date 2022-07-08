@@ -28,7 +28,7 @@ import (
 type HelmReleaseProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ClusterRef is the name of the cluster to deploy to
+	// ClusterRef is the name of the cluster to deploy to.
 	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
