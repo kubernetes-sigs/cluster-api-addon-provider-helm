@@ -13,6 +13,10 @@ resources:
   kind: HelmChartProxy
   path: cluster-api-addon-helm/api/v1beta1
   version: v1beta1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -22,4 +26,8 @@ resources:
   kind: HelmReleaseProxy
   path: cluster-api-addon-helm/api/v1beta1
   version: v1beta1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 version: "3"

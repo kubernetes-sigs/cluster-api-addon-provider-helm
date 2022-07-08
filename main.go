@@ -97,6 +97,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChartProxy")
 		os.Exit(1)
 	}
+	if err = (&addonsv1beta1.HelmChartProxy{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HelmChartProxy")
+		os.Exit(1)
+	}
+	if err = (&addonsv1beta1.HelmReleaseProxy{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HelmReleaseProxy")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err = (&controllers.HelmReleaseProxyReconciler{
@@ -104,6 +112,14 @@ func main() {
 		Scheme: scheme,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmReleaseProxy")
+		os.Exit(1)
+	}
+	if err = (&addonsv1beta1.HelmChartProxy{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HelmChartProxy")
+		os.Exit(1)
+	}
+	if err = (&addonsv1beta1.HelmReleaseProxy{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HelmReleaseProxy")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
