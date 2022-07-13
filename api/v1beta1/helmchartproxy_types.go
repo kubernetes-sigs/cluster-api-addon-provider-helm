@@ -24,19 +24,19 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// HelmChartProxySpec defines the desired state of HelmChartProxy
+// HelmChartProxySpec defines the desired state of HelmChartProxy.
 type HelmChartProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ClusterSelector selects Clusters with a label that matches the specified key/value pair. The Helm chart will be installed on
-	// all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
+	// ClusterSelector selects Clusters with a label that matches the specified key/value pair. The Helm chart will be
+	// installed on all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
 	ClusterSelector ClusterSelectorLabel `json:"clusterSelector"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
 	// +optional
 	ReleaseName string `json:"releaseName,omitempty"`
 
-	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
+	// Version is the version of the Helm chart. If it is not specified, the latest version will be used.
 	// +optional
 	Version string `json:"version,omitempty"`
 
@@ -46,7 +46,9 @@ type HelmChartProxySpec struct {
 	// RepoURL is the URL of the Helm chart repository.
 	RepoURL string `json:"repoURL,omitempty"`
 
-	// Values is the set of key/value pair values that we pass to Helm. This field is currently used for testing and is subject to change.
+	//  Values is a map of key/value pairs specifying values to be passed to the Helm chart. The map key is the full path
+	// to the field, and the map value is the value to set. The map value supports Go templating to reference fields from
+	// the selected workload Cluster.
 	// +optional
 	Values map[string]string `json:"values,omitempty"`
 }
@@ -60,16 +62,16 @@ type ClusterSelectorLabel struct {
 	Value string `json:"value"`
 }
 
-// HelmChartProxyStatus defines the observed state of HelmChartProxy
+// HelmChartProxyStatus defines the observed state of HelmChartProxy.
 type HelmChartProxyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Ready is true when the provider resource is ready.
+	// Ready is true when the HelmReleaseProxySpec for each selected Cluster is up to date.
 	// +optional
 	Ready bool `json:"ready"`
 
-	// MatchingClusters is the list of references to clusters selected by the ClusterSelectorLabel.
+	// MatchingClusters is the list of references to Clusters selected by the ClusterSelectorLabel.
 	// +optional
 	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
 

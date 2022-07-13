@@ -24,11 +24,11 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// HelmReleaseProxySpec defines the desired state of HelmReleaseProxy
+// HelmReleaseProxySpec defines the desired state of HelmReleaseProxy.
 type HelmReleaseProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ClusterRef is the name of the cluster to deploy to.
+	// ClusterRef is the name of the Cluster to install the Helm release on.
 	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
@@ -45,17 +45,19 @@ type HelmReleaseProxySpec struct {
 	// RepoURL is the URL of the Helm chart repository.
 	RepoURL string `json:"repoURL,omitempty"`
 
-	// Values is the set of key/value pair values that we pass to Helm. This field is currently used for testing and is subject to change.
+	// Values is a map of key/value pairs specifying values to be passed to the Helm chart. The map key is the full path
+	// to the field, and the map value is the value to set. The map value does not contain Go templates as it has already
+	// been resolved to the value of the field in the referenced workload Cluster.
 	// +optional
 	Values map[string]string `json:"values,omitempty"`
 }
 
-// HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy
+// HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.
 type HelmReleaseProxyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Ready is true when the provider resource is ready.
+	// Ready is true when the Helm release on the referenced Cluster is up to date with the HelmReleaseProxySpec.
 	// +optional
 	Ready bool `json:"ready"`
 

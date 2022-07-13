@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: HelmChartProxySpec defines the desired state of HelmChartProxy
+            description: HelmChartProxySpec defines the desired state of HelmChartProxy.
             properties:
               chartName:
                 description: ChartName is the name of the Helm chart in the repository.
@@ -68,26 +68,28 @@ spec:
               values:
                 additionalProperties:
                   type: string
-                description: Values is the set of key/value pair values that we pass
-                  to Helm. This field is currently used for testing and is subject
-                  to change.
+                description: Values is a map of key/value pairs specifying values
+                  to be passed to the Helm chart. The map key is the full path to
+                  the field, and the map value is the value to set. The map value
+                  supports Go templating to reference fields from the selected workload
+                  Cluster.
                 type: object
               version:
-                description: Version is the version of the Helm chart. To be replaced
-                  with a compatibility matrix.
+                description: Version is the version of the Helm chart. If it is not
+                  specified, the latest version will be used.
                 type: string
             required:
             - clusterSelector
             type: object
           status:
-            description: HelmChartProxyStatus defines the observed state of HelmChartProxy
+            description: HelmChartProxyStatus defines the observed state of HelmChartProxy.
             properties:
               failureReason:
                 description: FailureReason will be set in the event that there is
                   a an error reconciling the HelmChartProxy.
                 type: string
               matchingClusters:
-                description: MatchingClusters is the list of references to clusters
+                description: MatchingClusters is the list of references to Clusters
                   selected by the ClusterSelectorLabel.
                 items:
                   description: 'ObjectReference contains enough information to let
@@ -151,7 +153,8 @@ spec:
                   type: object
                 type: array
               ready:
-                description: Ready is true when the provider resource is ready.
+                description: Ready is true when the HelmReleaseProxySpec for each
+                  selected Cluster is up to date.
                 type: boolean
             type: object
         type: object

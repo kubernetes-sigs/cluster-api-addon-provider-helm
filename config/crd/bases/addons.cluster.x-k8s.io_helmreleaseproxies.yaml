@@ -50,13 +50,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: HelmReleaseProxySpec defines the desired state of HelmReleaseProxy
+            description: HelmReleaseProxySpec defines the desired state of HelmReleaseProxy.
             properties:
               chartName:
                 description: ChartName is the name of the Helm chart in the repository.
                 type: string
               clusterRef:
-                description: ClusterRef is the name of the cluster to deploy to.
+                description: ClusterRef is the name of the Cluster to install the
+                  Helm release on.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -101,9 +102,11 @@ spec:
               values:
                 additionalProperties:
                   type: string
-                description: Values is the set of key/value pair values that we pass
-                  to Helm. This field is currently used for testing and is subject
-                  to change.
+                description: Values is a map of key/value pairs specifying values
+                  to be passed to the Helm chart. The map key is the full path to
+                  the field, and the map value is the value to set. The map value
+                  does not contain Go templates as it has already been resolved to
+                  the value of the field in the referenced workload Cluster.
                 type: object
               version:
                 description: Version is the version of the Helm chart. To be replaced
@@ -111,7 +114,7 @@ spec:
                 type: string
             type: object
           status:
-            description: HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy
+            description: HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.
             properties:
               failureReason:
                 description: FailureReason will be set in the event that there is
@@ -122,7 +125,8 @@ spec:
                   workload cluster.
                 type: string
               ready:
-                description: Ready is true when the provider resource is ready.
+                description: Ready is true when the Helm release on the referenced
+                  Cluster is up to date with the HelmReleaseProxySpec.
                 type: boolean
               revision:
                 description: Revision is the current revision of the Helm release.
