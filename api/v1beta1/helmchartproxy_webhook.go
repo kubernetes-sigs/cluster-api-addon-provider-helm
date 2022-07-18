@@ -39,10 +39,12 @@ func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Defaulter = &HelmChartProxy{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *HelmChartProxy) Default() {
-	helmchartproxylog.Info("default", "name", r.Name)
+func (p *HelmChartProxy) Default() {
+	helmchartproxylog.Info("default", "name", p.Name)
 
-	// TODO(user): fill in your defaulting logic.
+	if p.Spec.Namespace == "" {
+		p.Spec.Namespace = "default"
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

@@ -28,8 +28,14 @@ import (
 type HelmReleaseProxySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ClusterRef is the name of the Cluster to install the Helm release on.
+	// ClusterRef is a reference to the Cluster to install the Helm release on.
 	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
+
+	// ChartName is the name of the Helm chart in the repository.
+	ChartName string `json:"chartName,omitempty"`
+
+	// RepoURL is the URL of the Helm chart repository.
+	RepoURL string `json:"repoURL,omitempty"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
 	// +optional
@@ -39,11 +45,9 @@ type HelmReleaseProxySpec struct {
 	// +optional
 	Version string `json:"version,omitempty"`
 
-	// ChartName is the name of the Helm chart in the repository.
-	ChartName string `json:"chartName,omitempty"`
-
-	// RepoURL is the URL of the Helm chart repository.
-	RepoURL string `json:"repoURL,omitempty"`
+	// Namespace is the namespace the Helm release will be installed on the referenced Cluster. If it is not specified, the default namespace.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 
 	// Values is a map of key/value pairs specifying values to be passed to the Helm chart. The map key is the full path
 	// to the field, and the map value is the value to set. The map value does not contain Go templates as it has already

@@ -58,6 +58,10 @@ spec:
                 - key
                 - value
                 type: object
+              namespace:
+                description: Namespace is the namespace the Helm release will be installed
+                  on each selected Cluster. If it is not specified, the default namespace.
+                type: string
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
                   chart. If it is not specified, a name will be generated.

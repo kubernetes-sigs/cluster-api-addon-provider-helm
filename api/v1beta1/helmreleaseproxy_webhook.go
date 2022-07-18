@@ -39,10 +39,12 @@ func (r *HelmReleaseProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Defaulter = &HelmReleaseProxy{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *HelmReleaseProxy) Default() {
-	helmreleaseproxylog.Info("default", "name", r.Name)
+func (p *HelmReleaseProxy) Default() {
+	helmreleaseproxylog.Info("default", "name", p.Name)
 
-	// TODO(user): fill in your defaulting logic.
+	if p.Spec.Namespace == "" {
+		p.Spec.Namespace = "default"
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

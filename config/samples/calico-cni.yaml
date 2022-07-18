@@ -1,0 +1,51 @@
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: HelmChartProxy
+metadata:
+  name: calico-cni
+spec:
+  clusterSelector:
+    key: calicoCNI
+    value: enabled
+  releaseName: calico
+  repoURL: https://projectcalico.docs.tigera.io/charts
+  chartName: tigera-operator
+  valuesA: |
+    installation.cni.type: "Calico"
+    installation.calicoNetwork.bgp: "Disabled"
+    {{range $i, $cidr := .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks }}
+      installation.calicoNetwork.ipPools[$i].cidr: "{{ $cidr }}"
+      installation.calicoNetwork.ipPools[$i].encapsulation: "VXLAN"
+    {{end}}
+  valuesB: |
+    installation:
+      cni:
+        type: Calico
+      calicoNetwork:
+        bgp: Disabled
+        ipPools:
+        {{range $i, $cidr := .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks }}
+          - cidr: $cidr
+            encapsulation: VXLAN
+        {{end}}
+  valuesC:
+    installation.cni.type: "Calico"
+    installation.calicoNetwork.bgp: "Disabled"
+    installation.calicoNetwork.ipPools: |
+      {
+        {{range $i, $cidr := .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks }}
+          "{ $cidr, 'VXLAN' },"
+        {{end}}
+      }
+  # values:
+  #   installation.cni.type: "Calico"
+  #   installation.calicoNetwork.bgp: "Disabled"
+  #   installation.calicoNetwork.ipPools[0].cidr: "{{ .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks[0] }}"
+  #   installation.calicoNetwork.ipPools[0].encapsulation: "VXLAN"
+  # installation:
+  #   cni:
+  #     type: Calico
+  #   calicoNetwork:
+  #     bgp: Disabled
+  #     ipPools:
+  #     - cidr: 192.168.0.0/16
+  #       encapsulation: VXLAN

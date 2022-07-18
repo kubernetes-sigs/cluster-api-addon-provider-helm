@@ -9,5 +9,6 @@ fi
 
 CLUSTER_NAMES=$(kubectl get clusters -o jsonpath="{.items[*].metadata.name}")
 for CLUSTER_NAME in $(echo $CLUSTER_NAMES); do
-    clusterctl get kubeconfig $CLUSTER_NAME > $TEMP_PATH/$CLUSTER_NAME.kubeconfig
+  clusterctl get kubeconfig $CLUSTER_NAME > $TEMP_PATH/$CLUSTER_NAME.kubeconfig
+  echo "Fetched kubeconfig for $CLUSTER_NAME"
 done

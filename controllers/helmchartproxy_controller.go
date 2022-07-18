@@ -378,6 +378,9 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 		if existing.Spec.Version != helmChartProxy.Spec.Version {
 			changed = true
 		}
+		if existing.Spec.Namespace != helmChartProxy.Spec.Namespace {
+			changed = true
+		}
 		if !cmp.Equal(existing.Spec.Values, parsedValues) {
 			changed = true
 		}
@@ -391,6 +394,7 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 	helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
 	helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
+	helmReleaseProxy.Spec.Namespace = helmChartProxy.Spec.Namespace
 	helmReleaseProxy.Spec.Values = parsedValues
 
 	return helmReleaseProxy

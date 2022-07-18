@@ -56,7 +56,7 @@ spec:
                 description: ChartName is the name of the Helm chart in the repository.
                 type: string
               clusterRef:
-                description: ClusterRef is the name of the Cluster to install the
+                description: ClusterRef is a reference to the Cluster to install the
                   Helm release on.
                 properties:
                   apiVersion:
@@ -92,6 +92,10 @@ spec:
                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                     type: string
                 type: object
+              namespace:
+                description: Namespace is the namespace the Helm release will be installed
+                  on the referenced Cluster. If it is not specified, the default namespace.
+                type: string
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
                   chart. If it is not specified, a name will be generated.

@@ -1,13 +1,13 @@
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: HelmChartProxy
 metadata:
-  name: nginx-ingress-helmchartproxy
+  name: nginx-ingress-chart
 spec:
   clusterSelector:
     key: nginxIngressChart
     value: enabled
-  releaseName: nginx-ingress
   repoURL: https://helm.nginx.com/stable
   chartName: nginx-ingress
+  namespace: addons
   values:
-    "controller.name": "{{ .Cluster.Name }}-nginx"
+    controller.name: "{{ .Cluster.Name }}-nginx"
