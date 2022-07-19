@@ -112,8 +112,8 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !controllerutil.ContainsFinalizer(helmReleaseProxy, finalizer) {
-			controllerutil.AddFinalizer(helmReleaseProxy, finalizer)
+		if !controllerutil.ContainsFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer) {
+			controllerutil.AddFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer)
 			if err := r.Update(ctx, helmReleaseProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
@@ -121,7 +121,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	} else {
 		// The object is being deleted
-		if controllerutil.ContainsFinalizer(helmReleaseProxy, finalizer) {
+		if controllerutil.ContainsFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer) {
 			// our finalizer is present, so lets handle any external dependency
 			if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfig); err != nil {
 				// if fail to delete the external dependency here, return with error
@@ -131,7 +131,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(helmReleaseProxy, finalizer)
+			controllerutil.RemoveFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer)
 			if err := r.Update(ctx, helmReleaseProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err

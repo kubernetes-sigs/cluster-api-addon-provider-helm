@@ -21,6 +21,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// HelmReleaseProxyFinalizer is the finalizer used by the HelmReleaseProxy controller to cleanup add-on resources when
+	// a HelmReleaseProxy is being deleted.
+	HelmReleaseProxyFinalizer = "helmreleaseproxy.addons.cluster.x-k8s.io"
+
+	// HelmChartProxyLabelName is the label signifying which HelmChartProxy a HelmReleaseProxy is associated with.
+	HelmChartProxyLabelName = "addons.cluster.x-k8s.io/helmchartproxy-name"
+)
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 

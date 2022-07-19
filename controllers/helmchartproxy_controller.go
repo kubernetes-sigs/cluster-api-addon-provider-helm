@@ -47,9 +47,6 @@ type HelmChartProxyReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-const finalizer = "addons.cluster.x-k8s.io"
-const HelmChartProxyLabelName = "addons.cluster.x-k8s.io/helmchartproxy-name"
-
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/finalizers,verbs=update
@@ -106,7 +103,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	labels := map[string]string{
-		HelmChartProxyLabelName: helmChartProxy.Name,
+		addonsv1beta1.HelmChartProxyLabelName: helmChartProxy.Name,
 	}
 	releaseList, err := r.listInstalledReleases(ctx, labels)
 	if err != nil {
@@ -119,8 +116,8 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !controllerutil.ContainsFinalizer(helmChartProxy, finalizer) {
-			controllerutil.AddFinalizer(helmChartProxy, finalizer)
+		if !controllerutil.ContainsFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer) {
+			controllerutil.AddFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't add the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
@@ -128,7 +125,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	} else {
 		// The object is being deleted
-		if controllerutil.ContainsFinalizer(helmChartProxy, finalizer) {
+		if controllerutil.ContainsFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer) {
 			// our finalizer is present, so lets handle any external dependency
 			if err := r.reconcileDelete(ctx, helmChartProxy, releaseList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
@@ -138,7 +135,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(helmChartProxy, finalizer)
+			controllerutil.RemoveFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer)
 			if err := r.Update(ctx, helmChartProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
@@ -351,7 +348,7 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
 		newLabels := map[string]string{}
 		newLabels[clusterv1.ClusterLabelName] = cluster.Name
-		newLabels[HelmChartProxyLabelName] = helmChartProxy.Name
+		newLabels[addonsv1beta1.HelmChartProxyLabelName] = helmChartProxy.Name
 		helmReleaseProxy.Labels = newLabels
 
 		helmReleaseProxy.Spec.ClusterRef = &corev1.ObjectReference{
