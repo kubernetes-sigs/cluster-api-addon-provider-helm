@@ -30,13 +30,8 @@ const (
 	HelmChartProxyLabelName = "addons.cluster.x-k8s.io/helmchartproxy-name"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // HelmReleaseProxySpec defines the desired state of HelmReleaseProxy.
 type HelmReleaseProxySpec struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// ClusterRef is a reference to the Cluster to install the Helm release on.
 	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
 
@@ -66,9 +61,6 @@ type HelmReleaseProxySpec struct {
 
 // HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.
 type HelmReleaseProxyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Ready is true when the Helm release on the referenced Cluster is up to date with the HelmReleaseProxySpec.
 	// +optional
 	Ready bool `json:"ready"`

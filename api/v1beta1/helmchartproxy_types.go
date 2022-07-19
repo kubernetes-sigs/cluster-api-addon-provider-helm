@@ -27,13 +27,8 @@ const (
 	HelmChartProxyFinalizer = "helmchartproxy.addons.cluster.x-k8s.io"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // HelmChartProxySpec defines the desired state of HelmChartProxy.
 type HelmChartProxySpec struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// ClusterSelector selects Clusters with a label that matches the specified key/value pair. The Helm chart will be
 	// installed on all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
 	ClusterSelector ClusterSelectorLabel `json:"clusterSelector"`
@@ -73,9 +68,6 @@ type ClusterSelectorLabel struct {
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy.
 type HelmChartProxyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Ready is true when the HelmReleaseProxySpec for each selected Cluster is up to date.
 	// +optional
 	Ready bool `json:"ready"`
