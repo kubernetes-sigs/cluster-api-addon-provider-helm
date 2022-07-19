@@ -112,34 +112,30 @@ type BuiltinTypes struct {
 	Machines           map[string]clusterv1.Machine
 }
 
-func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (map[string]string, error) {
+func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
-	specValues := map[string]string{}
-	for k, v := range spec.Values {
-		builtin, err := initializeBuiltins(ctx, c, spec, cluster)
-		if err != nil {
-			return nil, err
-		}
 
-		tmpl, err := template.New(cluster.GetName() + "-" + k).
-			Funcs(sprig.TxtFuncMap()).
-			Parse(v)
-		if err != nil {
-			return nil, err
-		}
-		var buffer bytes.Buffer
-
-		if err := tmpl.Execute(&buffer, builtin); err != nil {
-			return nil, errors.Wrapf(err, "error executing template string '%s' on cluster '%s'", v, cluster.GetName())
-		}
-		expandedTemplate := buffer.String()
-		log.V(2).Info("Expanded template", "template", v, "result", expandedTemplate)
-		specValues[k] = expandedTemplate
-		// specValues = append(specValues, fmt.Sprintf("%s=%s", k, expandedTemplate))
+	log.V(2).Info("Rendering templating in values:", "values", spec.Values)
+	builtin, err := initializeBuiltins(ctx, c, spec, cluster)
+	if err != nil {
+		return "", err
 	}
-	log.V(3).Info("Values", "values", specValues)
 
-	return specValues, nil
+	tmpl, err := template.New(spec.ChartName + "-" + cluster.GetName()).
+		Funcs(sprig.TxtFuncMap()).
+		Parse(spec.Values)
+	if err != nil {
+		return "", err
+	}
+	var buffer bytes.Buffer
+
+	if err := tmpl.Execute(&buffer, builtin); err != nil {
+		return "", errors.Wrapf(err, "error executing template string '%s' on cluster '%s'", spec.Values, cluster.GetName())
+	}
+	expandedTemplate := buffer.String()
+	log.V(2).Info("Expanded values to", "result", expandedTemplate)
+
+	return expandedTemplate, nil
 }
 
 func ValueMapToArray(valueMap map[string]string) []string {

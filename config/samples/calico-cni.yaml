@@ -9,6 +9,7 @@ spec:
   releaseName: calico
   repoURL: https://projectcalico.docs.tigera.io/charts
   chartName: tigera-operator
+<<<<<<< HEAD
   valuesA: |
     installation.cni.type: "Calico"
     installation.calicoNetwork.bgp: "Disabled"
@@ -17,6 +18,9 @@ spec:
       installation.calicoNetwork.ipPools[$i].encapsulation: "VXLAN"
     {{end}}
   valuesB: |
+=======
+  values: |
+>>>>>>> values
     installation:
       cni:
         type: Calico
@@ -27,6 +31,7 @@ spec:
           - cidr: $cidr
             encapsulation: VXLAN
         {{end}}
+<<<<<<< HEAD
   valuesC:
     installation.cni.type: "Calico"
     installation.calicoNetwork.bgp: "Disabled"
@@ -36,6 +41,26 @@ spec:
           "{ $cidr, 'VXLAN' },"
         {{end}}
       }
+=======
+  setValues:
+    installation.cni.type: "Calico"
+    installation.calicoNetwork.bgp: "Disabled"
+    installation.calicoNetwork.ipPools[0].cidr: "{{ .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks[0] }}"
+    installation.calicoNetwork.ipPools[0].encapsulation: "VXLAN"
+  valueFiles:
+    - myvalues.yaml
+    - https://myurl.com/myvalues.yaml
+
+  # valuesC:
+  #   installation.cni.type: "Calico"
+  #   installation.calicoNetwork.bgp: "Disabled"
+  #   installation.calicoNetwork.ipPools: |
+  #     {
+  #       {{range $i, $cidr := .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks }}
+  #         "{ $cidr, 'VXLAN' },"
+  #       {{end}}
+  #     }
+>>>>>>> values
   # values:
   #   installation.cni.type: "Calico"
   #   installation.calicoNetwork.bgp: "Disabled"

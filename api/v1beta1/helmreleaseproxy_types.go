@@ -58,11 +58,10 @@ type HelmReleaseProxySpec struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// Values is a map of key/value pairs specifying values to be passed to the Helm chart. The map key is the full path
-	// to the field, and the map value is the value to set. The map value does not contain Go templates as it has already
-	// been resolved to the value of the field in the referenced workload Cluster.
+	// Values is an inline YAML representing the values for the Helm chart. This YAML is the result of the rendered
+	// Go templating with the values from the referenced workload Cluster.
 	// +optional
-	Values map[string]string `json:"values,omitempty"`
+	Values string `json:"values,omitempty"`
 }
 
 // HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.

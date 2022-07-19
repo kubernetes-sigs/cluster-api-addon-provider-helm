@@ -287,7 +287,7 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 }
 
 // createOrUpdateHelmReleaseProxy...
-func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues map[string]string) error {
+func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues string) error {
 	log := ctrl.LoggerFrom(ctx)
 	helmReleaseProxyName := helmChartProxy.Spec.ChartName + "-" + cluster.Name
 	helmReleaseProxyNamespace := helmChartProxy.Namespace
@@ -340,7 +340,7 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 	return nil
 }
 
-func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, parsedValues map[string]string, cluster *clusterv1.Cluster) *addonsv1beta1.HelmReleaseProxy {
+func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1beta1.HelmReleaseProxy {
 	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
 	if existing == nil {
 		helmReleaseProxy.Name = name

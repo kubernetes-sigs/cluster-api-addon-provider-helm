@@ -70,14 +70,11 @@ spec:
                 description: RepoURL is the URL of the Helm chart repository.
                 type: string
               values:
-                additionalProperties:
-                  type: string
-                description: Values is a map of key/value pairs specifying values
-                  to be passed to the Helm chart. The map key is the full path to
-                  the field, and the map value is the value to set. The map value
-                  supports Go templating to reference fields from the selected workload
-                  Cluster.
-                type: object
+                description: Values is an inline YAML representing the values for
+                  the Helm chart. This YAML supports Go templating to reference fields
+                  from each selected workload Cluster and programatically create and
+                  set values.
+                type: string
               version:
                 description: Version is the version of the Helm chart. If it is not
                   specified, the latest version will be used.

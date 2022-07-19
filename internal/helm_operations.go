@@ -27,8 +27,6 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
-	helmVals "helm.sh/helm/v3/pkg/cli/values"
-	helmGetter "helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -147,11 +145,13 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 		return nil, err
 	}
 	log.V(2).Info("Located chart at path", "path", cp)
-	p := helmGetter.All(settings)
-	valueOpts := &helmVals.Options{
-		Values: ValueMapToArray(spec.Values),
-	}
-	vals, err := valueOpts.MergeValues(p)
+	// p := helmGetter.All(settings)
+	// valueOpts := &helmVals.Options{
+	// 	Values: ValueMapToArray(spec.Values),
+	// }
+	// vals, err := valueOpts.MergeValues(p)
+	vals := map[string]interface{}{}
+	err = yaml.Unmarshal([]byte(spec.Values), &vals)
 	if err != nil {
 		return nil, err
 	}
@@ -189,11 +189,13 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 		return nil, false, err
 	}
 	log.V(2).Info("Located chart at path", "path", cp)
-	p := helmGetter.All(settings)
-	valueOpts := &helmVals.Options{
-		Values: ValueMapToArray(spec.Values),
-	}
-	vals, err := valueOpts.MergeValues(p)
+	// p := helmGetter.All(settings)
+	// valueOpts := &helmVals.Options{
+	// 	Values: ValueMapToArray(spec.Values),
+	// }
+	// vals, err := valueOpts.MergeValues(p)
+	vals := map[string]interface{}{}
+	err = yaml.Unmarshal([]byte(spec.Values), &vals)
 	if err != nil {
 		return nil, false, err
 	}

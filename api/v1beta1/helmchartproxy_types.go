@@ -56,11 +56,10 @@ type HelmChartProxySpec struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	//  Values is a map of key/value pairs specifying values to be passed to the Helm chart. The map key is the full path
-	// to the field, and the map value is the value to set. The map value supports Go templating to reference fields from
-	// the selected workload Cluster.
+	// Values is an inline YAML representing the values for the Helm chart. This YAML supports Go templating to reference
+	// fields from each selected workload Cluster and programatically create and set values.
 	// +optional
-	Values map[string]string `json:"values,omitempty"`
+	Values string `json:"values,omitempty"`
 }
 
 // ClusterSelectorLabel defines a key/value pair used to select Clusters with a label matching the specified key and value.
