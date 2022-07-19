@@ -8,6 +8,5 @@ spec:
     value: enabled
   repoURL: https://helm.nginx.com/stable
   chartName: nginx-ingress
-  namespace: addons
   values: |
     controller.name: "{{ .Cluster.Name }}-nginx"

@@ -57,3 +57,19 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - controlplane.cluster.x-k8s.io
+  resources:
+  - kubeadmcontrolplanes
+  verbs:
+  - get
+  - list
+  - watch
