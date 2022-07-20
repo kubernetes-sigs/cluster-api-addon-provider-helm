@@ -171,6 +171,13 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 
 	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
+	// TODO: add this here or in HelmChartProxy controller?
+	if helmReleaseProxy.Spec.ReleaseName == "" {
+		helmReleaseProxy.ObjectMeta.SetAnnotations(map[string]string{
+			addonsv1beta1.IsReleaseNameGeneratedAnnotation: "true",
+		})
+	}
+
 	log.V(2).Info(fmt.Sprintf("Preparing to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
 	release, changed, err := internal.InstallOrUpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
 	if err != nil {
