@@ -19,27 +19,127 @@ package internal
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	"sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
+	configclient "sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
+func InitInClusterKubeconfig(ctx context.Context) (*cluster.Kubeconfig, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Generating kubeconfig file")
+	restConfig := configclient.GetConfigOrDie()
+
+	apiConfig, err := ConstructInClusterKubeconfig(ctx, restConfig, "")
+	if err != nil {
+		log.Error(err, "error constructing in-cluster kubeconfig")
+		return nil, err
+	}
+	filePath := "tmp/management.kubeconfig"
+	if err = WriteInClusterKubeconfigToFile(ctx, filePath, *apiConfig); err != nil {
+		log.Error(err, "error writing kubeconfig to file")
+		return nil, err
+	}
+	kubeconfigPath := filePath
+	kubeContext := apiConfig.CurrentContext
+
+	return &cluster.Kubeconfig{Path: kubeconfigPath, Context: kubeContext}, nil
+}
+
+func ConstructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, namespace string) (*clientcmdapi.Config, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Constructing kubeconfig file from rest.Config")
+
+	clusterName := "management-cluster"
+	userName := "default-user"
+	contextName := "default-context"
+	clusters := make(map[string]*clientcmdapi.Cluster)
+	clusters[clusterName] = &clientcmdapi.Cluster{
+		Server: restConfig.Host,
+		// Used in regular kubeconfigs.
+		CertificateAuthorityData: restConfig.CAData,
+		// Used in in-cluster configs.
+		CertificateAuthority: restConfig.CAFile,
+	}
+	// log.V(2).Info("Constructing clusters", "clusters", clusters)
+
+	contexts := make(map[string]*clientcmdapi.Context)
+	contexts[contextName] = &clientcmdapi.Context{
+		Cluster:   clusterName,
+		Namespace: namespace,
+		AuthInfo:  userName,
+	}
+	// log.V(2).Info("Constructing contexts", "contexts", contexts)
+
+	authInfos := make(map[string]*clientcmdapi.AuthInfo)
+	authInfos[userName] = &clientcmdapi.AuthInfo{
+		Token:                 restConfig.BearerToken,
+		ClientCertificateData: restConfig.TLSClientConfig.CertData,
+		ClientKeyData:         restConfig.TLSClientConfig.KeyData,
+	}
+	// log.V(2).Info("Constructing authInfos/users", "users", authInfos)
+
+	return &clientcmdapi.Config{
+		Kind:           "Config",
+		APIVersion:     "v1",
+		Clusters:       clusters,
+		Contexts:       contexts,
+		CurrentContext: contextName,
+		AuthInfos:      authInfos,
+	}, nil
+}
+
+func WriteInClusterKubeconfigToFile(ctx context.Context, filePath string, clientConfig clientcmdapi.Config) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	dir := filepath.Dir(filePath)
+	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir(dir, os.ModePerm)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create directory %s", dir)
+		}
+	}
+
+	log.V(2).Info("Writing kubeconfig to location", "location", filePath)
+	if err := clientcmd.WriteToFile(clientConfig, filePath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Initializing management cluster kubeconfig")
+	managementKubeconfig, err := InitInClusterKubeconfig(ctx)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to initialize management cluster kubeconfig")
+	}
+
 	c, err := client.New("")
+	c.Init(client.InitOptions{Kubeconfig: client.Kubeconfig(*managementKubeconfig)})
+
 	if err != nil {
 		return "", err
 	}
 
 	options := client.GetKubeconfigOptions{
-		Kubeconfig: client.Kubeconfig{},
+		Kubeconfig: client.Kubeconfig(*managementKubeconfig),
 		// Kubeconfig:          client.Kubeconfig{Path: gk.kubeconfig, Context: gk.kubeconfigContext},
 		WorkloadClusterName: cluster.Name,
 		Namespace:           cluster.Namespace,

@@ -47,6 +47,9 @@ type HelmReleaseProxyReconciler struct {
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies/finalizers,verbs=update
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;watch
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;watch
+//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=secrets,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -100,10 +103,10 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, wrappedErr
 	}
 
-	// TODO: is there a way to get around writing this to a file
+	log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
 	kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
 	if err != nil {
-		wrappedErr := errors.Wrapf(err, "failed to write kubeconfig to file")
+		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
 		setReleaseError(helmReleaseProxy, wrappedErr)
 		return ctrl.Result{}, wrappedErr
 	}
