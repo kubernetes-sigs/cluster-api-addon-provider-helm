@@ -1,0 +1,12 @@
+name: addon-helm
+config:
+  image: jont828/cluster-addon-provider-helm:latest
+  live_reload_deps:
+    - main.go
+    - go.mod
+    - go.sum
+    - api
+    - controllers
+    - internal
+  label: ClusterAddonProviderHelm
+  manager_name: capi-addon-controller-manager

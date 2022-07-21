@@ -9,8 +9,9 @@ namespace: capi-addon-system
 namePrefix: cluster-addon-provider-helm-
 
 # Labels to add to all resources and selectors.
-#commonLabels:
-#  someName: someValue
+# Labels to add to all resources and selectors.
+commonLabels:
+  cluster.x-k8s.io/provider: "addon-helm"
 
 bases:
 - ../crd
