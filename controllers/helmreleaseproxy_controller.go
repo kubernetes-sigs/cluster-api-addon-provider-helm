@@ -28,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
@@ -154,8 +155,9 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *HelmReleaseProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *HelmReleaseProxyReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(options).
 		For(&addonsv1beta1.HelmReleaseProxy{}).
 		// Watches(
 		// 	&source.Kind{Type: &v1beta1.HelmReleaseProxy{}},

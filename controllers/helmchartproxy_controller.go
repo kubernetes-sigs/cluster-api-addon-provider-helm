@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
@@ -158,8 +159,9 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(options).
 		For(&addonsv1beta1.HelmChartProxy{}).
 		// Watches(
 		// 	&source.Kind{Type: &v1beta1.HelmChartProxy{}},
@@ -199,13 +201,18 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				return errors.Wrapf(err, "failed to get HelmReleaseProxy for cluster %s", cluster.Name)
 			}
 		}
+		// log.V(2).Info("Found existing HelmReleaseProxy", "cluster", cluster.Name, "release", existingHelmReleaseProxy.Name)
 
-		if existingHelmReleaseProxy != nil && shouldDeleteAndRecreateHelmReleaseProxy(existingHelmReleaseProxy, helmChartProxy) {
+		if existingHelmReleaseProxy != nil && shouldReinstallHelmRelease(ctx, existingHelmReleaseProxy, helmChartProxy) {
 			log.V(2).Info("Reinstalling Helm release by deleting and creating HelmReleaseProxy", "helmReleaseProxy", existingHelmReleaseProxy.Name)
 			if err := r.deleteHelmReleaseProxy(ctx, existingHelmReleaseProxy); err != nil {
 				return err
 			}
-			existingHelmReleaseProxy = nil // Set to nil so we can create a new one
+
+			// TODO: Add a check on requeue to make sure that the HelmReleaseProxy isn't still deleting
+			log.V(2).Info("Successfully deleted HelmReleaseProxy on cluster, returning to requeue for reconcile", "cluster", cluster.Name)
+			return nil // Try returning early so it will requeue
+			// existingHelmReleaseProxy = nil // Set to nil so we can create a new one
 		}
 
 		values, err := internal.ParseValues(ctx, r.Client, helmChartProxy.Spec, &cluster)
@@ -375,6 +382,7 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 			Name:       cluster.Name,
 			Namespace:  cluster.Namespace,
 		}
+		// helmChartProxy.ObjectMeta.SetAnnotations(helmReleaseProxy.Annotations)
 	} else {
 		helmReleaseProxy = existing
 		changed := false
@@ -400,17 +408,28 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 	return helmReleaseProxy
 }
 
-func shouldDeleteAndRecreateHelmReleaseProxy(existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy) bool {
+func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy) bool {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Checking if HelmReleaseProxy needs to be reinstalled by by checking if immutable fields changed", "helmReleaseProxy", existing.Name)
+
 	annotations := existing.GetAnnotations()
 	result, ok := annotations[addonsv1beta1.IsReleaseNameGeneratedAnnotation]
+
+	// log.V(2).Info("IsReleaseNameGeneratedAnnotation", "result", result, "ok", ok)
 
 	isReleaseNameGenerated := ok && result == "true"
 	switch {
 	case existing.Spec.ChartName != helmChartProxy.Spec.ChartName:
+		log.V(2).Info("ChartName changed", "existing", existing.Spec.ChartName, "helmChartProxy", helmChartProxy.Spec.ChartName)
 	case existing.Spec.RepoURL != helmChartProxy.Spec.RepoURL:
+		log.V(2).Info("RepoURL changed", "existing", existing.Spec.RepoURL, "helmChartProxy", helmChartProxy.Spec.RepoURL)
 	case isReleaseNameGenerated && helmChartProxy.Spec.ReleaseName != "":
+		log.V(2).Info("Generated ReleaseName changed", "existing", existing.Spec.ReleaseName, "helmChartProxy", helmChartProxy.Spec.ReleaseName)
 	case !isReleaseNameGenerated && existing.Spec.ReleaseName != helmChartProxy.Spec.ReleaseName:
+		log.V(2).Info("Non-generated ReleaseName changed", "existing", existing.Spec.ReleaseName, "helmChartProxy", helmChartProxy.Spec.ReleaseName)
 	case existing.Spec.Namespace != helmChartProxy.Spec.Namespace:
+		log.V(2).Info("Namespace changed", "existing", existing.Spec.Namespace, "helmChartProxy", helmChartProxy.Spec.Namespace)
 		return true
 	}
 

@@ -32,6 +32,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
@@ -58,6 +59,8 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var helmChartProxyConcurrency int
+	var helmReleaseProxyConcurrency int
 
 	klog.InitFlags(nil)
 
@@ -66,11 +69,13 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 10, "The number of HelmChartProxies to process concurrently.")
+	flag.IntVar(&helmReleaseProxyConcurrency, "helm-release-proxy-concurrency", 10, "The number of HelmReleaseProxies to process concurrently.")
 	flag.Set("v", "2")
 	flag.Parse()
 
 	ctrl.SetLogger(klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog)))
-	syncPeriod := time.Second * 60 * 5
+	syncPeriod := time.Second * 60 * 1
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -93,7 +98,7 @@ func main() {
 	if err = (&controllers.HelmChartProxyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: scheme,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: helmChartProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChartProxy")
 		os.Exit(1)
 	}
@@ -106,7 +111,7 @@ func main() {
 	if err = (&controllers.HelmReleaseProxyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: scheme,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmReleaseProxy")
 		os.Exit(1)
 	}
