@@ -98,19 +98,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Namespace: helmReleaseProxy.Spec.ClusterRef.Namespace,
 		Name:      helmReleaseProxy.Spec.ClusterRef.Name,
 	}
-	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
-		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-		setReleaseError(helmReleaseProxy, wrappedErr)
-		return ctrl.Result{}, wrappedErr
-	}
-
-	log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
-	kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
-	if err != nil {
-		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-		setReleaseError(helmReleaseProxy, wrappedErr)
-		return ctrl.Result{}, wrappedErr
-	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmReleaseProxy.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -128,11 +115,28 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfig); err != nil {
-				// if fail to delete the external dependency here, return with error
-				// so that it can be retried
-				setReleaseError(helmReleaseProxy, err)
-				return ctrl.Result{}, err
+			if err := r.Client.Get(ctx, clusterKey, cluster); err == nil {
+				log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
+				kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
+				if err != nil {
+					wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
+					setReleaseError(helmReleaseProxy, wrappedErr)
+					return ctrl.Result{}, wrappedErr
+				}
+
+				if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfig); err != nil {
+					// if fail to delete the external dependency here, return with error
+					// so that it can be retried
+					setReleaseError(helmReleaseProxy, err)
+					return ctrl.Result{}, err
+				}
+			} else if apierrors.IsNotFound(err) {
+				// Cluster is gone, so we should remove our finalizer from the list and delete
+				log.V(2).Info("Cluster not found, no need to delete external dependency", "cluster", cluster.Name)
+			} else {
+				wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
+				setReleaseError(helmReleaseProxy, wrappedErr)
+				return ctrl.Result{}, wrappedErr
 			}
 
 			// remove our finalizer from the list and update it.
@@ -145,6 +149,21 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		// Stop reconciliation as the item is being deleted
 		return ctrl.Result{}, nil
+	}
+
+	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
+		// TODO: add check to tell if Cluster is deleted so we can remove the HelmReleaseProxy.
+		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
+		setReleaseError(helmReleaseProxy, wrappedErr)
+		return ctrl.Result{}, wrappedErr
+	}
+
+	log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
+	kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
+	if err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
+		setReleaseError(helmReleaseProxy, wrappedErr)
+		return ctrl.Result{}, wrappedErr
 	}
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)

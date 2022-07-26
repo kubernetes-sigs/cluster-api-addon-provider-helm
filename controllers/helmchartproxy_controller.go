@@ -177,12 +177,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	log.V(2).Info("Starting reconcileNormal for chart proxy", "name", helmChartProxy.Name)
 
-	if len(clusters) == 0 {
-		log.V(2).Info("No clusters to reconcile")
-
-		return nil
-	}
-
 	releasesToDelete := getOrphanedHelmReleaseProxies(ctx, clusters, helmReleaseProxies)
 	log.V(2).Info("Deleting orphaned releases")
 	for _, release := range releasesToDelete {
