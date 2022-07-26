@@ -98,6 +98,9 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	label := helmChartProxy.Spec.ClusterSelector
 
 	log.V(2).Info("Finding matching clusters for HelmChartProxy with label", "helmChartProxy", helmChartProxy.Name, "label", label)
+	// TODO: When a Cluster is being deleted, it will show up in the list of clusters even though we can't Reconcile on it.
+	// This is because of ownerRefs and how the Cluster gets deleted. It will be eventually consistent but it would be better
+	// to not have errors. An idea would be to check the deletion timestamp.
 	clusterList, err := r.listClustersWithLabel(ctx, label)
 	if err != nil {
 		setChartError(helmChartProxy, errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
