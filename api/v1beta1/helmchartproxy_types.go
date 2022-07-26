@@ -82,8 +82,9 @@ type HelmChartProxyStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
+// +kubebuilder:resource:path=helmchartproxies,scope=Namespaced,categories=cluster-api,shortName=hcp
 
 // HelmChartProxy is the Schema for the helmchartproxies API
 type HelmChartProxy struct {

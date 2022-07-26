@@ -9,9 +9,13 @@ metadata:
 spec:
   group: addons.cluster.x-k8s.io
   names:
+    categories:
+    - cluster-api
     kind: HelmChartProxy
     listKind: HelmChartProxyList
     plural: helmchartproxies
+    shortNames:
+    - hcp
     singular: helmchartproxy
   scope: Namespaced
   versions:
