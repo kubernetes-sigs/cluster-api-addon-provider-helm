@@ -9,4 +9,5 @@ spec:
   repoURL: https://helm.nginx.com/stable
   chartName: nginx-ingress
   values: |
-    controller.name: "{{ .Cluster.Name }}-nginx"
+    controller:
+      name: "{{ .Cluster.Name }}-nginx"

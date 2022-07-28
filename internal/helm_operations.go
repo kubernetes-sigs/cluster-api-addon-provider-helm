@@ -19,6 +19,8 @@ package internal
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -27,6 +29,9 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
+
+	helmVals "helm.sh/helm/v3/pkg/cli/values"
+	helmGetter "helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -145,13 +150,26 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1bet
 		return nil, err
 	}
 	log.V(2).Info("Located chart at path", "path", cp)
-	// p := helmGetter.All(settings)
-	// valueOpts := &helmVals.Options{
-	// 	Values: ValueMapToArray(spec.Values),
-	// }
-	// vals, err := valueOpts.MergeValues(p)
-	vals := map[string]interface{}{}
-	err = yaml.Unmarshal([]byte(spec.Values), &vals)
+
+	log.V(2).Info("Writing values to file")
+	filename, err := writeValuesToFile(ctx, spec)
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(filename)
+	log.V(2).Info("Values written to file", "path", filename)
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.V(2).Infof("Values written to file %s are:\n%s\n", filename, string(content))
+
+	p := helmGetter.All(settings)
+	valueOpts := &helmVals.Options{
+		ValueFiles: []string{filename},
+	}
+	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
 		return nil, err
 	}
@@ -189,13 +207,26 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 		return nil, false, err
 	}
 	log.V(2).Info("Located chart at path", "path", cp)
-	// p := helmGetter.All(settings)
-	// valueOpts := &helmVals.Options{
-	// 	Values: ValueMapToArray(spec.Values),
-	// }
-	// vals, err := valueOpts.MergeValues(p)
-	vals := map[string]interface{}{}
-	err = yaml.Unmarshal([]byte(spec.Values), &vals)
+
+	log.V(2).Info("Writing values to file")
+	filename, err := writeValuesToFile(ctx, spec)
+	if err != nil {
+		return nil, false, err
+	}
+	defer os.Remove(filename)
+	log.V(2).Info("Values written to file", "path", filename)
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, false, err
+	}
+
+	klog.V(2).Infof("Values written to file %s are:\n%s\n", filename, string(content))
+
+	p := helmGetter.All(settings)
+	valueOpts := &helmVals.Options{
+		ValueFiles: []string{filename},
+	}
+	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
 		return nil, false, err
 	}
@@ -224,6 +255,31 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 	}
 
 	return release, true, nil
+}
+
+func writeValuesToFile(ctx context.Context, spec addonsv1beta1.HelmReleaseProxySpec) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("Reading contents of current directory")
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		return "", err
+	}
+
+	for i, file := range files {
+		log.V(2).Info("File is", "num", i, "filename", file.Name())
+	}
+
+	log.V(2).Info("Writing values to file")
+	valuesFile, err := ioutil.TempFile("", spec.ChartName+"-"+spec.ReleaseName+"-*.yaml")
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := valuesFile.Write([]byte(spec.Values)); err != nil {
+		return "", err
+	}
+
+	return valuesFile.Name(), nil
 }
 
 func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {

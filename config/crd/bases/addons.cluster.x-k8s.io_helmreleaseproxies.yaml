@@ -9,13 +9,11 @@ metadata:
 spec:
   group: addons.cluster.x-k8s.io
   names:
-    categories:
-    - cluster-api
     kind: HelmReleaseProxy
     listKind: HelmReleaseProxyList
     plural: helmreleaseproxies
     shortNames:
-    - hcp
+    - hrp
     singular: helmreleaseproxy
   scope: Namespaced
   versions:

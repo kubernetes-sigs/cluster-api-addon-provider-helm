@@ -92,7 +92,7 @@ type HelmReleaseProxyStatus struct {
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status"
 // +kubebuilder:printcolumn:name="Revision",type="string",JSONPath=".status.revision"
 // +kubebuilder:printcolumn:name="Namespace",type="string",JSONPath=".status.namespace"
-// +kubebuilder:resource:path=helmreleaseproxies,scope=Namespaced,categories=cluster-api,shortName=hcp
+// +kubebuilder:resource:shortName=hrp
 
 // HelmReleaseProxy is the Schema for the helmreleaseproxies API
 type HelmReleaseProxy struct {
