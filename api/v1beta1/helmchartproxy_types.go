@@ -19,6 +19,7 @@ package v1beta1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -76,6 +77,10 @@ type HelmChartProxyStatus struct {
 	// +optional
 	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
 
+	// Conditions defines current state of the HelmChartProxy.
+	// +optional
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+
 	// FailureReason will be set in the event that there is a an error reconciling the HelmChartProxy.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
@@ -102,6 +107,16 @@ type HelmChartProxyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []HelmChartProxy `json:"items"`
+}
+
+// GetConditions returns the list of conditions for an HelmChartProxy API object.
+func (c *HelmChartProxy) GetConditions() clusterv1.Conditions {
+	return c.Status.Conditions
+}
+
+// SetConditions will set the given conditions on an HelmChartProxy object.
+func (c *HelmChartProxy) SetConditions(conditions clusterv1.Conditions) {
+	c.Status.Conditions = conditions
 }
 
 func init() {

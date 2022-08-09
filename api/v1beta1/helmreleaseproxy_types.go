@@ -19,6 +19,7 @@ package v1beta1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -72,6 +73,10 @@ type HelmReleaseProxyStatus struct {
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
+	// Conditions defines current state of the HelmReleaseProxy.
+	// +optional
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+
 	// Status is the current status of the Helm release.
 	// +optional
 	Status string `json:"status,omitempty"`
@@ -110,6 +115,16 @@ type HelmReleaseProxyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []HelmReleaseProxy `json:"items"`
+}
+
+// GetConditions returns the list of conditions for an HelmReleaseProxy API object.
+func (r *HelmReleaseProxy) GetConditions() clusterv1.Conditions {
+	return r.Status.Conditions
+}
+
+// SetConditions will set the given conditions on an HelmReleaseProxy object.
+func (r *HelmReleaseProxy) SetConditions(conditions clusterv1.Conditions) {
+	r.Status.Conditions = conditions
 }
 
 func init() {
