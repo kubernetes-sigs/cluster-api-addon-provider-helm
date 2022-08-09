@@ -35,8 +35,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
-	"cluster-api-addon-helm/controllers"
+	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
+	"cluster-api-addon-provider-helm/controllers"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"

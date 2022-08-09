@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
+	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 

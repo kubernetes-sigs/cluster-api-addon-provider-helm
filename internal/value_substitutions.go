@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
+	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
 )
 
 func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (*BuiltinTypes, error) {

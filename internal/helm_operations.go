@@ -40,7 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
+	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
 )
 
 func GetActionConfig(ctx context.Context, namespace string, config *rest.Config) (*helmAction.Configuration, error) {

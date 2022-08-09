@@ -1,8 +1,8 @@
 domain: cluster.x-k8s.io
 layout:
 - go.kubebuilder.io/v3
-projectName: cluster-api-addon-helm
-repo: cluster-api-addon-helm
+projectName: cluster-api-addon-provider-helm
+repo: cluster-api-addon-provider-helm
 resources:
 - api:
     crdVersion: v1
@@ -11,7 +11,7 @@ resources:
   domain: cluster.x-k8s.io
   group: addons
   kind: HelmChartProxy
-  path: cluster-api-addon-helm/api/v1beta1
+  path: cluster-api-addon-provider-helm/api/v1beta1
   version: v1beta1
   webhooks:
     defaulting: true
@@ -24,7 +24,7 @@ resources:
   domain: cluster.x-k8s.io
   group: addons
   kind: HelmReleaseProxy
-  path: cluster-api-addon-helm/api/v1beta1
+  path: cluster-api-addon-provider-helm/api/v1beta1
   version: v1beta1
   webhooks:
     defaulting: true

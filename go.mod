@@ -1,4 +1,4 @@
-module cluster-api-addon-helm
+module cluster-api-addon-provider-helm
 
 go 1.17
 

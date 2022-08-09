@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	addonsv1beta1 "cluster-api-addon-helm/api/v1beta1"
-	"cluster-api-addon-helm/internal"
+	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
+	"cluster-api-addon-provider-helm/internal"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
