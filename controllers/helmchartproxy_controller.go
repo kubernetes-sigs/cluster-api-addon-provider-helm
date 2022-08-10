@@ -54,6 +54,37 @@ type HelmChartProxyReconciler struct {
 	WatchFilterValue string
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	helmChartProxyMapper, err := ClusterToHelmChartProxiesMapper(r.Client)
+	if err != nil {
+		return errors.Wrap(err, "failed to create mapper for Cluster to HelmChartProxies")
+	}
+
+	c, err := ctrl.NewControllerManagedBy(mgr).
+		WithOptions(options).
+		For(&addonsv1beta1.HelmChartProxy{}).
+		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
+		// WithEventFilter(predicates.ResourceIsNotExternallyManaged(log)).
+		Build(r)
+	if err != nil {
+		return errors.Wrap(err, "error creating controller")
+	}
+
+	// Add a watch on clusterv1.Cluster object for changes.
+	if err = c.Watch(
+		&source.Kind{Type: &clusterv1.Cluster{}},
+		handler.EnqueueRequestsFromMapFunc(helmChartProxyMapper),
+		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
+	); err != nil {
+		return errors.Wrap(err, "failed adding a watch for clusters")
+	}
+
+	return nil
+}
+
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/finalizers,verbs=update
@@ -165,37 +196,6 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	helmChartProxy.SetError(err)
 	return ctrl.Result{}, err
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	helmChartProxyMapper, err := ClusterToHelmChartProxiesMapper(r.Client)
-	if err != nil {
-		return errors.Wrap(err, "failed to create mapper for Cluster to HelmChartProxies")
-	}
-
-	c, err := ctrl.NewControllerManagedBy(mgr).
-		WithOptions(options).
-		For(&addonsv1beta1.HelmChartProxy{}).
-		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
-		// WithEventFilter(predicates.ResourceIsNotExternallyManaged(log)).
-		Build(r)
-	if err != nil {
-		return errors.Wrap(err, "error creating controller")
-	}
-
-	// Add a watch on clusterv1.Cluster object for changes.
-	if err = c.Watch(
-		&source.Kind{Type: &clusterv1.Cluster{}},
-		handler.EnqueueRequestsFromMapFunc(helmChartProxyMapper),
-		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
-	); err != nil {
-		return errors.Wrap(err, "failed adding a watch for clusters")
-	}
-
-	return nil
 }
 
 // reconcileNormal...

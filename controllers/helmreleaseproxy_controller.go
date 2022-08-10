@@ -43,6 +43,21 @@ type HelmReleaseProxyReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
+	_ = ctrl.LoggerFrom(ctx)
+
+	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(options).
+		For(&addonsv1beta1.HelmReleaseProxy{}).
+		// Watches(
+		// 	&source.Kind{Type: &v1beta1.HelmReleaseProxy{}},
+		// 	handler.EnqueueRequestsFromMapFunc(r.findProxyForSecret),
+		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		// ).
+		Complete(r)
+}
+
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies/finalizers,verbs=update
@@ -170,21 +185,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	helmReleaseProxy.SetError(err)
 
 	return ctrl.Result{}, err
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
-	_ = ctrl.LoggerFrom(ctx)
-
-	return ctrl.NewControllerManagedBy(mgr).
-		WithOptions(options).
-		For(&addonsv1beta1.HelmReleaseProxy{}).
-		// Watches(
-		// 	&source.Kind{Type: &v1beta1.HelmReleaseProxy{}},
-		// 	handler.EnqueueRequestsFromMapFunc(r.findProxyForSecret),
-		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		// ).
-		Complete(r)
 }
 
 // reconcileNormal,...
