@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -94,7 +93,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}()
 
 	cluster := &clusterv1.Cluster{}
-	clusterKey := ctrlClient.ObjectKey{
+	clusterKey := client.ObjectKey{
 		Namespace: helmReleaseProxy.Spec.ClusterRef.Namespace,
 		Name:      helmReleaseProxy.Spec.ClusterRef.Name,
 	}

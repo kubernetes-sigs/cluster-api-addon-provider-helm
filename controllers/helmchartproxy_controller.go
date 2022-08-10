@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -48,7 +47,7 @@ import (
 
 // HelmChartProxyReconciler reconciles a HelmChartProxy object
 type HelmChartProxyReconciler struct {
-	ctrlClient.Client
+	client.Client
 	Scheme *runtime.Scheme
 
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
@@ -306,7 +305,7 @@ func (r *HelmChartProxyReconciler) listClustersWithLabel(ctx context.Context, la
 		label.Key: label.Value,
 	}
 
-	if err := r.Client.List(ctx, clusterList, ctrlClient.MatchingLabels(labelMap)); err != nil {
+	if err := r.Client.List(ctx, clusterList, client.MatchingLabels(labelMap)); err != nil {
 		return nil, err
 	}
 
@@ -320,8 +319,8 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 		return nil, nil
 	}
 
-	// TODO: should we use ctrlClient.MatchingLabels or try to use the labelSelector itself?
-	if err := r.Client.List(ctx, releaseList, ctrlClient.MatchingLabels(labels)); err != nil {
+	// TODO: should we use client.MatchingLabels or try to use the labelSelector itself?
+	if err := r.Client.List(ctx, releaseList, client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 
