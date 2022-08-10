@@ -172,8 +172,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	// TODO: Either add a label to HCP for every matching cluster, or create a new mapper func from Cluster => all HCPs that select that cluster.
-	helmChartProxyMapper, err := util.ClusterToObjectsMapper(r.Client, &addonsv1beta1.HelmChartProxyList{}, mgr.GetScheme())
+	helmChartProxyMapper, err := ClusterToHelmChartProxiesMapper(r.Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to create mapper for Cluster to HelmChartProxies")
 	}
@@ -480,4 +479,40 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 		}},
 		patch.WithStatusObservedGeneration{},
 	)
+}
+
+func ClusterToHelmChartProxiesMapper(c client.Client) (handler.MapFunc, error) {
+	// Note: this finds every HelmReleaseProxy associated with a Cluster and returns a Request for its parent HelmChartProxy.
+	// This will not trigger an update if the HelmChartProxy selected a Cluster but ran into an error before creating the HelmReleaseProxy.
+	// Though in that case the HelmChartProxy will requeue soon anyway so it's most likely not an issue.
+	return func(o client.Object) []ctrl.Request {
+		cluster, ok := o.(*clusterv1.Cluster)
+		if !ok {
+			return nil
+		}
+
+		helmReleaseProxies := &addonsv1beta1.HelmReleaseProxyList{}
+
+		listOpts := []client.ListOption{
+			client.MatchingLabels{
+				clusterv1.ClusterLabelName: cluster.Name,
+			},
+		}
+
+		// TODO: Figure out if we want this search to be cross-namespaces.
+
+		if err := c.List(context.TODO(), helmReleaseProxies, listOpts...); err != nil {
+			return nil
+		}
+
+		results := []ctrl.Request{}
+		for _, helmReleaseProxy := range helmReleaseProxies.Items {
+			results = append(results, ctrl.Request{
+				// The HelmReleaseProxy is always in the same namespace as the HelmChartProxy.
+				NamespacedName: client.ObjectKey{Namespace: helmReleaseProxy.GetNamespace(), Name: helmReleaseProxy.Labels[addonsv1beta1.HelmChartProxyLabelName]},
+			})
+		}
+
+		return results
+	}, nil
 }

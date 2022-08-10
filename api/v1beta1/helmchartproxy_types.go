@@ -121,7 +121,6 @@ func (c *HelmChartProxy) SetConditions(conditions clusterv1.Conditions) {
 }
 
 func (c *HelmChartProxy) SetMatchingClusters(clusterList []clusterv1.Cluster) {
-	// TODO: Consider adding labels to selected clusters and removing unselected ones.
 	matchingClusters := make([]corev1.ObjectReference, 0, len(clusterList))
 	for _, cluster := range clusterList {
 		matchingClusters = append(matchingClusters, corev1.ObjectReference{
