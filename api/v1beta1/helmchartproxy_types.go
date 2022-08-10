@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 const (
@@ -117,6 +118,34 @@ func (c *HelmChartProxy) GetConditions() clusterv1.Conditions {
 // SetConditions will set the given conditions on an HelmChartProxy object.
 func (c *HelmChartProxy) SetConditions(conditions clusterv1.Conditions) {
 	c.Status.Conditions = conditions
+}
+
+func (c *HelmChartProxy) SetMatchingClusters(clusterList []clusterv1.Cluster) {
+	// TODO: Consider adding labels to selected clusters and removing unselected ones.
+	matchingClusters := make([]corev1.ObjectReference, 0, len(clusterList))
+	for _, cluster := range clusterList {
+		matchingClusters = append(matchingClusters, corev1.ObjectReference{
+			Kind:       cluster.Kind,
+			APIVersion: cluster.APIVersion,
+			Name:       cluster.Name,
+			Namespace:  cluster.Namespace,
+		})
+	}
+
+	c.Status.MatchingClusters = matchingClusters
+}
+
+func (c *HelmChartProxy) SetError(err error) {
+	if err != nil {
+		c.Status.FailureReason = err.Error()
+		c.Status.Ready = false
+		// TODO: Parse error reason severity
+		conditions.MarkFalse(c, clusterv1.ReadyCondition, "ReconciliationError", "Error", err.Error())
+	} else {
+		c.Status.FailureReason = ""
+		c.Status.Ready = true
+		conditions.MarkTrue(c, clusterv1.ReadyCondition)
+	}
 }
 
 func init() {

@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +34,7 @@ import (
 	"cluster-api-addon-provider-helm/internal"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 )
 
@@ -85,7 +85,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	defer func() {
 		log.V(2).Info("Preparing to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
 		log.V(2).Info("HelmReleaseProxy return error is", "reterr", reterr)
-		if err := patchHelper.Patch(ctx, helmReleaseProxy); err != nil && reterr == nil {
+		if err := patchHelmReleaseProxy(ctx, patchHelper, helmReleaseProxy); err != nil && reterr == nil {
 			reterr = err
 			log.Error(err, "failed to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
 			return
@@ -120,14 +120,14 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
 				if err != nil {
 					wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-					setReleaseError(helmReleaseProxy, wrappedErr)
+					helmReleaseProxy.SetError(wrappedErr)
 					return ctrl.Result{}, wrappedErr
 				}
 
 				if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfig); err != nil {
 					// if fail to delete the external dependency here, return with error
 					// so that it can be retried
-					setReleaseError(helmReleaseProxy, err)
+					helmReleaseProxy.SetError(err)
 					return ctrl.Result{}, err
 				}
 			} else if apierrors.IsNotFound(err) {
@@ -135,7 +135,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				log.V(2).Info("Cluster not found, no need to delete external dependency", "cluster", cluster.Name)
 			} else {
 				wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-				setReleaseError(helmReleaseProxy, wrappedErr)
+				helmReleaseProxy.SetError(wrappedErr)
 				return ctrl.Result{}, wrappedErr
 			}
 
@@ -154,7 +154,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
 		// TODO: add check to tell if Cluster is deleted so we can remove the HelmReleaseProxy.
 		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-		setReleaseError(helmReleaseProxy, wrappedErr)
+		helmReleaseProxy.SetError(wrappedErr)
 		return ctrl.Result{}, wrappedErr
 	}
 
@@ -162,19 +162,21 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-		setReleaseError(helmReleaseProxy, wrappedErr)
+		helmReleaseProxy.SetError(wrappedErr)
 		return ctrl.Result{}, wrappedErr
 	}
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
 	err = r.reconcileNormal(ctx, helmReleaseProxy, kubeconfig)
-	setReleaseError(helmReleaseProxy, err)
+	helmReleaseProxy.SetError(err)
 
 	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *HelmReleaseProxyReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
+func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
+	_ = ctrl.LoggerFrom(ctx)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1beta1.HelmReleaseProxy{}).
@@ -212,8 +214,10 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 			log.V(2).Info((fmt.Sprintf("Release '%s' is up to date on cluster %s, no upgrade required, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
 		}
 
-		setReleaseStatusFields(helmReleaseProxy, release)
-		updateReleaseName(helmReleaseProxy, release)
+		helmReleaseProxy.SetReleaseStatus(release.Info.Status.String())
+		helmReleaseProxy.SetReleaseRevision(release.Version)
+		helmReleaseProxy.SetReleaseNamespace(release.Namespace)
+		helmReleaseProxy.SetReleaseName(release.Name)
 		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
 	}
 
@@ -255,24 +259,21 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	return nil
 }
 
-func setReleaseError(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, err error) {
-	if err != nil {
-		helmReleaseProxy.Status.FailureReason = err.Error()
-		helmReleaseProxy.Status.Ready = false
-	} else {
-		helmReleaseProxy.Status.FailureReason = ""
-		helmReleaseProxy.Status.Ready = true
-	}
-}
+func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy) error {
+	// TODO: Update the readyCondition by summarizing the state of other conditions when they are implemented.
+	conditions.SetSummary(helmReleaseProxy,
+		conditions.WithConditions(
+			clusterv1.ReadyCondition,
+		),
+	)
 
-func setReleaseStatusFields(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, release *release.Release) {
-	helmReleaseProxy.Status.Status = release.Info.Status.String() // See pkg/release/status.go in Helm for possible values
-	helmReleaseProxy.Status.Revision = release.Version
-	helmReleaseProxy.Status.Namespace = release.Namespace // TODO: Add a way to configure the namespace
-}
-
-func updateReleaseName(helmReleaseProxy *addonsv1beta1.HelmReleaseProxy, release *release.Release) {
-	if helmReleaseProxy.Spec.ReleaseName == "" {
-		helmReleaseProxy.Spec.ReleaseName = release.Name
-	}
+	// Patch the object, ignoring conflicts on the conditions owned by this controller.
+	return patchHelper.Patch(
+		ctx,
+		helmReleaseProxy,
+		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
+			clusterv1.ReadyCondition,
+		}},
+		patch.WithStatusObservedGeneration{},
+	)
 }

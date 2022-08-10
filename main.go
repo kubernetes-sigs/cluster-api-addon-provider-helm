@@ -95,10 +95,12 @@ func main() {
 	_ = clusterv1.AddToScheme(scheme)
 	_ = kcpv1.AddToScheme(scheme)
 
+	ctx := ctrl.SetupSignalHandler()
+
 	if err = (&controllers.HelmChartProxyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: scheme,
-	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: helmChartProxyConcurrency}); err != nil {
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmChartProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChartProxy")
 		os.Exit(1)
 	}
@@ -111,7 +113,7 @@ func main() {
 	if err = (&controllers.HelmReleaseProxyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: scheme,
-	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmReleaseProxy")
 		os.Exit(1)
 	}

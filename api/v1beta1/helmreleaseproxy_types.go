@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 const (
@@ -125,6 +126,38 @@ func (r *HelmReleaseProxy) GetConditions() clusterv1.Conditions {
 // SetConditions will set the given conditions on an HelmReleaseProxy object.
 func (r *HelmReleaseProxy) SetConditions(conditions clusterv1.Conditions) {
 	r.Status.Conditions = conditions
+}
+
+func (r *HelmReleaseProxy) SetReleaseStatus(status string) {
+	r.Status.Status = status // See pkg/release/status.go in Helm for possible values
+	// r.Status.Status = release.Info.Status.String() // See pkg/release/status.go in Helm for possible values
+}
+
+func (r *HelmReleaseProxy) SetReleaseRevision(version int) {
+	r.Status.Revision = version
+}
+
+func (r *HelmReleaseProxy) SetReleaseNamespace(namespace string) {
+	r.Status.Namespace = namespace // TODO: Add a way to configure the namespace
+}
+
+func (r *HelmReleaseProxy) SetReleaseName(name string) {
+	if r.Spec.ReleaseName == "" {
+		r.Spec.ReleaseName = name
+	}
+}
+
+func (r *HelmReleaseProxy) SetError(err error) {
+	if err != nil {
+		r.Status.FailureReason = err.Error()
+		r.Status.Ready = false
+		// TODO: Parse error reason severity
+		conditions.MarkFalse(r, clusterv1.ReadyCondition, "ReconciliationError", "Error", err.Error())
+	} else {
+		r.Status.FailureReason = ""
+		r.Status.Ready = true
+		conditions.MarkTrue(r, clusterv1.ReadyCondition)
+	}
 }
 
 func init() {

@@ -31,13 +31,17 @@ import (
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
 	"cluster-api-addon-provider-helm/internal"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/cluster-api/util/predicates"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 )
@@ -46,6 +50,9 @@ import (
 type HelmChartProxyReconciler struct {
 	ctrlClient.Client
 	Scheme *runtime.Scheme
+
+	// WatchFilterValue is the label value used to filter events prior to reconciliation.
+	WatchFilterValue string
 }
 
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
@@ -87,7 +94,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	defer func() {
 		log.V(2).Info("Preparing to patch HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
-		if err := patchHelper.Patch(ctx, helmChartProxy); err != nil && reterr == nil {
+		if err := patchHelmChartProxy(ctx, patchHelper, helmChartProxy); err != nil && reterr == nil {
 			reterr = err
 			log.Error(err, "failed to patch HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 			return
@@ -103,10 +110,10 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// to not have errors. An idea would be to check the deletion timestamp.
 	clusterList, err := r.listClustersWithLabel(ctx, label)
 	if err != nil {
-		setChartError(helmChartProxy, errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
+		helmChartProxy.SetError(errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
 		return ctrl.Result{}, err
 	}
-	setMatchingClusters(helmChartProxy, clusterList.Items)
+	helmChartProxy.SetMatchingClusters(clusterList.Items)
 
 	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	labels := map[string]string{
@@ -114,7 +121,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	releaseList, err := r.listInstalledReleases(ctx, labels)
 	if err != nil {
-		setChartError(helmChartProxy, errors.Wrapf(err, "failed to list installed releases with labels %+v", labels))
+		helmChartProxy.SetError(errors.Wrapf(err, "failed to list installed releases with labels %+v", labels))
 		return ctrl.Result{}, err
 	}
 
@@ -137,7 +144,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.reconcileDelete(ctx, helmChartProxy, releaseList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
-				setChartError(helmChartProxy, err)
+				helmChartProxy.SetError(err)
 				return ctrl.Result{}, err
 			}
 
@@ -150,28 +157,47 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		// Stop reconciliation as the item is being deleted
-		setChartError(helmChartProxy, nil)
+		helmChartProxy.SetError(nil)
 		return ctrl.Result{}, nil
 	}
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items, releaseList.Items)
 
-	setChartError(helmChartProxy, err)
+	helmChartProxy.SetError(err)
 	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *HelmChartProxyReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
-	return ctrl.NewControllerManagedBy(mgr).
+func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// TODO: Either add a label to HCP for every matching cluster, or create a new mapper func from Cluster => all HCPs that select that cluster.
+	helmChartProxyMapper, err := util.ClusterToObjectsMapper(r.Client, &addonsv1beta1.HelmChartProxyList{}, mgr.GetScheme())
+	if err != nil {
+		return errors.Wrap(err, "failed to create mapper for Cluster to HelmChartProxies")
+	}
+
+	c, err := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1beta1.HelmChartProxy{}).
-		// Watches(
-		// 	&source.Kind{Type: &v1beta1.HelmChartProxy{}},
-		// 	handler.EnqueueRequestsFromMapFunc(r.findProxyForSecret),
-		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		// ).
-		Complete(r)
+		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
+		// WithEventFilter(predicates.ResourceIsNotExternallyManaged(log)).
+		Build(r)
+	if err != nil {
+		return errors.Wrap(err, "error creating controller")
+	}
+
+	// Add a watch on clusterv1.Cluster object for changes.
+	if err = c.Watch(
+		&source.Kind{Type: &clusterv1.Cluster{}},
+		handler.EnqueueRequestsFromMapFunc(helmChartProxyMapper),
+		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
+	); err != nil {
+		return errors.Wrap(err, "failed adding a watch for clusters")
+	}
+
+	return nil
 }
 
 // reconcileNormal...
@@ -437,26 +463,21 @@ func generateHelmReleaseProxyName(helmChartProxy addonsv1beta1.HelmChartProxy, c
 	return helmChartProxy.Spec.ChartName + "-" + cluster.Name
 }
 
-func setMatchingClusters(helmChartProxy *addonsv1beta1.HelmChartProxy, clusterList []clusterv1.Cluster) {
-	matchingClusters := make([]corev1.ObjectReference, 0, len(clusterList))
-	for _, cluster := range clusterList {
-		matchingClusters = append(matchingClusters, corev1.ObjectReference{
-			Kind:       cluster.Kind,
-			APIVersion: cluster.APIVersion,
-			Name:       cluster.Name,
-			Namespace:  cluster.Namespace,
-		})
-	}
+func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
+	// TODO: Update the readyCondition by summarizing the state of other conditions when they are implemented.
+	conditions.SetSummary(helmChartProxy,
+		conditions.WithConditions(
+			clusterv1.ReadyCondition,
+		),
+	)
 
-	helmChartProxy.Status.MatchingClusters = matchingClusters
-}
-
-func setChartError(helmChartProxy *addonsv1beta1.HelmChartProxy, err error) {
-	if err != nil {
-		helmChartProxy.Status.FailureReason = err.Error()
-		helmChartProxy.Status.Ready = false
-	} else {
-		helmChartProxy.Status.FailureReason = ""
-		helmChartProxy.Status.Ready = true
-	}
+	// Patch the object, ignoring conflicts on the conditions owned by this controller.
+	return patchHelper.Patch(
+		ctx,
+		helmChartProxy,
+		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
+			clusterv1.ReadyCondition,
+		}},
+		patch.WithStatusObservedGeneration{},
+	)
 }
