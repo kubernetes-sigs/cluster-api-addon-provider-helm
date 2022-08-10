@@ -22,8 +22,15 @@ spec:
       jsonPath: .spec.clusterRef.name
       name: Cluster
       type: string
-    - jsonPath: .status.ready
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].reason
+      name: Reason
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].message
+      name: Message
+      priority: 1
       type: string
     - jsonPath: .status.status
       name: Status
