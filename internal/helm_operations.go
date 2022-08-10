@@ -259,16 +259,6 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 
 func writeValuesToFile(ctx context.Context, spec addonsv1beta1.HelmReleaseProxySpec) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Reading contents of current directory")
-	files, err := ioutil.ReadDir(".")
-	if err != nil {
-		return "", err
-	}
-
-	for i, file := range files {
-		log.V(2).Info("File is", "num", i, "filename", file.Name())
-	}
-
 	log.V(2).Info("Writing values to file")
 	valuesFile, err := ioutil.TempFile("", spec.ChartName+"-"+spec.ReleaseName+"-*.yaml")
 	if err != nil {

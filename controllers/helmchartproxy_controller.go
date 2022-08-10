@@ -222,7 +222,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				return errors.Wrapf(err, "failed to get HelmReleaseProxy for cluster %s", cluster.Name)
 			}
 		}
-		// log.V(2).Info("Found existing HelmReleaseProxy", "cluster", cluster.Name, "release", existingHelmReleaseProxy.Name)
+		log.V(2).Info("Found existing HelmReleaseProxy", "cluster", cluster.Name, "release", existingHelmReleaseProxy)
 
 		if existingHelmReleaseProxy != nil && shouldReinstallHelmRelease(ctx, existingHelmReleaseProxy, helmChartProxy) {
 			log.V(2).Info("Reinstalling Helm release by deleting and creating HelmReleaseProxy", "helmReleaseProxy", existingHelmReleaseProxy.Name)
@@ -403,6 +403,12 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 			Name:       cluster.Name,
 			Namespace:  cluster.Namespace,
 		}
+
+		helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
+		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
+		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
+		helmReleaseProxy.Spec.Namespace = helmChartProxy.Spec.Namespace
+
 		// helmChartProxy.ObjectMeta.SetAnnotations(helmReleaseProxy.Annotations)
 	} else {
 		helmReleaseProxy = existing
@@ -419,11 +425,7 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 		}
 	}
 
-	helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
-	helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
-	helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
-	helmReleaseProxy.Spec.Namespace = helmChartProxy.Spec.Namespace
 	helmReleaseProxy.Spec.Values = parsedValues
 
 	return helmReleaseProxy
