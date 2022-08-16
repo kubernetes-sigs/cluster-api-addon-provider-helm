@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 const (
@@ -153,12 +152,9 @@ func (r *HelmReleaseProxy) SetError(err error) {
 	if err != nil {
 		r.Status.FailureReason = err.Error()
 		r.Status.Ready = false
-		// TODO: Parse error reason severity
-		conditions.MarkFalse(r, clusterv1.ReadyCondition, "ReconciliationError", "Error", err.Error())
 	} else {
 		r.Status.FailureReason = ""
 		r.Status.Ready = true
-		conditions.MarkTrue(r, clusterv1.ReadyCondition)
 	}
 }
 
