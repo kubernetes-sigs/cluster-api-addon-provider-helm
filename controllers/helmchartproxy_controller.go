@@ -219,6 +219,11 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	}
 
 	for _, cluster := range clusters {
+		// Don't reconcile if the Cluster is being deleted
+		if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+			continue
+		}
+
 		existingHelmReleaseProxy, err := r.getExistingHelmReleaseProxy(ctx, helmChartProxy, &cluster)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -406,15 +411,15 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
 			metav1.OwnerReference{
-				APIVersion: helmChartProxy.GroupVersionKind().String(),
-				Kind:       helmChartProxy.GroupVersionKind().Kind,
+				Kind:       helmChartProxy.Kind,
+				APIVersion: helmChartProxy.APIVersion,
 				Name:       helmChartProxy.Name,
 				UID:        helmChartProxy.UID,
 			})
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
 			metav1.OwnerReference{
-				APIVersion: cluster.GroupVersionKind().String(),
-				Kind:       cluster.GroupVersionKind().Kind,
+				Kind:       cluster.Kind,
+				APIVersion: cluster.APIVersion,
 				Name:       cluster.Name,
 				UID:        cluster.UID,
 			})
