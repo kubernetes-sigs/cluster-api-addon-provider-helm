@@ -20,33 +20,44 @@ import clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
 // HelmChartProxy Conditions and Reasons.
 const (
-	// HelmReleaseProxySpecsUpToDateCondition...
-	HelmReleaseProxySpecsUpToDateCondition clusterv1.ConditionType = "HelmReleaseProxySpecsUpToDate"
-	// GenericErrorReason is used to indicate there was some error in reconciliation.
-	GenericErrorReason = "GenericError"
+	// ReconciliationErrorReason is used to indicate there was some error in reconciliation.
+	ReconciliationErrorReason = "ReconciliationError"
+
+	// HelmReleaseProxySpecsReadyCondition...
+	HelmReleaseProxySpecsReadyCondition clusterv1.ConditionType = "HelmReleaseProxySpecsReady"
+
+	// // HelmReleaseProxiesReadyCondition...
+	// HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
+
+	// HelmReleaseProxyCreationFailedReason...
+	HelmReleaseProxyCreationFailedReason = "HelmReleaseProxyCreationFailed"
+	// HelmReleaseProxyDeletionFailedReason...
+	HelmReleaseProxyDeletionFailedReason = "HelmReleaseProxyDeletionFailed"
 
 	// ClusterSelectionSucceededCondition...
 	ClusterSelectionSucceededCondition clusterv1.ConditionType = "ClusterSelectionSucceeded"
-
-	// ReinstallInProgressReason...
-	ReinstallInProgressReason = "ReinstallInProgress"
-
 	// ClusterSelectionFailedReason is ...
 	ClusterSelectionFailedReason = "ClusterSelectionFailed"
+
+	// ValueParsingSucceededCondition...
+	ValueParsingSucceededCondition clusterv1.ConditionType = "ValueParsingSucceeded"
+
 	// ValueParsingFailedReason is ...
 	ValueParsingFailedReason = "ValueParsingFailed"
 )
 
 // HelmReleaseProxy Conditions and Reasons.
 const (
-	// HelmReleaseUpToDateCondition reports on current status of the HelmRelease managed by the HelmChartProxy.
-	HelmReleaseUpToDateCondition clusterv1.ConditionType = "HelmReleaseUpToDate"
-	// HelmInstallFailedReason is ...
-	HelmInstallFailedReason = "HelmInstallFailed"
-	// HelmUpgradeFailedReason is ...
-	HelmUpgradeFailedReason = "HelmUpgradeFailed"
+	// HelmReleaseReadyCondition reports on current status of the HelmRelease managed by the HelmChartProxy.
+	HelmReleaseReadyCondition clusterv1.ConditionType = "HelmReleaseReady"
+	// HelmInstallOrUpgradeFailedReason is ...
+	HelmInstallOrUpgradeFailedReason = "HelmInstallOrUpgradeFailed"
+	// HelmReleaseDeletionFailedReason is ...
+	HelmReleaseDeletionFailedReason = "HelmReleaseDeletionFailed"
 	// HelmReleaseDeletedReason is ...
 	HelmReleaseDeletedReason = "HelmReleaseDeleted"
+	// HelmReleaseGetFailedReason is ...
+	HelmReleaseGetFailedReason = "HelmReleaseGetFailed"
 
 	// ClusterAvailableCondition...
 	ClusterAvailableCondition clusterv1.ConditionType = "ClusterAvailable"
