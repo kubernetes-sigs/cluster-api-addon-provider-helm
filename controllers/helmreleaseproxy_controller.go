@@ -120,7 +120,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// registering our finalizer.
 		if !controllerutil.ContainsFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer) {
 			controllerutil.AddFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer)
-			if err := r.Update(ctx, helmReleaseProxy); err != nil {
+			if err := patchHelmReleaseProxy(ctx, patchHelper, helmReleaseProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
@@ -155,7 +155,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmReleaseProxy, addonsv1beta1.HelmReleaseProxyFinalizer)
-			if err := r.Update(ctx, helmReleaseProxy); err != nil {
+			if err := patchHelmReleaseProxy(ctx, patchHelper, helmReleaseProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}

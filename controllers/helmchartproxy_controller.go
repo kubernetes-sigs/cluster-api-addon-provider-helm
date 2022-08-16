@@ -162,7 +162,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// registering our finalizer.
 		if !controllerutil.ContainsFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer) {
 			controllerutil.AddFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer)
-			if err := r.Update(ctx, helmChartProxy); err != nil {
+			if err := patchHelmChartProxy(ctx, patchHelper, helmChartProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't add the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
@@ -180,7 +180,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(helmChartProxy, addonsv1beta1.HelmChartProxyFinalizer)
-			if err := r.Update(ctx, helmChartProxy); err != nil {
+			if err := patchHelmChartProxy(ctx, patchHelper, helmChartProxy); err != nil {
 				// TODO: Should we try to set the error here? If we can't remove the finalizer we likely can't update the status either.
 				return ctrl.Result{}, err
 			}
@@ -363,6 +363,7 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 			return errors.Wrapf(err, "failed to create HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
 	} else {
+		// TODO: should this use patchHelmReleaseProxy() instead of Update() in case there's a race condition?
 		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
 			return errors.Wrapf(err, "failed to update HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
