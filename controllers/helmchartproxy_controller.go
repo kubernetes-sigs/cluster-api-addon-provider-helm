@@ -404,7 +404,21 @@ func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseP
 	if existing == nil {
 		helmReleaseProxy.Name = name
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
-		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
+		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
+			metav1.OwnerReference{
+				APIVersion: helmChartProxy.GroupVersionKind().String(),
+				Kind:       helmChartProxy.GroupVersionKind().Kind,
+				Name:       helmChartProxy.Name,
+				UID:        helmChartProxy.UID,
+			})
+		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
+			metav1.OwnerReference{
+				APIVersion: cluster.GroupVersionKind().String(),
+				Kind:       cluster.GroupVersionKind().Kind,
+				Name:       cluster.Name,
+				UID:        cluster.UID,
+			})
+
 		newLabels := map[string]string{}
 		newLabels[clusterv1.ClusterLabelName] = cluster.Name
 		newLabels[addonsv1beta1.HelmChartProxyLabelName] = helmChartProxy.Name
