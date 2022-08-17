@@ -24,6 +24,7 @@ import (
 
 	"github.com/Masterminds/sprig"
 	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
@@ -34,6 +35,8 @@ import (
 )
 
 func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1beta1.HelmChartProxySpec, cluster *clusterv1.Cluster) (*BuiltinTypes, error) {
+	log := ctrl.LoggerFrom(ctx)
+
 	kubeadmControlPlane := &kcpv1.KubeadmControlPlane{}
 	key := types.NamespacedName{
 		Name:      cluster.Spec.ControlPlaneRef.Name,
@@ -41,7 +44,11 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, spec addonsv1b
 	}
 	err := c.Get(ctx, key, kubeadmControlPlane)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get kubeadm control plane %s", key)
+		if apierrors.IsNotFound(err) {
+			log.V(2).Info("kubeadm control plane not found", "cluster", cluster.Name, "namespace", cluster.Namespace)
+		} else {
+			return nil, errors.Wrapf(err, "failed to get kubeadm control plane %s", key)
+		}
 	}
 
 	builtInTypes := BuiltinTypes{
