@@ -347,6 +347,9 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 // getExistingHelmReleaseProxy...
 func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster) (*addonsv1beta1.HelmReleaseProxy, error) {
 	log := ctrl.LoggerFrom(ctx)
+	// TODO: Explore other ways to figure find the HRP for a HCP and a Cluster. This name could cause a conflict in the following edge case.
+	// 1. Chart name: alpha-bravo, Cluster name: charlie, Generated name: alpha-bravo-charlie
+	// 2. Chart name: alpha, Cluster name: bravo-charlie, Generated name: alpha-bravo-charlie
 	helmReleaseProxyName := generateHelmReleaseProxyName(*helmChartProxy, *cluster)
 	helmReleaseProxyNamespace := helmChartProxy.Namespace
 
@@ -368,9 +371,7 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 // createOrUpdateHelmReleaseProxy...
 func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues string) error {
 	log := ctrl.LoggerFrom(ctx)
-	helmReleaseProxyName := generateHelmReleaseProxyName(*helmChartProxy, *cluster)
-
-	helmReleaseProxy := constructHelmReleaseProxy(helmReleaseProxyName, existing, helmChartProxy, parsedValues, cluster)
+	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, cluster)
 	if helmReleaseProxy == nil {
 		log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)
 		return nil
@@ -404,10 +405,10 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 	return nil
 }
 
-func constructHelmReleaseProxy(name string, existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1beta1.HelmReleaseProxy {
+func constructHelmReleaseProxy(existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1beta1.HelmReleaseProxy {
 	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
 	if existing == nil {
-		helmReleaseProxy.Name = name
+		helmReleaseProxy.Name = generateHelmReleaseProxyName(*helmChartProxy, *cluster)
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
 			metav1.OwnerReference{
