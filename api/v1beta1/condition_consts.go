@@ -20,30 +20,20 @@ import clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
 // HelmChartProxy Conditions and Reasons.
 const (
-	// ReconciliationErrorReason is used to indicate there was some error in reconciliation.
-	ReconciliationErrorReason = "ReconciliationError"
+	// // HelmReleaseProxiesReadyCondition...
+	// HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
 
 	// HelmReleaseProxySpecsReadyCondition...
 	HelmReleaseProxySpecsReadyCondition clusterv1.ConditionType = "HelmReleaseProxySpecsReady"
-
-	// // HelmReleaseProxiesReadyCondition...
-	// HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
 
 	// HelmReleaseProxyCreationFailedReason...
 	HelmReleaseProxyCreationFailedReason = "HelmReleaseProxyCreationFailed"
 	// HelmReleaseProxyDeletionFailedReason...
 	HelmReleaseProxyDeletionFailedReason = "HelmReleaseProxyDeletionFailed"
-
-	// ClusterSelectionSucceededCondition...
-	ClusterSelectionSucceededCondition clusterv1.ConditionType = "ClusterSelectionSucceeded"
-	// ClusterSelectionFailedReason is ...
-	ClusterSelectionFailedReason = "ClusterSelectionFailed"
-
-	// ValueParsingSucceededCondition...
-	ValueParsingSucceededCondition clusterv1.ConditionType = "ValueParsingSucceeded"
-
 	// ValueParsingFailedReason is ...
 	ValueParsingFailedReason = "ValueParsingFailed"
+	// ClusterSelectionFailedReason is ...
+	ClusterSelectionFailedReason = "ClusterSelectionFailed"
 )
 
 // HelmReleaseProxy Conditions and Reasons.

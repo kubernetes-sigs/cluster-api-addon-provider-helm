@@ -141,11 +141,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	clusterList, err := r.listClustersWithLabel(ctx, label)
 	if err != nil {
 		helmChartProxy.SetError(errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
-		conditions.MarkFalse(helmChartProxy, addonsv1beta1.ClusterSelectionSucceededCondition, addonsv1beta1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
+		conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition, addonsv1beta1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 		return ctrl.Result{}, err
 	}
-	conditions.MarkTrue(helmChartProxy, addonsv1beta1.ClusterSelectionSucceededCondition)
+	conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition)
 	helmChartProxy.SetMatchingClusters(clusterList.Items)
 
 	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
@@ -500,7 +500,6 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 	conditions.SetSummary(helmChartProxy,
 		conditions.WithConditions(
 			addonsv1beta1.HelmReleaseProxySpecsReadyCondition,
-			addonsv1beta1.ClusterSelectionSucceededCondition,
 		),
 	)
 
@@ -511,7 +510,6 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
 			clusterv1.ReadyCondition,
 			addonsv1beta1.HelmReleaseProxySpecsReadyCondition,
-			addonsv1beta1.ClusterSelectionSucceededCondition,
 		}},
 		patch.WithStatusObservedGeneration{},
 	)
