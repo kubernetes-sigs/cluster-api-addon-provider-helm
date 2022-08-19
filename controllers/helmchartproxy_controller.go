@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -58,11 +59,6 @@ type HelmChartProxyReconciler struct {
 func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	helmChartProxyMapper, err := ClusterToHelmChartProxiesMapper(r.Client)
-	if err != nil {
-		return errors.Wrap(err, "failed to create mapper for Cluster to HelmChartProxies")
-	}
-
 	c, err := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1beta1.HelmChartProxy{}).
@@ -76,10 +72,19 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 	// Add a watch on clusterv1.Cluster object for changes.
 	if err = c.Watch(
 		&source.Kind{Type: &clusterv1.Cluster{}},
-		handler.EnqueueRequestsFromMapFunc(helmChartProxyMapper),
+		handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
 		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
 	); err != nil {
-		return errors.Wrap(err, "failed adding a watch for clusters")
+		return errors.Wrap(err, "failed adding a watch for Clusters")
+	}
+
+	// Add a watch on HelmReleaseProxy object for changes.
+	if err = c.Watch(
+		&source.Kind{Type: &addonsv1beta1.HelmReleaseProxy{}},
+		handler.EnqueueRequestsFromMapFunc(HelmReleaseProxyToHelmChartProxyMapper),
+		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
+	); err != nil {
+		return errors.Wrap(err, "failed adding a watch for HelmReleaseProxies")
 	}
 
 	return nil
@@ -440,20 +445,14 @@ func constructHelmReleaseProxy(existing *addonsv1beta1.HelmReleaseProxy, helmCha
 	if existing == nil {
 		helmReleaseProxy.Name = generateHelmReleaseProxyName(*helmChartProxy, *cluster)
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
-		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
-			metav1.OwnerReference{
-				Kind:       helmChartProxy.Kind,
-				APIVersion: helmChartProxy.APIVersion,
-				Name:       helmChartProxy.Name,
-				UID:        helmChartProxy.UID,
-			})
-		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
-			metav1.OwnerReference{
-				Kind:       cluster.Kind,
-				APIVersion: cluster.APIVersion,
-				Name:       cluster.Name,
-				UID:        cluster.UID,
-			})
+		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
+		// helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
+		// 	metav1.OwnerReference{
+		// 		Kind:       cluster.Kind,
+		// 		APIVersion: cluster.APIVersion,
+		// 		Name:       cluster.Name,
+		// 		UID:        cluster.UID,
+		// 	})
 
 		newLabels := map[string]string{}
 		newLabels[clusterv1.ClusterLabelName] = cluster.Name
@@ -546,38 +545,63 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 	)
 }
 
-func ClusterToHelmChartProxiesMapper(c client.Client) (handler.MapFunc, error) {
-	// Note: this finds every HelmReleaseProxy associated with a Cluster and returns a Request for its parent HelmChartProxy.
-	// This will not trigger an update if the HelmChartProxy selected a Cluster but ran into an error before creating the HelmReleaseProxy.
-	// Though in that case the HelmChartProxy will requeue soon anyway so it's most likely not an issue.
-	return func(o client.Object) []ctrl.Request {
-		cluster, ok := o.(*clusterv1.Cluster)
-		if !ok {
-			return nil
+// Note: this finds every HelmReleaseProxy associated with a Cluster and returns a Request for its parent HelmChartProxy.
+// This will not trigger an update if the HelmChartProxy selected a Cluster but ran into an error before creating the HelmReleaseProxy.
+// Though in that case the HelmChartProxy will requeue soon anyway so it's most likely not an issue.
+func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Object) []ctrl.Request {
+	cluster, ok := o.(*clusterv1.Cluster)
+	if !ok {
+		fmt.Errorf("Expected a Cluster but got %T", o)
+		return nil
+	}
+
+	helmReleaseProxies := &addonsv1beta1.HelmReleaseProxyList{}
+
+	listOpts := []client.ListOption{
+		client.MatchingLabels{
+			clusterv1.ClusterLabelName: cluster.Name,
+		},
+	}
+
+	// TODO: Figure out if we want this search to be cross-namespaces.
+
+	if err := r.Client.List(context.TODO(), helmReleaseProxies, listOpts...); err != nil {
+		return nil
+	}
+
+	results := []ctrl.Request{}
+	for _, helmReleaseProxy := range helmReleaseProxies.Items {
+		results = append(results, ctrl.Request{
+			// The HelmReleaseProxy is always in the same namespace as the HelmChartProxy.
+			NamespacedName: client.ObjectKey{Namespace: helmReleaseProxy.GetNamespace(), Name: helmReleaseProxy.Labels[addonsv1beta1.HelmChartProxyLabelName]},
+		})
+	}
+
+	return results
+}
+
+func HelmReleaseProxyToHelmChartProxyMapper(o client.Object) []ctrl.Request {
+	helmReleaseProxy, ok := o.(*addonsv1beta1.HelmReleaseProxy)
+	if !ok {
+		fmt.Errorf("Expected a HelmReleaseProxy but got %T", o)
+		return nil
+	}
+
+	// Check if the controller reference is already set and
+	// return an empty result when one is found.
+	for _, ref := range helmReleaseProxy.ObjectMeta.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller {
+			name := client.ObjectKey{
+				Namespace: helmReleaseProxy.GetNamespace(),
+				Name:      ref.Name,
+			}
+			return []ctrl.Request{
+				{
+					NamespacedName: name,
+				},
+			}
 		}
+	}
 
-		helmReleaseProxies := &addonsv1beta1.HelmReleaseProxyList{}
-
-		listOpts := []client.ListOption{
-			client.MatchingLabels{
-				clusterv1.ClusterLabelName: cluster.Name,
-			},
-		}
-
-		// TODO: Figure out if we want this search to be cross-namespaces.
-
-		if err := c.List(context.TODO(), helmReleaseProxies, listOpts...); err != nil {
-			return nil
-		}
-
-		results := []ctrl.Request{}
-		for _, helmReleaseProxy := range helmReleaseProxies.Items {
-			results = append(results, ctrl.Request{
-				// The HelmReleaseProxy is always in the same namespace as the HelmChartProxy.
-				NamespacedName: client.ObjectKey{Namespace: helmReleaseProxy.GetNamespace(), Name: helmReleaseProxy.Labels[addonsv1beta1.HelmChartProxyLabelName]},
-			})
-		}
-
-		return results
-	}, nil
+	return nil
 }

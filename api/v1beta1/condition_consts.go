@@ -33,11 +33,6 @@ const (
 	ValueParsingFailedReason = "ValueParsingFailed"
 	// ClusterSelectionFailedReason is ...
 	ClusterSelectionFailedReason = "ClusterSelectionFailed"
-
-	// HelmReleaseProxyReadyConditionNotSetReason...
-	HelmReleaseProxyReadyConditionNotSetReason = "HelmReleaseProxyReadyConditionNotSet"
-	// WaitingForHelmReleaseProxyToBeReadyReason...
-	WaitingForHelmReleaseProxyToBeReadyReason = "WaitingForHelmReleaseProxyToBeReady"
 )
 
 // HelmReleaseProxy Conditions and Reasons.
