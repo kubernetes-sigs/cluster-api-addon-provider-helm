@@ -20,8 +20,8 @@ import clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
 // HelmChartProxy Conditions and Reasons.
 const (
-	// HelmReleaseProxiesReadyCondition...
-	HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
+	// HelmReleaseProxySpecsUpToDateCondition...
+	HelmReleaseProxySpecsUpToDateCondition clusterv1.ConditionType = "HelmReleaseProxySpecsUpToDate"
 
 	// HelmReleaseProxyCreationFailedReason...
 	HelmReleaseProxyCreationFailedReason = "HelmReleaseProxyCreationFailed"
@@ -33,6 +33,9 @@ const (
 	ValueParsingFailedReason = "ValueParsingFailed"
 	// ClusterSelectionFailedReason is ...
 	ClusterSelectionFailedReason = "ClusterSelectionFailed"
+
+	// HelmReleaseProxiesReadyCondition...
+	HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
 )
 
 // HelmReleaseProxy Conditions and Reasons.
