@@ -240,12 +240,8 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 		existingHelmReleaseProxy, err := r.getExistingHelmReleaseProxy(ctx, helmChartProxy, &cluster)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				log.Info("HelmReleaseProxy for cluster not found", "cluster", cluster.Name)
-			} else {
-				// TODO: Should we set a condition here?
-				return errors.Wrapf(err, "failed to get HelmReleaseProxy for cluster %s", cluster.Name)
-			}
+			// TODO: Should we set a condition here?
+			return errors.Wrapf(err, "failed to get HelmReleaseProxy for cluster %s", cluster.Name)
 		}
 		// log.V(2).Info("Found existing HelmReleaseProxy", "cluster", cluster.Name, "release", existingHelmReleaseProxy.Name)
 
@@ -386,25 +382,34 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 // getExistingHelmReleaseProxy...
 func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy, cluster *clusterv1.Cluster) (*addonsv1beta1.HelmReleaseProxy, error) {
 	log := ctrl.LoggerFrom(ctx)
-	// TODO: Explore other ways to figure find the HRP for a HCP and a Cluster. This name could cause a conflict in the following edge case.
-	// 1. Chart name: alpha-bravo, Cluster name: charlie, Generated name: alpha-bravo-charlie
-	// 2. Chart name: alpha, Cluster name: bravo-charlie, Generated name: alpha-bravo-charlie
-	helmReleaseProxyName := generateHelmReleaseProxyName(*helmChartProxy, *cluster)
-	helmReleaseProxyNamespace := helmChartProxy.Namespace
 
-	existing := &addonsv1beta1.HelmReleaseProxy{}
-	helmReleaseProxyKey := client.ObjectKey{
-		Namespace: helmReleaseProxyNamespace,
-		Name:      helmReleaseProxyName,
+	helmReleaseProxyList := &addonsv1beta1.HelmReleaseProxyList{}
+
+	listOpts := []client.ListOption{
+		client.MatchingLabels{
+			clusterv1.ClusterLabelName:            cluster.Name,
+			addonsv1beta1.HelmChartProxyLabelName: helmChartProxy.Name,
+		},
 	}
 
-	log.V(2).Info("Getting HelmReleaseProxy", "cluster", cluster.Name)
-	err := r.Client.Get(ctx, helmReleaseProxyKey, existing)
-	if err != nil {
+	// TODO: Figure out if we want this search to be cross-namespaces.
+
+	log.V(2).Info("Attempting to fetch existing HelmReleaseProxy with Cluster and HelmChartProxy labels", "cluster", cluster.Name, "helmChartProxy", helmChartProxy.Name)
+	if err := r.Client.List(context.TODO(), helmReleaseProxyList, listOpts...); err != nil {
 		return nil, err
 	}
 
-	return existing, nil
+	if helmReleaseProxyList.Items == nil || len(helmReleaseProxyList.Items) == 0 {
+		log.V(2).Info("No HelmReleaseProxy found matching the cluster and HelmChartProxy", "cluster", cluster.Name, "helmChartProxy", helmChartProxy.Name)
+		return nil, nil
+	} else if len(helmReleaseProxyList.Items) > 1 {
+		log.V(2).Info("Multiple HelmReleaseProxies found matching the cluster and HelmChartProxy", "cluster", cluster.Name, "helmChartProxy", helmChartProxy.Name)
+		return nil, errors.Errorf("multiple HelmReleaseProxies found matching the cluster and HelmChartProxy")
+	}
+
+	log.V(2).Info("Found existing matching HelmReleaseProxy", "cluster", cluster.Name, "helmChartProxy", helmChartProxy.Name)
+
+	return &helmReleaseProxyList.Items[0], nil
 }
 
 // createOrUpdateHelmReleaseProxy...
@@ -447,7 +452,7 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 func constructHelmReleaseProxy(existing *addonsv1beta1.HelmReleaseProxy, helmChartProxy *addonsv1beta1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1beta1.HelmReleaseProxy {
 	helmReleaseProxy := &addonsv1beta1.HelmReleaseProxy{}
 	if existing == nil {
-		helmReleaseProxy.Name = generateHelmReleaseProxyName(*helmChartProxy, *cluster)
+		helmReleaseProxy.GenerateName = fmt.Sprintf("%s-%s-", helmChartProxy.Spec.ChartName, cluster.Name)
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
 		// helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences,
@@ -523,10 +528,6 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1beta1.Hel
 	}
 
 	return false
-}
-
-func generateHelmReleaseProxyName(helmChartProxy addonsv1beta1.HelmChartProxy, cluster clusterv1.Cluster) string {
-	return helmChartProxy.Spec.ChartName + "-" + cluster.Name
 }
 
 func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
