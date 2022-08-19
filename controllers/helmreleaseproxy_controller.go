@@ -96,6 +96,8 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, errors.Wrapf(err, "failed to init patch helper")
 	}
 
+	initalizeConditions(ctx, patchHelper, helmReleaseProxy)
+
 	defer func() {
 		log.V(2).Info("Preparing to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
 		log.V(2).Info("HelmReleaseProxy return error is", "reterr", reterr)
@@ -275,6 +277,16 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	}
 
 	return nil
+}
+
+func initalizeConditions(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy) {
+	log := ctrl.LoggerFrom(ctx)
+	if len(helmReleaseProxy.GetConditions()) == 0 {
+		conditions.MarkFalse(helmReleaseProxy, addonsv1beta1.HelmReleaseReadyCondition, addonsv1beta1.PreparingToHelmInstallReason, clusterv1.ConditionSeverityInfo, "Preparing to to install Helm chart")
+		if err := patchHelmReleaseProxy(ctx, patchHelper, helmReleaseProxy); err != nil {
+			log.Error(err, "failed to patch HelmReleaseProxy with initial conditions")
+		}
+	}
 }
 
 func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1beta1.HelmReleaseProxy) error {

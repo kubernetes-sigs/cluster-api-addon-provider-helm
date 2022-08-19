@@ -141,11 +141,11 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	clusterList, err := r.listClustersWithLabel(ctx, label)
 	if err != nil {
 		helmChartProxy.SetError(errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
-		conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition, addonsv1beta1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
+		conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 		return ctrl.Result{}, err
 	}
-	conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition)
+	// conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition)
 	helmChartProxy.SetMatchingClusters(clusterList.Items)
 
 	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
@@ -196,7 +196,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items, releaseList.Items)
-	conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition)
+	// conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition)
 
 	helmChartProxy.SetError(err)
 	return ctrl.Result{}, err
@@ -213,7 +213,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	for _, release := range releasesToDelete {
 		log.V(2).Info("Deleting release", "release", release)
 		if err := r.deleteHelmReleaseProxy(ctx, &release); err != nil {
-			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition, addonsv1beta1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, err.Error())
+			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, err.Error())
 			return err
 		}
 	}
@@ -238,30 +238,36 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		if existingHelmReleaseProxy != nil && shouldReinstallHelmRelease(ctx, existingHelmReleaseProxy, helmChartProxy) {
 			log.V(2).Info("Reinstalling Helm release by deleting and creating HelmReleaseProxy", "helmReleaseProxy", existingHelmReleaseProxy.Name)
 			if err := r.deleteHelmReleaseProxy(ctx, existingHelmReleaseProxy); err != nil {
-				conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition, addonsv1beta1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, err.Error())
+				conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 				return err
 			}
 
 			// TODO: Add a check on requeue to make sure that the HelmReleaseProxy isn't still deleting
 			log.V(2).Info("Successfully deleted HelmReleaseProxy on cluster, returning to requeue for reconcile", "cluster", cluster.Name)
+			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.HelmReleaseProxyReinstallingReason, clusterv1.ConditionSeverityInfo, "HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", cluster.Name)
 			return nil // Try returning early so it will requeue
-			// existingHelmReleaseProxy = nil // Set to nil so we can create a new one
+			// TODO: should we continue in the loop or just requeue?
 		}
 
 		values, err := internal.ParseValues(ctx, r.Client, helmChartProxy.Spec, &cluster)
 		if err != nil {
-			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition, addonsv1beta1.ValueParsingFailedReason, clusterv1.ConditionSeverityError, err.Error())
+			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.ValueParsingFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 			return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
 		}
 
 		log.V(2).Info("Values for cluster", "cluster", cluster.Name, "values", values)
 		if err := r.createOrUpdateHelmReleaseProxy(ctx, existingHelmReleaseProxy, helmChartProxy, &cluster, values); err != nil {
-			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition, addonsv1beta1.HelmReleaseProxyCreationFailedReason, clusterv1.ConditionSeverityError, err.Error())
+			conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.HelmReleaseProxyCreationFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 			return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
 		}
+	}
+
+	err := r.aggregateHelmReleaseProxyReadyCondition(ctx, helmChartProxy)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -342,6 +348,30 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 	}
 
 	return releaseList, nil
+}
+
+func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx context.Context, helmChartProxy *addonsv1beta1.HelmChartProxy) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Aggregating HelmReleaseProxyReadyCondition")
+
+	labels := map[string]string{
+		addonsv1beta1.HelmChartProxyLabelName: helmChartProxy.Name,
+	}
+	releaseList, err := r.listInstalledReleases(ctx, labels)
+	if err != nil {
+		// conditions.MarkFalse(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, addonsv1beta1.HelmReleaseProxyListFailedReason, clusterv1.ConditionSeverityError, err.Error())
+		return err
+	}
+
+	getters := make([]conditions.Getter, 0, len(releaseList.Items))
+	for _, r := range releaseList.Items {
+		getters = append(getters, &r)
+	}
+
+	conditions.SetAggregate(helmChartProxy, addonsv1beta1.HelmReleaseProxiesReadyCondition, getters, conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
+
+	return nil
 }
 
 // getExistingHelmReleaseProxy...
@@ -500,7 +530,7 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 	// TODO: Update the readyCondition by summarizing the state of other conditions when they are implemented.
 	conditions.SetSummary(helmChartProxy,
 		conditions.WithConditions(
-			addonsv1beta1.HelmReleaseProxySpecsReadyCondition,
+			addonsv1beta1.HelmReleaseProxiesReadyCondition,
 		),
 	)
 
@@ -510,7 +540,7 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 		helmChartProxy,
 		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
 			clusterv1.ReadyCondition,
-			addonsv1beta1.HelmReleaseProxySpecsReadyCondition,
+			addonsv1beta1.HelmReleaseProxiesReadyCondition,
 		}},
 		patch.WithStatusObservedGeneration{},
 	)
