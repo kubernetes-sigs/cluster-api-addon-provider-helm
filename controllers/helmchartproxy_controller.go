@@ -201,10 +201,19 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items, releaseList.Items)
-	// conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsReadyCondition)
+	if err != nil {
+		helmChartProxy.SetError(err)
+		return ctrl.Result{}, err
+	}
+	conditions.MarkTrue(helmChartProxy, addonsv1beta1.HelmReleaseProxySpecsUpToDateCondition)
 
-	helmChartProxy.SetError(err)
-	return ctrl.Result{}, err
+	err = r.aggregateHelmReleaseProxyReadyCondition(ctx, helmChartProxy)
+	if err != nil {
+		log.Error(err, "failed to aggregate HelmReleaseProxy ready condition", "helmChartProxy", helmChartProxy.Name)
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // reconcileNormal...
@@ -268,11 +277,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 			return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
 		}
-	}
-
-	err := r.aggregateHelmReleaseProxyReadyCondition(ctx, helmChartProxy)
-	if err != nil {
-		return err
 	}
 
 	return nil
