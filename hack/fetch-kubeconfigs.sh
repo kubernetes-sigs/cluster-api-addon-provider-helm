@@ -7,8 +7,11 @@ if [ ! -d $TEMP_PATH ]; then
   mkdir $TEMP_PATH
 fi
 
-CLUSTER_NAMES=$(kubectl get clusters -o jsonpath="{.items[*].metadata.name}")
-for CLUSTER_NAME in $(echo $CLUSTER_NAMES); do
-  clusterctl get kubeconfig $CLUSTER_NAME > $TEMP_PATH/$CLUSTER_NAME.kubeconfig
-  echo "Fetched kubeconfig for $CLUSTER_NAME"
+CLUSTERS=$(kubectl get clusters -A -o jsonpath="{range .items[*].metadata}{.namespace}{'\t'}{.name}{'\n'}{end}")
+# Read each Cluster's namespace and names on a line
+
+IFS=$'\n'; for CLUSTER in $CLUSTERS; do
+  IFS=$'\t' read -r NAMESPACE NAME <<< $CLUSTER
+  clusterctl get kubeconfig -n $NAMESPACE $NAME > $TEMP_PATH/$NAMESPACE-$NAME.kubeconfig
+  echo "Fetched kubeconfig for $NAMESPACE/$NAME"
 done
