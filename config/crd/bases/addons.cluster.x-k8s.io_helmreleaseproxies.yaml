@@ -102,8 +102,9 @@ spec:
                     type: string
                 type: object
               namespace:
-                description: Namespace is the namespace the Helm release will be installed
-                  on the referenced Cluster. If it is not specified, the default namespace.
+                description: ReleaseNamespace is the namespace the Helm release will
+                  be installed on the referenced Cluster. If it is not specified,
+                  it will be set to the default namespace.
                 type: string
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
@@ -118,9 +119,14 @@ spec:
                   with the values from the referenced workload Cluster.
                 type: string
               version:
-                description: Version is the version of the Helm chart. To be replaced
-                  with a compatibility matrix.
+                description: Version is the version of the Helm chart. If it is not
+                  specified, the chart will use and be kept up to date with the latest
+                  version.
                 type: string
+            required:
+            - chartName
+            - clusterRef
+            - repoURL
             type: object
           status:
             description: HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.
@@ -170,18 +176,6 @@ spec:
                   - type
                   type: object
                 type: array
-              failureReason:
-                description: FailureReason will be set in the event that there is
-                  a an error reconciling the HelmReleaseProxy.
-                type: string
-              namespace:
-                description: Namespace is the namespace of the Helm release on the
-                  workload cluster.
-                type: string
-              ready:
-                description: Ready is true when the Helm release on the referenced
-                  Cluster is up to date with the HelmReleaseProxySpec.
-                type: boolean
               revision:
                 description: Revision is the current revision of the Helm release.
                 type: integer

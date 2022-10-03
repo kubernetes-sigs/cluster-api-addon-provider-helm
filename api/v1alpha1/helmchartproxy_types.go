@@ -30,60 +30,45 @@ const (
 
 // HelmChartProxySpec defines the desired state of HelmChartProxy.
 type HelmChartProxySpec struct {
-	// ClusterSelector selects Clusters with a label that matches the specified key/value pair. The Helm chart will be
-	// installed on all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
-	ClusterSelector ClusterSelectorLabel `json:"clusterSelector"`
+	// ClusterSelector selects Clusters in the same namespace with a label that matches the specified label selector. The Helm
+	// chart will be installed on all selected Clusters. If a Cluster is no longer selected, the Helm release will be uninstalled.
+	ClusterSelector metav1.LabelSelector `json:"clusterSelector"`
 
 	// ChartName is the name of the Helm chart in the repository.
-	ChartName string `json:"chartName,omitempty"`
+	ChartName string `json:"chartName"`
 
 	// RepoURL is the URL of the Helm chart repository.
-	RepoURL string `json:"repoURL,omitempty"`
+	RepoURL string `json:"repoURL"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
 	// +optional
 	ReleaseName string `json:"releaseName,omitempty"`
 
-	// Version is the version of the Helm chart. If it is not specified, the latest version will be used.
+	// ReleaseNamespace is the namespace the Helm release will be installed on each selected
+	// Cluster. If it is not specified, it will be set to the default namespace.
+	// +optional
+	ReleaseNamespace string `json:"namespace,omitempty"`
+
+	// Version is the version of the Helm chart. If it is not specified, the chart will use
+	// and be kept up to date with the latest version.
 	// +optional
 	Version string `json:"version,omitempty"`
 
-	// Namespace is the namespace the Helm release will be installed on each selected Cluster. If it is not specified, the default namespace.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// Values is an inline YAML representing the values for the Helm chart. This YAML supports Go templating to reference
+	// ValuesTemplate is an inline YAML representing the values for the Helm chart. This YAML supports Go templating to reference
 	// fields from each selected workload Cluster and programatically create and set values.
 	// +optional
-	Values string `json:"values,omitempty"`
-}
-
-// ClusterSelectorLabel defines a key/value pair used to select Clusters with a label matching the specified key and value.
-type ClusterSelectorLabel struct {
-	// Key is the label key.
-	Key string `json:"key"`
-
-	// Value is the label value.
-	Value string `json:"value"`
+	ValuesTemplate string `json:"valuesTemplate,omitempty"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy.
 type HelmChartProxyStatus struct {
-	// Ready is true when the HelmReleaseProxySpec for each selected Cluster is up to date.
-	// +optional
-	Ready bool `json:"ready"`
-
-	// MatchingClusters is the list of references to Clusters selected by the ClusterSelectorLabel.
-	// +optional
-	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
-
 	// Conditions defines current state of the HelmChartProxy.
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 
-	// FailureReason will be set in the event that there is a an error reconciling the HelmChartProxy.
+	// MatchingClusters is the list of references to Clusters selected by the ClusterSelector.
 	// +optional
-	FailureReason string `json:"failureReason,omitempty"`
+	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
 }
 
 // +kubebuilder:object:root=true
@@ -133,16 +118,6 @@ func (c *HelmChartProxy) SetMatchingClusters(clusterList []clusterv1.Cluster) {
 	}
 
 	c.Status.MatchingClusters = matchingClusters
-}
-
-func (c *HelmChartProxy) SetError(err error) {
-	if err != nil {
-		c.Status.FailureReason = err.Error()
-		c.Status.Ready = false
-	} else {
-		c.Status.FailureReason = ""
-		c.Status.Ready = true
-	}
 }
 
 func init() {

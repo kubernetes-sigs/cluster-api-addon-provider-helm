@@ -47,8 +47,8 @@ var _ webhook.Defaulter = &HelmReleaseProxy{}
 func (p *HelmReleaseProxy) Default() {
 	helmreleaseproxylog.Info("default", "name", p.Name)
 
-	if p.Spec.Namespace == "" {
-		p.Spec.Namespace = "default"
+	if p.Spec.ReleaseNamespace == "" {
+		p.Spec.ReleaseNamespace = "default"
 	}
 }
 
@@ -86,10 +86,10 @@ func (r *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) error {
 		)
 	}
 
-	if !reflect.DeepEqual(r.Spec.Namespace, old.Spec.Namespace) {
+	if !reflect.DeepEqual(r.Spec.ReleaseNamespace, old.Spec.ReleaseNamespace) {
 		allErrs = append(allErrs,
-			field.Invalid(field.NewPath("spec", "Namespace"),
-				r.Spec.Namespace, "field is immutable"),
+			field.Invalid(field.NewPath("spec", "ReleaseNamespace"),
+				r.Spec.ReleaseNamespace, "field is immutable"),
 		)
 	}
 

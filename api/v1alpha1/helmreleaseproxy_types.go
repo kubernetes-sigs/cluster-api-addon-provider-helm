@@ -37,25 +37,27 @@ const (
 // HelmReleaseProxySpec defines the desired state of HelmReleaseProxy.
 type HelmReleaseProxySpec struct {
 	// ClusterRef is a reference to the Cluster to install the Helm release on.
-	ClusterRef *corev1.ObjectReference `json:"clusterRef,omitempty"`
+	ClusterRef corev1.ObjectReference `json:"clusterRef"`
 
 	// ChartName is the name of the Helm chart in the repository.
-	ChartName string `json:"chartName,omitempty"`
+	ChartName string `json:"chartName"`
 
 	// RepoURL is the URL of the Helm chart repository.
-	RepoURL string `json:"repoURL,omitempty"`
+	RepoURL string `json:"repoURL"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
 	// +optional
 	ReleaseName string `json:"releaseName,omitempty"`
 
-	// Version is the version of the Helm chart. To be replaced with a compatibility matrix.
+	// ReleaseNamespace is the namespace the Helm release will be installed on the referenced
+	// Cluster. If it is not specified, it will be set to the default namespace.
+	// +optional
+	ReleaseNamespace string `json:"namespace"`
+
+	// Version is the version of the Helm chart. If it is not specified, the chart will use
+	// and be kept up to date with the latest version.
 	// +optional
 	Version string `json:"version,omitempty"`
-
-	// Namespace is the namespace the Helm release will be installed on the referenced Cluster. If it is not specified, the default namespace.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 
 	// Values is an inline YAML representing the values for the Helm chart. This YAML is the result of the rendered
 	// Go templating with the values from the referenced workload Cluster.
@@ -65,14 +67,6 @@ type HelmReleaseProxySpec struct {
 
 // HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.
 type HelmReleaseProxyStatus struct {
-	// Ready is true when the Helm release on the referenced Cluster is up to date with the HelmReleaseProxySpec.
-	// +optional
-	Ready bool `json:"ready"`
-
-	// FailureReason will be set in the event that there is a an error reconciling the HelmReleaseProxy.
-	// +optional
-	FailureReason string `json:"failureReason,omitempty"`
-
 	// Conditions defines current state of the HelmReleaseProxy.
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
@@ -84,10 +78,6 @@ type HelmReleaseProxyStatus struct {
 	// Revision is the current revision of the Helm release.
 	// +optional
 	Revision int `json:"revision,omitempty"`
-
-	// Namespace is the namespace of the Helm release on the workload cluster.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -138,23 +128,9 @@ func (r *HelmReleaseProxy) SetReleaseRevision(version int) {
 	r.Status.Revision = version
 }
 
-func (r *HelmReleaseProxy) SetReleaseNamespace(namespace string) {
-	r.Status.Namespace = namespace // TODO: Add a way to configure the namespace
-}
-
 func (r *HelmReleaseProxy) SetReleaseName(name string) {
 	if r.Spec.ReleaseName == "" {
 		r.Spec.ReleaseName = name
-	}
-}
-
-func (r *HelmReleaseProxy) SetError(err error) {
-	if err != nil {
-		r.Status.FailureReason = err.Error()
-		r.Status.Ready = false
-	} else {
-		r.Status.FailureReason = ""
-		r.Status.Ready = true
 	}
 }
 

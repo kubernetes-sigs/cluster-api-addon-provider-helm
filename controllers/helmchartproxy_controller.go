@@ -143,9 +143,8 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// TODO: When a Cluster is being deleted, it will show up in the list of clusters even though we can't Reconcile on it.
 	// This is because of ownerRefs and how the Cluster gets deleted. It will be eventually consistent but it would be better
 	// to not have errors. An idea would be to check the deletion timestamp.
-	clusterList, err := r.listClustersWithLabel(ctx, label)
+	clusterList, err := r.listClustersWithLabels(ctx, label)
 	if err != nil {
-		helmChartProxy.SetError(errors.Wrapf(err, "failed to list clusters with label selector %+v", label))
 		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 		return ctrl.Result{}, err
@@ -159,7 +158,6 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	releaseList, err := r.listInstalledReleases(ctx, labels)
 	if err != nil {
-		helmChartProxy.SetError(errors.Wrapf(err, "failed to list installed releases with labels %+v", labels))
 		return ctrl.Result{}, err
 	}
 
@@ -182,7 +180,6 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err := r.reconcileDelete(ctx, helmChartProxy, releaseList.Items); err != nil {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
-				helmChartProxy.SetError(err)
 				return ctrl.Result{}, err
 			}
 
@@ -195,14 +192,12 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		// Stop reconciliation as the item is being deleted
-		helmChartProxy.SetError(nil)
 		return ctrl.Result{}, nil
 	}
 
 	log.V(2).Info("Reconciling HelmChartProxy", "randomName", helmChartProxy.Name)
 	err = r.reconcileNormal(ctx, helmChartProxy, clusterList.Items, releaseList.Items)
 	if err != nil {
-		helmChartProxy.SetError(err)
 		return ctrl.Result{}, err
 	}
 	conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)
@@ -292,11 +287,9 @@ func getOrphanedHelmReleaseProxies(ctx context.Context, clusters []clusterv1.Clu
 	releasesToDelete := []addonsv1alpha1.HelmReleaseProxy{}
 	for _, helmReleaseProxy := range helmReleaseProxies {
 		clusterRef := helmReleaseProxy.Spec.ClusterRef
-		if clusterRef != nil {
-			key := clusterRef.Namespace + "/" + clusterRef.Name
-			if _, ok := selectedClusters[key]; !ok {
-				releasesToDelete = append(releasesToDelete, helmReleaseProxy)
-			}
+		key := clusterRef.Namespace + "/" + clusterRef.Name
+		if _, ok := selectedClusters[key]; !ok {
+			releasesToDelete = append(releasesToDelete, helmReleaseProxy)
 		}
 	}
 
@@ -326,14 +319,10 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	return nil
 }
 
-func (r *HelmChartProxyReconciler) listClustersWithLabel(ctx context.Context, label addonsv1alpha1.ClusterSelectorLabel) (*clusterv1.ClusterList, error) {
+func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, labels metav1.LabelSelector) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
 	// TODO: validate empty key or empty value to make sure it doesn't match everything.
-	labelMap := map[string]string{
-		label.Key: label.Value,
-	}
-
-	if err := r.Client.List(ctx, clusterList, client.MatchingLabels(labelMap)); err != nil {
+	if err := r.Client.List(ctx, clusterList, client.MatchingLabels(labels.MatchLabels)); err != nil {
 		return nil, err
 	}
 
@@ -468,7 +457,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		newLabels[addonsv1alpha1.HelmChartProxyLabelName] = helmChartProxy.Name
 		helmReleaseProxy.Labels = newLabels
 
-		helmReleaseProxy.Spec.ClusterRef = &corev1.ObjectReference{
+		helmReleaseProxy.Spec.ClusterRef = corev1.ObjectReference{
 			Kind:       cluster.Kind,
 			APIVersion: cluster.APIVersion,
 			Name:       cluster.Name,
@@ -478,7 +467,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		helmReleaseProxy.Spec.ReleaseName = helmChartProxy.Spec.ReleaseName
 		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
 		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
-		helmReleaseProxy.Spec.Namespace = helmChartProxy.Spec.Namespace
+		helmReleaseProxy.Spec.ReleaseNamespace = helmChartProxy.Spec.ReleaseNamespace
 
 		// helmChartProxy.ObjectMeta.SetAnnotations(helmReleaseProxy.Annotations)
 	} else {
@@ -522,8 +511,8 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 		log.V(2).Info("Generated ReleaseName changed", "existing", existing.Spec.ReleaseName, "helmChartProxy", helmChartProxy.Spec.ReleaseName)
 	case !isReleaseNameGenerated && existing.Spec.ReleaseName != helmChartProxy.Spec.ReleaseName:
 		log.V(2).Info("Non-generated ReleaseName changed", "existing", existing.Spec.ReleaseName, "helmChartProxy", helmChartProxy.Spec.ReleaseName)
-	case existing.Spec.Namespace != helmChartProxy.Spec.Namespace:
-		log.V(2).Info("Namespace changed", "existing", existing.Spec.Namespace, "helmChartProxy", helmChartProxy.Spec.Namespace)
+	case existing.Spec.ReleaseNamespace != helmChartProxy.Spec.ReleaseNamespace:
+		log.V(2).Info("ReleaseNamespace changed", "existing", existing.Spec.ReleaseNamespace, "helmChartProxy", helmChartProxy.Spec.ReleaseNamespace)
 		return true
 	}
 

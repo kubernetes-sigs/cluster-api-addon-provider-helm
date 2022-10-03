@@ -42,8 +42,8 @@ var _ webhook.Defaulter = &HelmChartProxy{}
 func (p *HelmChartProxy) Default() {
 	helmchartproxylog.Info("default", "name", p.Name)
 
-	if p.Spec.Namespace == "" {
-		p.Spec.Namespace = "default"
+	if p.Spec.ReleaseNamespace == "" {
+		p.Spec.ReleaseNamespace = "default"
 	}
 }
 

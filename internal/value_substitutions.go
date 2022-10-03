@@ -122,7 +122,7 @@ type BuiltinTypes struct {
 func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.HelmChartProxySpec, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Rendering templating in values:", "values", spec.Values)
+	log.V(2).Info("Rendering templating in values:", "values", spec.ValuesTemplate)
 	builtin, err := initializeBuiltins(ctx, c, spec, cluster)
 	if err != nil {
 		return "", err
@@ -130,14 +130,14 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 
 	tmpl, err := template.New(spec.ChartName + "-" + cluster.GetName()).
 		Funcs(sprig.TxtFuncMap()).
-		Parse(spec.Values)
+		Parse(spec.ValuesTemplate)
 	if err != nil {
 		return "", err
 	}
 	var buffer bytes.Buffer
 
 	if err := tmpl.Execute(&buffer, builtin); err != nil {
-		return "", errors.Wrapf(err, "error executing template string '%s' on cluster '%s'", spec.Values, cluster.GetName())
+		return "", errors.Wrapf(err, "error executing template string '%s' on cluster '%s'", spec.ValuesTemplate, cluster.GetName())
 	}
 	expandedTemplate := buffer.String()
 	log.V(2).Info("Expanded values to", "result", expandedTemplate)

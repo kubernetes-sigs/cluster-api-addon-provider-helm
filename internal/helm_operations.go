@@ -125,14 +125,14 @@ func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec ad
 func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, spec.Namespace, kubeconfig)
+	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
 	installClient := helmAction.NewInstall(actionConfig)
 	installClient.RepoURL = spec.RepoURL
 	installClient.Version = spec.Version
-	installClient.Namespace = spec.Namespace
+	installClient.Namespace = spec.ReleaseNamespace
 	installClient.CreateNamespace = true
 
 	if spec.ReleaseName == "" {
@@ -193,14 +193,14 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *release.Release) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, spec.Namespace, kubeconfig)
+	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, false, err
 	}
 	upgradeClient := helmAction.NewUpgrade(actionConfig)
 	upgradeClient.RepoURL = spec.RepoURL
 	upgradeClient.Version = spec.Version
-	upgradeClient.Namespace = spec.Namespace
+	upgradeClient.Namespace = spec.ReleaseNamespace
 	log.V(2).Info("Locating chart...")
 	cp, err := upgradeClient.ChartPathOptions.LocateChart(spec.ChartName, settings)
 	if err != nil {
@@ -303,7 +303,7 @@ func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.
 		return nil, helmDriver.ErrReleaseNotFound
 	}
 
-	_, actionConfig, err := HelmInit(ctx, spec.Namespace, kubeconfig)
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.
 }
 
 func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) ([]*release.Release, error) {
-	_, actionConfig, err := HelmInit(ctx, spec.Namespace, kubeconfig)
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha
 }
 
 func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.UninstallReleaseResponse, error) {
-	_, actionConfig, err := HelmInit(ctx, spec.Namespace, kubeconfig)
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1a
 }
 
 func RollbackHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) error {
-	_, actionConfig, err := HelmInit(ctx, spec.Namespace, kubeconfig)
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return err
 	}

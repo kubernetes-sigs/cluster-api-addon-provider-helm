@@ -136,7 +136,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
 				if err != nil {
 					wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-					helmReleaseProxy.SetError(wrappedErr)
 					conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
 
 					return ctrl.Result{}, wrappedErr
@@ -146,7 +145,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				if err := r.reconcileDelete(ctx, helmReleaseProxy, kubeconfig); err != nil {
 					// if fail to delete the external dependency here, return with error
 					// so that it can be retried
-					helmReleaseProxy.SetError(err)
 					return ctrl.Result{}, err
 				}
 			} else if apierrors.IsNotFound(err) {
@@ -155,7 +153,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				// TODO: should we set a condition here?
 			} else {
 				wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-				helmReleaseProxy.SetError(wrappedErr)
 				conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
 
 				return ctrl.Result{}, wrappedErr
@@ -176,7 +173,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
 		// TODO: add check to tell if Cluster is deleted so we can remove the HelmReleaseProxy.
 		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-		helmReleaseProxy.SetError(wrappedErr)
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
 
 		return ctrl.Result{}, wrappedErr
@@ -186,7 +182,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	kubeconfig, err := internal.GetClusterKubeconfig(ctx, cluster)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-		helmReleaseProxy.SetError(wrappedErr)
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
 
 		return ctrl.Result{}, wrappedErr
@@ -195,7 +190,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
 	err = r.reconcileNormal(ctx, helmReleaseProxy, kubeconfig)
-	helmReleaseProxy.SetError(err)
 
 	return ctrl.Result{}, err
 }
@@ -230,7 +224,6 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 
 		helmReleaseProxy.SetReleaseStatus(release.Info.Status.String())
 		helmReleaseProxy.SetReleaseRevision(release.Version)
-		helmReleaseProxy.SetReleaseNamespace(release.Namespace)
 		helmReleaseProxy.SetReleaseName(release.Name)
 		conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
 		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
