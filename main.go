@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	addonsv1beta1 "cluster-api-addon-provider-helm/api/v1beta1"
+	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
 	"cluster-api-addon-provider-helm/controllers"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -51,7 +51,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(addonsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(addonsv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -104,7 +104,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChartProxy")
 		os.Exit(1)
 	}
-	if err = (&addonsv1beta1.HelmChartProxy{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&addonsv1alpha1.HelmChartProxy{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "HelmChartProxy")
 		os.Exit(1)
 	}
@@ -117,7 +117,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmReleaseProxy")
 		os.Exit(1)
 	}
-	if err = (&addonsv1beta1.HelmReleaseProxy{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&addonsv1alpha1.HelmReleaseProxy{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "HelmReleaseProxy")
 		os.Exit(1)
 	}

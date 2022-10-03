@@ -28,7 +28,7 @@ spec:
       name: Message
       priority: 1
       type: string
-    name: v1beta1
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: HelmChartProxy is the Schema for the helmchartproxies API

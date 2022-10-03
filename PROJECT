@@ -11,8 +11,8 @@ resources:
   domain: cluster.x-k8s.io
   group: addons
   kind: HelmChartProxy
-  path: cluster-api-addon-provider-helm/api/v1beta1
-  version: v1beta1
+  path: cluster-api-addon-provider-helm/api/v1alpha1
+  version: v1alpha1
   webhooks:
     defaulting: true
     validation: true
@@ -24,8 +24,8 @@ resources:
   domain: cluster.x-k8s.io
   group: addons
   kind: HelmReleaseProxy
-  path: cluster-api-addon-provider-helm/api/v1beta1
-  version: v1beta1
+  path: cluster-api-addon-provider-helm/api/v1alpha1
+  version: v1alpha1
   webhooks:
     defaulting: true
     validation: true

@@ -41,7 +41,7 @@ spec:
     - jsonPath: .status.namespace
       name: Namespace
       type: string
-    name: v1beta1
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: HelmReleaseProxy is the Schema for the helmreleaseproxies API
