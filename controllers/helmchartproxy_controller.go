@@ -137,13 +137,13 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		log.V(2).Info("Successfully patched HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 	}()
 
-	label := helmChartProxy.Spec.ClusterSelector
+	selector := helmChartProxy.Spec.ClusterSelector
 
-	log.V(2).Info("Finding matching clusters for HelmChartProxy with label", "helmChartProxy", helmChartProxy.Name, "label", label)
+	log.V(2).Info("Finding matching clusters for HelmChartProxy with selector selector", "helmChartProxy", helmChartProxy.Name, "selector", selector)
 	// TODO: When a Cluster is being deleted, it will show up in the list of clusters even though we can't Reconcile on it.
 	// This is because of ownerRefs and how the Cluster gets deleted. It will be eventually consistent but it would be better
 	// to not have errors. An idea would be to check the deletion timestamp.
-	clusterList, err := r.listClustersWithLabels(ctx, label)
+	clusterList, err := r.listClustersWithLabels(ctx, helmChartProxy.Namespace, selector)
 	if err != nil {
 		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
@@ -153,10 +153,10 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	helmChartProxy.SetMatchingClusters(clusterList.Items)
 
 	log.V(2).Info("Finding HelmRelease for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
-	labels := map[string]string{
+	label := map[string]string{
 		addonsv1alpha1.HelmChartProxyLabelName: helmChartProxy.Name,
 	}
-	releaseList, err := r.listInstalledReleases(ctx, labels)
+	releaseList, err := r.listInstalledReleases(ctx, helmChartProxy.Namespace, label)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -319,17 +319,17 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	return nil
 }
 
-func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, labels metav1.LabelSelector) (*clusterv1.ClusterList, error) {
+func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, namespace string, selector metav1.LabelSelector) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
 	// TODO: validate empty key or empty value to make sure it doesn't match everything.
-	if err := r.Client.List(ctx, clusterList, client.MatchingLabels(labels.MatchLabels)); err != nil {
+	if err := r.Client.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabels(selector.MatchLabels)); err != nil {
 		return nil, err
 	}
 
 	return clusterList, nil
 }
 
-func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, labels map[string]string) (*addonsv1alpha1.HelmReleaseProxyList, error) {
+func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, namespace string, labels map[string]string) (*addonsv1alpha1.HelmReleaseProxyList, error) {
 	releaseList := &addonsv1alpha1.HelmReleaseProxyList{}
 	// Empty labels should match nothing, not everything
 	if len(labels) == 0 {
@@ -337,7 +337,7 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, la
 	}
 
 	// TODO: should we use client.MatchingLabels or try to use the labelSelector itself?
-	if err := r.Client.List(ctx, releaseList, client.MatchingLabels(labels)); err != nil {
+	if err := r.Client.List(ctx, releaseList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 
@@ -352,7 +352,7 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 	labels := map[string]string{
 		addonsv1alpha1.HelmChartProxyLabelName: helmChartProxy.Name,
 	}
-	releaseList, err := r.listInstalledReleases(ctx, labels)
+	releaseList, err := r.listInstalledReleases(ctx, helmChartProxy.Namespace, labels)
 	if err != nil {
 		// conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition, addonsv1alpha1.HelmReleaseProxyListFailedReason, clusterv1.ConditionSeverityError, err.Error())
 		return err
