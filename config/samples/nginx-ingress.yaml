@@ -4,8 +4,8 @@ metadata:
   name: nginx-ingress
 spec:
   clusterSelector:
-    key: nginxIngressChart
-    value: enabled
+    matchLabels:
+      nginxIngressChart: enabled
   repoURL: https://helm.nginx.com/stable
   chartName: nginx-ingress
   values: |

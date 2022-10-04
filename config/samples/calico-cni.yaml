@@ -4,8 +4,8 @@ metadata:
   name: calico-cni
 spec:
   clusterSelector:
-    key: calicoCNI
-    value: enabled
+    matchLabels:
+      calicoCNI: enabled
   releaseName: calico
   repoURL: https://projectcalico.docs.tigera.io/charts
   chartName: tigera-operator

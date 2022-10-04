@@ -4,8 +4,8 @@ metadata:
   name: cloud-provider-azure-chart
 spec:
   clusterSelector:
-    key: cloudProviderAzureChart
-    value: enabled
+    matchLabels:
+      cloudProviderAzureChart: enabled
   repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
   chartName: cloud-provider-azure
   version: 1.23.8
