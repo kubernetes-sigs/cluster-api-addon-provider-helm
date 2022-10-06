@@ -547,7 +547,8 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Object) []ctrl.Request {
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
-		fmt.Errorf("Expected a Cluster but got %T", o)
+		// Suppress the error for now
+		fmt.Printf("Expected a Cluster but got %T\n", o)
 		return nil
 	}
 
@@ -579,7 +580,8 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 func HelmReleaseProxyToHelmChartProxyMapper(o client.Object) []ctrl.Request {
 	helmReleaseProxy, ok := o.(*addonsv1alpha1.HelmReleaseProxy)
 	if !ok {
-		fmt.Errorf("Expected a HelmReleaseProxy but got %T", o)
+		// Suppress the error for now
+		fmt.Printf("Expected a HelmReleaseProxy but got %T\n", o)
 		return nil
 	}
 
