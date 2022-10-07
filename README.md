@@ -1,4 +1,4 @@
-# Cluster API Addon Provider for Helm
+# Cluster API Addon Provider for Helm (CAAPH)
 
 Cluster API manages the lifecycle of Kubernetes Clusters while users rely on their own package management tool of choice for Kubernetes application management such as Helm or carvel-kapp. 
 
