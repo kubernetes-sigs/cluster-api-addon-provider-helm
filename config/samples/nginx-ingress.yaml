@@ -8,7 +8,7 @@ spec:
       nginxIngressChart: enabled
   repoURL: https://helm.nginx.com/stable
   chartName: nginx-ingress
-  values: |
+  valuesTemplate: |
     controller:
       name: "{{ .Cluster.Name }}-nginx"
       nginxStatus:
