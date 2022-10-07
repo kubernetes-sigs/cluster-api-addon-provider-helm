@@ -134,7 +134,7 @@ nginx-ingress-default-23995-828jp   default-23995   True             deployed   
 The spec of the HelmReleaseProxy should look as follows:
 
 ```yaml
-  spec:
+spec:
   chartName: nginx-ingress
   clusterRef:
     apiVersion: cluster.x-k8s.io/v1beta1
@@ -166,11 +166,25 @@ No resources found in default namespace.
 
 Additionally, the HelmChartProxy status will show that no Clusters are matching in the `matchingClusters` list.
 
+```yaml
+status:
+  conditions:
+  - lastTransitionTime: "2022-10-07T23:35:09Z"
+    status: "True"
+    type: Ready
+  - lastTransitionTime: "2022-10-07T23:35:09Z"
+    status: "True"
+    type: HelmReleaseProxiesReady
+  - lastTransitionTime: "2022-10-07T23:31:49Z"
+    status: "True"
+    type: HelmReleaseProxySpecsUpToDate
+  matchingClusters: []
+```
+
 ### 8. Uninstall CAAPH
 
 To uninstall CAAPH, run the following command from `src/cluster-api-addon-provider-helm`:
 
 ```bash
 $ make undeploy
-$ make uninstall
 ```

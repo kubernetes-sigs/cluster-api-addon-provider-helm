@@ -358,6 +358,13 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 		return err
 	}
 
+	if len(releaseList.Items) == 0 {
+		// Consider it to be vacuously true if there are no releases. This should only be reached if we previously had HelmReleaseProxies but they were all deleted
+		// due to the Clusters being unselected. In that case, we should consider the condition to be true.
+		conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition)
+		return nil
+	}
+
 	getters := make([]conditions.Getter, 0, len(releaseList.Items))
 	for _, r := range releaseList.Items {
 		getters = append(getters, &r)
