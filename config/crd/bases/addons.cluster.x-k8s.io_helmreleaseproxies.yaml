@@ -38,9 +38,6 @@ spec:
     - jsonPath: .status.revision
       name: Revision
       type: string
-    - jsonPath: .status.namespace
-      name: Namespace
-      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
