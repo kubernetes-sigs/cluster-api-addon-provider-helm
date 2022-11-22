@@ -21,9 +21,6 @@ import (
 	"os"
 	"time"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
@@ -36,7 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
-	"cluster-api-addon-provider-helm/controllers"
+	hcpController "cluster-api-addon-provider-helm/controllers/helmchartproxy"
+	hrpController "cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
@@ -97,7 +95,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	if err = (&controllers.HelmChartProxyReconciler{
+	if err = (&hcpController.HelmChartProxyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: scheme,
 	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmChartProxyConcurrency}); err != nil {
@@ -110,7 +108,7 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err = (&controllers.HelmReleaseProxyReconciler{
+	if err = (&hrpController.HelmReleaseProxyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: scheme,
 	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {

@@ -10,9 +10,6 @@ spec:
   chartName: cloud-provider-azure
   version: 1.23.8
   releaseName: cloud-provider-azure
-  values: |
+  valuesTemplate: |
     infra:
-      clusterName: {{ .Cluster.Name }}
-    cloudControllerManager:
-      containerResourceManagement:
-        limitsCPU: {{ add .ControlPlane.Spec.Replicas 10 }}
+      clusterName: {{ .Cluster.metadata.name }}
