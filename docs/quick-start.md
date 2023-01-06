@@ -81,9 +81,9 @@ spec:
   chartName: nginx-ingress
   valuesTemplate: |
     controller:
-      name: "{{ .Cluster.Name }}-nginx"
+      name: "{{ .ControlPlane.metadata.name }}-nginx"
       nginxStatus:
-        allowCidrs: 127.0.0.1,::1,{{ index .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks 0 }}
+        allowCidrs: 127.0.0.1,::1,{{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}
 ```
 
 We use the `clusterSelector` to select the workload cluster to install the chart to. In this case, we install the chart to any workload cluster with the label `nginxIngressChart: enabled`.
