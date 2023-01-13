@@ -81,12 +81,12 @@ spec:
   chartName: nginx-ingress
   valuesTemplate: |
     controller:
-      name: "{{ .Cluster.Name }}-nginx"
+      name: "{{ .ControlPlane.metadata.name }}-nginx"
       nginxStatus:
-        allowCidrs: 127.0.0.1,::1,{{ index .Cluster.Spec.ClusterNetwork.Pods.CIDRBlocks 0 }}
+        allowCidrs: 127.0.0.1,::1,{{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}
 ```
 
-We use the `clusterSelector` to select the workload cluster to install the chart to. In this case, we install the chart to any workload cluster with the label `nginxIngressChart: enabled`.
+We use the `clusterSelector` to select the workload cluster to install the chart to. In this case, we install the chart to any workload cluster with the label `nginxIngressChart: enabled` found in the same namespace as `HelmChartProxy` resource. To provide specific namespace to install the chart to set `spec.namespace` field.
 
 The `repoURL` and `chartName` are used to specify the chart to install. The `valuesTemplate` is used to specify the values to use when installing the chart. It supports Go templating, and here we set `controller.name` to the name of the selected cluster + `-nginx`. We also set `controller.nginxStatus.allowCidrs` to include the first entry in the workload cluster's pod CIDR blocks.
 
