@@ -132,8 +132,6 @@ func GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (stri
 	}
 
 	c, err := client.New("")
-	c.Init(client.InitOptions{Kubeconfig: client.Kubeconfig(*managementKubeconfig)})
-
 	if err != nil {
 		return "", err
 	}
