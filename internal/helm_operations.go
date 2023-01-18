@@ -19,7 +19,6 @@ package internal
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/google/go-cmp/cmp"
@@ -158,7 +157,7 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 	}
 	defer os.Remove(filename)
 	log.V(2).Info("Values written to file", "path", filename)
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +214,7 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 	}
 	defer os.Remove(filename)
 	log.V(2).Info("Values written to file", "path", filename)
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, false, err
 	}
@@ -260,7 +259,7 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 func writeValuesToFile(ctx context.Context, spec addonsv1alpha1.HelmReleaseProxySpec) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Writing values to file")
-	valuesFile, err := ioutil.TempFile("", spec.ChartName+"-"+spec.ReleaseName+"-*.yaml")
+	valuesFile, err := os.CreateTemp("", spec.ChartName+"-"+spec.ReleaseName+"-*.yaml")
 	if err != nil {
 		return "", err
 	}
