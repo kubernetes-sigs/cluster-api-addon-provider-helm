@@ -1,3 +1,4 @@
+// TODO: Is this preferrable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -69,13 +70,6 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the HelmReleaseProxy object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -195,7 +189,8 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	return ctrl.Result{}, err
 }
 
-// reconcileNormal,...
+// reconcileNormal handles HelmReleaseProxy reconciliation when it is not being deleted. This will install or upgrade the HelmReleaseProxy on the Cluster.
+// It will set the ReleaseName on the HelmReleaseProxy if the name is generated and also set the release status and release revision.
 func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, kubeconfig string) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -227,13 +222,12 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		helmReleaseProxy.SetReleaseRevision(release.Version)
 		helmReleaseProxy.SetReleaseName(release.Name)
 		conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
-		// addClusterRefToStatusList(ctx, helmReleaseProxy, cluster)
 	}
 
 	return nil
 }
 
-// reconcileDelete...
+// reconcileDelete handles HelmReleaseProxy deletion. This will uninstall the HelmReleaseProxy on the Cluster or return nil if the HelmReleaseProxy is not found.
 func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, kubeconfig string) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -283,8 +277,9 @@ func initalizeConditions(ctx context.Context, patchHelper *patch.Helper, helmRel
 	}
 }
 
+// patchHelmReleaseProxy patches the HelmReleaseProxy object and sets the ReadyCondition as an aggregate of the other condition set.
+// TODO: Is this preferrable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) error {
-	// TODO: Update the readyCondition by summarizing the state of other conditions when they are implemented.
 	conditions.SetSummary(helmReleaseProxy,
 		conditions.WithConditions(
 			addonsv1alpha1.HelmReleaseReadyCondition,

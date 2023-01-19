@@ -97,13 +97,6 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the HelmChartProxy object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -209,7 +202,8 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, nil
 }
 
-// reconcileNormal...
+// reconcileNormal handles the reconciliation of a HelmChartProxy when it is not being deleted. It takes a list of selected Clusters and HelmReleaseProxies
+// to uninstall the Helm chart from any Clusters that are no longer selected and to install or update the Helm chart on any Clusters that currently selected.
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -235,7 +229,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	return nil
 }
 
-// reconcileDelete...
+// reconcileDelete handles the deletion of a HelmChartProxy. It takes a list of HelmReleaseProxies to uninstall the Helm chart from all selected Clusters.
 func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, releases []addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -252,6 +246,7 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	return nil
 }
 
+// listClustersWithLabels returns a list of Clusters that match the given label selector.
 func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, namespace string, selector metav1.LabelSelector) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
 	// TODO: validate empty key or empty value to make sure it doesn't match everything.
@@ -262,6 +257,7 @@ func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, n
 	return clusterList, nil
 }
 
+// listInstalledReleases returns a list of HelmReleaseProxies that match the given label selector.
 func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, namespace string, labels map[string]string) (*addonsv1alpha1.HelmReleaseProxyList, error) {
 	releaseList := &addonsv1alpha1.HelmReleaseProxyList{}
 	// Empty labels should match nothing, not everything
@@ -277,6 +273,7 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, na
 	return releaseList, nil
 }
 
+// aggregateHelmReleaseProxyReadyCondition HelmReleaseProxyReadyCondition from all HelmReleaseProxies that match the given label selector.
 func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -308,8 +305,9 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 	return nil
 }
 
+// patchHelmChartProxy patches the HelmChartProxy object and sets the ReadyCondition as an aggregate of the other condition set.
+// TODO: Is this preferrable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmChartProxy *addonsv1alpha1.HelmChartProxy) error {
-	// TODO: Update the readyCondition by summarizing the state of other conditions when they are implemented.
 	conditions.SetSummary(helmChartProxy,
 		conditions.WithConditions(
 			addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
@@ -330,9 +328,10 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 	)
 }
 
+// ClusterToHelmChartProxiesMapper is a mapper function that maps a Cluster to the HelmReleaseProxies that are associated with it.
+// This is used to trigger an update of all HelmChartProxies associated with a Cluster when that Cluster is changed.
 // Note: this finds every HelmReleaseProxy associated with a Cluster and returns a Request for its parent HelmChartProxy.
 // This will not trigger an update if the HelmChartProxy selected a Cluster but ran into an error before creating the HelmReleaseProxy.
-// Though in that case the HelmChartProxy will requeue soon anyway so it's most likely not an issue.
 func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Object) []ctrl.Request {
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
@@ -366,6 +365,8 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 	return results
 }
 
+// HelmReleaseProxyToHelmChartProxyMapper is a mapper function that maps a HelmReleaseProxy to the HelmChartProxy that owns it.
+// This is used to trigger an update of the HelmChartProxy when a HelmReleaseProxy is changed.
 func HelmReleaseProxyToHelmChartProxyMapper(o client.Object) []ctrl.Request {
 	helmReleaseProxy, ok := o.(*addonsv1alpha1.HelmReleaseProxy)
 	if !ok {

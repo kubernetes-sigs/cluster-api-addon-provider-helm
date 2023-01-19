@@ -59,6 +59,7 @@ func main() {
 	var probeAddr string
 	var helmChartProxyConcurrency int
 	var helmReleaseProxyConcurrency int
+	var syncPeriod time.Duration
 
 	klog.InitFlags(nil)
 
@@ -69,11 +70,11 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 10, "The number of HelmChartProxies to process concurrently.")
 	flag.IntVar(&helmReleaseProxyConcurrency, "helm-release-proxy-concurrency", 10, "The number of HelmReleaseProxies to process concurrently.")
-	// flag.Set("v", "2")
+	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
+		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
 	flag.Parse()
 
 	ctrl.SetLogger(klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog)))
-	syncPeriod := time.Second * 60 * 5
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,

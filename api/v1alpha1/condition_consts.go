@@ -20,43 +20,56 @@ import clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
 // HelmChartProxy Conditions and Reasons.
 const (
-	// HelmReleaseProxySpecsUpToDateCondition...
+	// HelmReleaseProxySpecsUpToDateCondition indicates that the HelmReleaseProxy specs are up to date with the HelmChartProxy specs,
+	// meaning that the HelmReleaseProxies are created/updated, value template parsing succeeded, and the orphaned HelmReleaseProxies are deleted.
 	HelmReleaseProxySpecsUpToDateCondition clusterv1.ConditionType = "HelmReleaseProxySpecsUpToDate"
 
-	// HelmReleaseProxyCreationFailedReason...
+	// HelmReleaseProxyCreationFailedReason indicates that the HelmChartProxy controller failed to create a HelmReleaseProxy.
 	HelmReleaseProxyCreationFailedReason = "HelmReleaseProxyCreationFailed"
-	// HelmReleaseProxyDeletionFailedReason...
+
+	// HelmReleaseProxyDeletionFailedReason indicates that the HelmChartProxy controller failed to delete a HelmReleaseProxy.
 	HelmReleaseProxyDeletionFailedReason = "HelmReleaseProxyDeletionFailed"
-	// HelmReleaseProxyReinstallingReason...
+
+	// HelmReleaseProxyReinstallingReason indicates that the HelmChartProxy controller is reinstalling a HelmReleaseProxy.
 	HelmReleaseProxyReinstallingReason = "HelmReleaseProxyReinstalling"
-	// ValueParsingFailedReason is ...
+
+	// ValueParsingFailedReason indicates that the HelmChartProxy controller failed to parse the values.
 	ValueParsingFailedReason = "ValueParsingFailed"
-	// ClusterSelectionFailedReason is ...
+
+	// ClusterSelectionFailedReason indicates that the HelmChartProxy controller failed to select the workload Clusters.
 	ClusterSelectionFailedReason = "ClusterSelectionFailed"
 
-	// HelmReleaseProxiesReadyCondition...
+	// HelmReleaseProxiesReadyCondition indicates that the HelmReleaseProxies are ready, meaning that the Helm installation, upgrade
+	// or deletion is complete.
 	HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
 )
 
 // HelmReleaseProxy Conditions and Reasons.
 const (
-	// HelmReleaseReadyCondition reports on current status of the HelmRelease managed by the HelmChartProxy.
+	// HelmReleaseReadyCondition indicates the current status of the underlying Helm release managed by the HelmReleaseProxy.
 	HelmReleaseReadyCondition clusterv1.ConditionType = "HelmReleaseReady"
-	// PreparingToHelmInstallReason is ...
+
+	// PreparingToHelmInstallReason indicates that the HelmReleaseProxy is preparing to install the Helm release.
 	PreparingToHelmInstallReason = "PreparingToHelmInstall"
-	// HelmInstallOrUpgradeFailedReason is ...
+
+	// HelmInstallOrUpgradeFailedReason indicates that the HelmReleaseProxy failed to install or upgrade the Helm release.
 	HelmInstallOrUpgradeFailedReason = "HelmInstallOrUpgradeFailed"
-	// HelmReleaseDeletionFailedReason is ...
+
+	// HelmReleaseDeletionFailedReason is indicates that the HelmReleaseProxy failed to delete the Helm release.
 	HelmReleaseDeletionFailedReason = "HelmReleaseDeletionFailed"
-	// HelmReleaseDeletedReason is ...
+
+	// HelmReleaseDeletedReason indicates that the HelmReleaseProxy deleted the Helm release.
 	HelmReleaseDeletedReason = "HelmReleaseDeleted"
-	// HelmReleaseGetFailedReason is ...
+
+	// HelmReleaseGetFailedReason indicates that the HelmReleaseProxy failed to get the Helm release.
 	HelmReleaseGetFailedReason = "HelmReleaseGetFailed"
 
-	// ClusterAvailableCondition...
+	// ClusterAvailableCondition indicates that the Cluster to install the Helm release on is available.
 	ClusterAvailableCondition clusterv1.ConditionType = "ClusterAvailable"
-	// GetClusterFailedReason is ...
+
+	// GetClusterFailedReason indicates that the HelmReleaseProxy failed to get the Cluster.
 	GetClusterFailedReason = "GetClusterFailed"
-	// GetKubeconfigFailedReason is ...
+
+	// GetKubeconfigFailedReason indicates that the HelmReleaseProxy failed to get the kubeconfig for the Cluster.
 	GetKubeconfigFailedReason = "GetKubeconfigFailed"
 )
