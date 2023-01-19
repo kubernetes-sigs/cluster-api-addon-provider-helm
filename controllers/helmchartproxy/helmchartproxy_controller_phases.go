@@ -34,9 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
-// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
-
+// deleteOrphanedHelmReleaseProxies deletes any HelmReleaseProxy resources that belong to a Cluster that is not selected by its parent HelmChartProxy.
 func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -53,6 +51,7 @@ func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.
 	return nil
 }
 
+// reconcileForCluster will create or update a HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -94,7 +93,7 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 	return nil
 }
 
-// getExistingHelmReleaseProxy...
+// getExistingHelmReleaseProxy returns the HelmReleaseProxy for the given cluster if it exists.
 func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster) (*addonsv1alpha1.HelmReleaseProxy, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -127,7 +126,7 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 	return &helmReleaseProxyList.Items[0], nil
 }
 
-// createOrUpdateHelmReleaseProxy...
+// createOrUpdateHelmReleaseProxy creates or updates the HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues string) error {
 	log := ctrl.LoggerFrom(ctx)
 	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, cluster)
@@ -149,7 +148,7 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 	return nil
 }
 
-// deleteHelmReleaseProxy...
+// deleteHelmReleaseProxy deletes the HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -164,6 +163,8 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 	return nil
 }
 
+// constructHelmReleaseProxy constructs a new HelmReleaseProxy for the given Cluster or updates the existing HelmReleaseProxy if needed.
+// If no update is needed, this returns nil. Note that this does not check if we need to reinstall the HelmReleaseProxy, i.e. immutable fields changed.
 func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1alpha1.HelmReleaseProxy {
 	helmReleaseProxy := &addonsv1alpha1.HelmReleaseProxy{}
 	if existing == nil {
@@ -210,6 +211,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	return helmReleaseProxy
 }
 
+// shouldReinstallHelmRelease returns true if the HelmReleaseProxy needs to be reinstalled. This is the case if any of the immutable fields changed.
 func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy) bool {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -217,8 +219,6 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 
 	annotations := existing.GetAnnotations()
 	result, ok := annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
-
-	// log.V(2).Info("IsReleaseNameGeneratedAnnotation", "result", result, "ok", ok)
 
 	isReleaseNameGenerated := ok && result == "true"
 	switch {
@@ -238,6 +238,7 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 	return false
 }
 
+// getOrphanedHelmReleaseProxies returns a list of HelmReleaseProxies that are not associated with any of the selected Clusters for a given HelmChartProxy.
 func getOrphanedHelmReleaseProxies(ctx context.Context, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) []addonsv1alpha1.HelmReleaseProxy {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Getting HelmReleaseProxies to delete")

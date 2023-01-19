@@ -42,6 +42,7 @@ import (
 	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
+// GetActionConfig returns a new Helm action configuration.
 func GetActionConfig(ctx context.Context, namespace string, config *rest.Config) (*helmAction.Configuration, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(4).Info("Getting action config")
@@ -76,6 +77,7 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	return actionConfig, nil
 }
 
+// HelmInit initializes Helm.
 func HelmInit(ctx context.Context, namespace string, kubeconfig string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
 	// log := ctrl.LoggerFrom(ctx)
 
@@ -100,7 +102,8 @@ func HelmInit(ctx context.Context, namespace string, kubeconfig string) (*helmCl
 	return settings, actionConfig, nil
 }
 
-// Install Helm release if it doesn't exist. If it exists, check if it needs to be updated.
+// InstallOrUpgradeHelmRelease installs a Helm release if it does not exist, or upgrades it if it does and differs from the spec.
+// It returns a boolean indicating whether an install or upgrade was performed.
 func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -121,6 +124,7 @@ func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec ad
 	return UpgradeHelmReleaseIfChanged(ctx, kubeconfig, spec, existingRelease)
 }
 
+// InstallHelmRelease installs a Helm release.
 func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -188,7 +192,7 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 	return release, nil
 }
 
-// This function will be refactored to differentiate from installHelmRelease()
+// UpgradeHelmReleaseIfChanged upgrades a Helm release.
 func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *release.Release) (*release.Release, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -256,6 +260,7 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 	return release, true, nil
 }
 
+// writeValuesToFile writes the Helm values to a temporary file.
 func writeValuesToFile(ctx context.Context, spec addonsv1alpha1.HelmReleaseProxySpec) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Writing values to file")
@@ -271,6 +276,7 @@ func writeValuesToFile(ctx context.Context, spec addonsv1alpha1.HelmReleaseProxy
 	return valuesFile.Name(), nil
 }
 
+// shouldUpgradeHelmRelease determines if a Helm release should be upgraded.
 func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -297,6 +303,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 	return !cmp.Equal(oldValues, newValues), nil
 }
 
+// GetHelmRelease returns a Helm release if it exists.
 func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
 	if spec.ReleaseName == "" {
 		return nil, helmDriver.ErrReleaseNotFound
@@ -315,6 +322,7 @@ func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.
 	return release, nil
 }
 
+// ListHelmReleases lists all Helm releases in a namespace.
 func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) ([]*release.Release, error) {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
@@ -329,6 +337,7 @@ func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha
 	return releases, nil
 }
 
+// UninstallHelmRelease uninstalls a Helm release.
 func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.UninstallReleaseResponse, error) {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
@@ -344,6 +353,7 @@ func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1a
 	return response, nil
 }
 
+// RollbackHelmRelease rolls back a Helm release.
 func RollbackHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) error {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {

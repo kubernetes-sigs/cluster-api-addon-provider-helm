@@ -37,6 +37,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// InitInClusterKubeconfig generates a kubeconfig file for the management cluster.
+// Note: The k8s.io/client-go/tools/clientcmd/api package and associated tools require a path to a kubeconfig file rather than the data stored in an object.
 func InitInClusterKubeconfig(ctx context.Context) (*cluster.Kubeconfig, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -59,6 +61,9 @@ func InitInClusterKubeconfig(ctx context.Context) (*cluster.Kubeconfig, error) {
 	return &cluster.Kubeconfig{Path: kubeconfigPath, Context: kubeContext}, nil
 }
 
+// GetClusterKubeconfig generates a kubeconfig file for the management cluster using a rest.Config. This is a bit of a workaround
+// since the k8s.io/client-go/tools/clientcmd/api expects to be run from a CLI context, but within a pod we don't have that.
+// As a result, we have to manually fill in the fields that would normally be present in ~/.kube/config. This seems to work for now.
 func ConstructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, namespace string) (*clientcmdapi.Config, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -75,7 +80,6 @@ func ConstructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, 
 		// Used in in-cluster configs.
 		CertificateAuthority: restConfig.CAFile,
 	}
-	// log.V(2).Info("Constructing clusters", "clusters", clusters)
 
 	contexts := make(map[string]*clientcmdapi.Context)
 	contexts[contextName] = &clientcmdapi.Context{
@@ -83,7 +87,6 @@ func ConstructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, 
 		Namespace: namespace,
 		AuthInfo:  userName,
 	}
-	// log.V(2).Info("Constructing contexts", "contexts", contexts)
 
 	authInfos := make(map[string]*clientcmdapi.AuthInfo)
 	authInfos[userName] = &clientcmdapi.AuthInfo{
@@ -91,7 +94,6 @@ func ConstructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, 
 		ClientCertificateData: restConfig.TLSClientConfig.CertData,
 		ClientKeyData:         restConfig.TLSClientConfig.KeyData,
 	}
-	// log.V(2).Info("Constructing authInfos/users", "users", authInfos)
 
 	return &clientcmdapi.Config{
 		Kind:           "Config",
@@ -103,6 +105,7 @@ func ConstructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, 
 	}, nil
 }
 
+// WriteInClusterKubeconfigToFile writes the clientcmdapi.Config to a kubeconfig file.
 func WriteInClusterKubeconfigToFile(ctx context.Context, filePath string, clientConfig clientcmdapi.Config) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -122,6 +125,7 @@ func WriteInClusterKubeconfigToFile(ctx context.Context, filePath string, client
 	return nil
 }
 
+// GetClusterKubeconfig returns the kubeconfig for a selected Cluster as a string.
 func GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -152,6 +156,7 @@ func GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (stri
 	return kubeconfig, nil
 }
 
+// WriteClusterKubeconfigToFile writes the kubeconfig for a selected Cluster to a file.
 func WriteClusterKubeconfigToFile(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 	c, err := client.New("")
@@ -201,6 +206,7 @@ func WriteClusterKubeconfigToFile(ctx context.Context, cluster *clusterv1.Cluste
 	return filePath, nil
 }
 
+// GetCustomResource returns the unstructured object for a selected Custom Resource.
 func GetCustomResource(ctx context.Context, c ctrlClient.Client, kind string, apiVersion string, namespace string, name string) (*unstructured.Unstructured, error) {
 	objectRef := corev1.ObjectReference{
 		Kind:       kind,
@@ -216,6 +222,7 @@ func GetCustomResource(ctx context.Context, c ctrlClient.Client, kind string, ap
 	return object, nil
 }
 
+// GetClusterField returns the value of a field in a selected Cluster.
 func GetClusterField(ctx context.Context, c ctrlClient.Client, cluster *clusterv1.Cluster, fields []string) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 

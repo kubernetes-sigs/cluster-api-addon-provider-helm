@@ -19,7 +19,6 @@ package internal
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
@@ -27,13 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/external"
-	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
+// initializeBuiltins takes a map of keys to object references, attempts to get the referenced objects, and returns a map of keys to the actual objects.
+// These objects are a map[string]interface{} so that they can be used as values in the template.
 func initializeBuiltins(ctx context.Context, c ctrlClient.Client, referenceMap map[string]corev1.ObjectReference, spec addonsv1alpha1.HelmChartProxySpec, cluster *clusterv1.Cluster) (map[string]interface{}, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -51,14 +51,7 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, referenceMap m
 	return valueLookUp, nil
 }
 
-type BuiltinTypes struct {
-	Cluster            *clusterv1.Cluster
-	ControlPlane       *kcpv1.KubeadmControlPlane
-	MachineDeployments map[string]clusterv1.MachineDeployment
-	MachineSets        map[string]clusterv1.MachineSet
-	Machines           map[string]clusterv1.Machine
-}
-
+// ParseValues parses the values template and returns the expanded template. It attempts to populate a map of supported templating objects.
 func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.HelmChartProxySpec, cluster *clusterv1.Cluster) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -100,13 +93,4 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 	log.V(2).Info("Expanded values to", "result", expandedTemplate)
 
 	return expandedTemplate, nil
-}
-
-func ValueMapToArray(valueMap map[string]string) []string {
-	valueArray := make([]string, 0, len(valueMap))
-	for k, v := range valueMap {
-		valueArray = append(valueArray, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	return valueArray
 }
