@@ -1,0 +1,17 @@
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: metallb
+spec:
+  clusterSelector:
+    matchLabels:
+      MetalLBChart: enabled
+  repoURL: https://metallb.github.io/metallb
+  chartName: metallb
+  namespace: metallb-system
+  releaseName: metallb
+  valuesTemplate: |
+    speaker:
+      nodeSelector:
+        kubernetes.io/os: "linux"
+    controller:
