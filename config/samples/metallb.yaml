@@ -14,4 +14,3 @@ spec:
     speaker:
       nodeSelector:
         kubernetes.io/os: "linux"
-    controller:
