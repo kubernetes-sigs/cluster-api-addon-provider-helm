@@ -1,4 +1,3 @@
-// TODO: Is this preferrable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 /*
 Copyright 2022 The Kubernetes Authors.
 

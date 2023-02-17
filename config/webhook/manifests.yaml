@@ -13,7 +13,7 @@ webhooks:
       namespace: system
       path: /mutate-addons-cluster-x-k8s-io-v1alpha1-helmchartproxy
   failurePolicy: Fail
-  name: mhelmchartproxy.kb.io
+  name: helmchartproxy.kb.io
   rules:
   - apiGroups:
     - addons.cluster.x-k8s.io
@@ -33,7 +33,7 @@ webhooks:
       namespace: system
       path: /mutate-addons-cluster-x-k8s-io-v1alpha1-helmreleaseproxy
   failurePolicy: Fail
-  name: mhelmreleaseproxy.kb.io
+  name: helmreleaseproxy.kb.io
   rules:
   - apiGroups:
     - addons.cluster.x-k8s.io
