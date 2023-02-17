@@ -73,7 +73,7 @@ fi
 
 echo "Running shellcheck..."
 cd "${ROOT_PATH}" || exit
-FILES=$(find . -name "*.sh")
+FILES=$(find . -path "./.git" -prune -o -name "*.sh" -print)
 while read -r file; do
     "$SHELLCHECK" -x "$file" >> "${OUT}" 2>&1
 done <<< "$FILES"

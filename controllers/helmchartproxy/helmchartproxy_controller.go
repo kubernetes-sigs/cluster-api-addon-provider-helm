@@ -260,10 +260,6 @@ func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, n
 // listInstalledReleases returns a list of HelmReleaseProxies that match the given label selector.
 func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, namespace string, labels map[string]string) (*addonsv1alpha1.HelmReleaseProxyList, error) {
 	releaseList := &addonsv1alpha1.HelmReleaseProxyList{}
-	// Empty labels should match nothing, not everything
-	if len(labels) == 0 {
-		return nil, nil
-	}
 
 	// TODO: should we use client.MatchingLabels or try to use the labelSelector itself?
 	if err := r.Client.List(ctx, releaseList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {

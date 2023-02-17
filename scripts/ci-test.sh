@@ -24,13 +24,5 @@ cd "${REPO_ROOT}" || exit 1
 # shellcheck source=./hack/ensure-go.sh
 source "${REPO_ROOT}/hack/ensure-go.sh"
 
-echo "*** Testing Cluster API ***"
-make test-junit
-
-echo -e "\n*** Testing Cluster API Provider Docker ***\n"
-# Docker provider
-make test-docker-infrastructure-junit
-
-echo -e "\n*** Testing Cluster API Runtime SDK test extension ***\n"
-# Test Extension
-make test-test-extension-junit
+echo "*** Testing Cluster API Add-on Provider for Helm ***"
+make test
