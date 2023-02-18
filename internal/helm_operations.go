@@ -113,12 +113,16 @@ func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec ad
 	// historyClient.Max = 1
 	// if _, err := historyClient.Run(spec.ReleaseName); err == helmDriver.ErrReleaseNotFound {
 	existingRelease, err := GetHelmRelease(ctx, kubeconfig, spec)
-	if err == helmDriver.ErrReleaseNotFound {
-		release, err := InstallHelmRelease(ctx, kubeconfig, spec)
-		if err != nil {
-			return nil, false, err
+	if err != nil {
+		if err == helmDriver.ErrReleaseNotFound {
+			release, err := InstallHelmRelease(ctx, kubeconfig, spec)
+			if err != nil {
+				return nil, false, err
+			}
+			return release, true, nil
 		}
-		return release, true, nil
+
+		return nil, false, err
 	}
 
 	return UpgradeHelmReleaseIfChanged(ctx, kubeconfig, spec, existingRelease)
