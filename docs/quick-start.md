@@ -23,7 +23,7 @@ Create a management cluster using kind and then create a workload cluster runnin
 Run the following command to clone the CAAPH repository into your Go src folder:
 
 ```bash
-$ git clone git@github.com:Jont828/cluster-api-addon-provider-helm.git ${GOPATH}/src/cluster-api-addon-provider-helm
+$ git clone git@github.com:kubernetes-sigs/cluster-api-addon-provider-helm.git ${GOPATH}/src/cluster-api-addon-provider-helm
 ```
 
 ### 4. Install CAAPH to the management cluster
