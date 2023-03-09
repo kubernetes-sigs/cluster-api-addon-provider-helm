@@ -47,8 +47,19 @@ enable_providers:
 - helm 
 ```
 
+#### 3. Set up automatic installation for calico. (Optional)
 
-#### 3. Run Tilt
+Calico is automatically installed when workload clusters are started.  
+
+From `src/cluster-api-addon-provider-helm` run:
+
+```bash
+$ ./hack/setup-calico-autoinstallation.sh
+```
+
+See [Automatically install calico in workload clusters with Tilt](#automatically-install-calico-in-workload-clusters-with-tilt) for more details.
+
+#### 4. Run Tilt
 
 From `src/cluster-api` run:
 
@@ -57,3 +68,28 @@ $ make tilt-up
 ```
 
 From within Tilt, you should be able to see the CAAPH controller running alongside the Cluster API controllers with the CRDs installed.
+
+### Automatically install calico in workload clusters with Tilt
+
+Automatically install [calico](https://docs.tigera.io/calico) in workload clusters using the [yaml manifest](https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/blob/main/config/samples/calico-cni.yaml) provided by CAAPH.  
+The setup script(`setup-calico-autoinstallation.sh`) generates a tiltfile to incorporate the above yaml manifest as a Tilt resource.  
+
+**Setup script (`setup-calico-autoinstallation.sh`) Summary:**  
+- Generate the tiltfile to incorporate the above yaml manifest as a Tilt resource.
+  - Refer to [Tiltfile API Reference](https://docs.tilt.dev/api.html) for functions used in the tiltfile.
+- The tiltfile is output to the `src/cluster-api/tilt.d` directory.
+  - Run `make tilt-up` ,files under the `src/cluster-api/tilt.d` are automatically started. (excluding subdirectories)
+  
+
+The yaml manifest (`src/cluster-api-addon-provider-helm/config/samples/calico-cni.yaml`) is changed, it is redeployed by Tilt.  
+
+**For the target workload clusters**  
+The yaml manifest (`src/cluster-api-addon-provider-helm/config/samples/calico-cni.yaml`) is for all workload clusters.  <br>
+
+An example targeting workload clusters with a specific label.
+```yaml
+spec:
+  clusterSelector:
+    matchLabels:
+      cni: calico 
+```
