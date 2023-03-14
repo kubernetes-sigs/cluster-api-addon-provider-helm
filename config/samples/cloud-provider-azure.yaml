@@ -8,7 +8,7 @@ spec:
       cloudProviderAzureChart: enabled
   repoURL: https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo
   chartName: cloud-provider-azure
-  version: 1.23.8
+  version: 1.26.5
   releaseName: cloud-provider-azure
   valuesTemplate: |
     infra:
