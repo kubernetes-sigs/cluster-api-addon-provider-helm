@@ -183,7 +183,7 @@ STAGING_REGISTRY ?= gcr.io/k8s-staging-cluster-api
 STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api.appspot.com
 
 # core
-IMAGE_NAME ?= cluster-api-controller
+IMAGE_NAME ?= cluster-api-addons-helm-provider
 CONTROLLER_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
 
 # kind
