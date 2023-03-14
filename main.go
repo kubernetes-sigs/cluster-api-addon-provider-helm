@@ -56,6 +56,9 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var leaderElectionLeaseDuration time.Duration
+	var leaderElectionRenewDeadline time.Duration
+	var leaderElectionRetryPeriod time.Duration
 	var probeAddr string
 	var helmChartProxyConcurrency int
 	var helmReleaseProxyConcurrency int
@@ -68,6 +71,12 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.DurationVar(&leaderElectionLeaseDuration, "leader-elect-lease-duration", 15*time.Second,
+		"Interval at which non-leader candidates will wait to force acquire leadership (duration string)")
+	flag.DurationVar(&leaderElectionRenewDeadline, "leader-elect-renew-deadline", 10*time.Second,
+		"Duration that the leading controller manager will retry refreshing leadership before giving up (duration string)")
+	flag.DurationVar(&leaderElectionRetryPeriod, "leader-elect-retry-period", 2*time.Second,
+		"Duration the LeaderElector clients should wait between tries of actions (duration string)")
 	flag.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 10, "The number of HelmChartProxies to process concurrently.")
 	flag.IntVar(&helmReleaseProxyConcurrency, "helm-release-proxy-concurrency", 10, "The number of HelmReleaseProxies to process concurrently.")
 	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
@@ -82,6 +91,9 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "5a2dee3e.cluster.x-k8s.io",
+		LeaseDuration:          &leaderElectionLeaseDuration,
+		RenewDeadline:          &leaderElectionRenewDeadline,
+		RetryPeriod:            &leaderElectionRetryPeriod,
 		SyncPeriod:             &syncPeriod,
 	})
 	if err != nil {
