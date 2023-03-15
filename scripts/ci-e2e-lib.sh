@@ -22,7 +22,7 @@ capi:buildDockerImages () {
   # please ensure the generated image name matches image names used in the E2E_CONF_FILE;
   # also the same settings must be set in Makefile, docker-build-e2e target.
   ARCH="$(go env GOARCH)"
-  export REGISTRY=gcr.io/k8s-staging-cluster-api
+  export REGISTRY=gcr.io/k8s-staging-cluster-api-helm
   export TAG=dev
   export ARCH
 
