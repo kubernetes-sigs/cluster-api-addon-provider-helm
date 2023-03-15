@@ -8,9 +8,4 @@ spec:
       MetalLBChart: enabled
   repoURL: https://metallb.github.io/metallb
   chartName: metallb
-  namespace: metallb-system
   releaseName: metallb
-  valuesTemplate: |
-    speaker:
-      nodeSelector:
-        kubernetes.io/os: "linux"

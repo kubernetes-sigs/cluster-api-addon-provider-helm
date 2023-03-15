@@ -179,11 +179,11 @@ GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN))
 REGISTRY ?= gcr.io/$(shell gcloud config get-value project)
 PROD_REGISTRY ?= registry.k8s.io/cluster-api
 
-STAGING_REGISTRY ?= gcr.io/k8s-staging-cluster-api
-STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api.appspot.com
+STAGING_REGISTRY ?= gcr.io/k8s-staging-cluster-api-helm
+STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api-helm.appspot.com
 
 # core
-IMAGE_NAME ?= cluster-api-controller
+IMAGE_NAME ?= cluster-api-helm-controller
 CONTROLLER_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
 
 # kind
@@ -479,7 +479,7 @@ release-staging-nightly: ## Tag and push container images to the staging bucket.
 	$(MAKE) manifest-modification-dev REGISTRY=$(STAGING_REGISTRY) RELEASE_TAG=$(NEW_RELEASE_ALIAS_TAG)
 	## Build the dev manifests
 	$(MAKE) release-manifests-dev
-	# Example manifest location: artifacts.k8s-staging-cluster-api.appspot.com/components/nightly_main_20210121/bootstrap-components.yaml
+	# Example manifest location: artifacts.k8s-staging-cluster-api-helm.appspot.com/components/nightly_main_20210121/bootstrap-components.yaml
 	gsutil cp $(RELEASE_DIR)/* gs://$(STAGING_BUCKET)/components/$(NEW_RELEASE_ALIAS_TAG)
 
 .PHONY: release-alias-tag
