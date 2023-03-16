@@ -387,7 +387,7 @@ RELEASE_ALIAS_TAG := $(PULL_BASE_REF)
 RELEASE_DIR := out
 RELEASE_NOTES_DIR := _releasenotes
 USER_FORK ?= $(shell git config --get remote.origin.url | cut -d/ -f4) # only works on https://github.com/<username>/cluster-api-addon-provider-helm.git style URLs
-ifeq ($(USER_FORK),)
+ifdef USER_FORK
 USER_FORK := $(shell git config --get remote.origin.url | cut -d: -f2 | cut -d/ -f1) # for git@github.com:<username>/cluster-api-addon-provider-helm.git style URLs
 endif
 IMAGE_REVIEWERS ?= $(shell ./hack/get-project-maintainers.sh)
@@ -482,7 +482,7 @@ release-notes: $(RELEASE_NOTES_DIR) $(RELEASE_NOTES)
 
 .PHONY: promote-images
 promote-images: $(KPROMO)
-	$(KPROMO) pr --project cluster-api --tag $(RELEASE_TAG) --reviewers "$(IMAGE_REVIEWERS)" --fork $(USER_FORK) --image cluster-api-helm-controller
+	$(KPROMO) pr --project cluster-api-helm --tag $(RELEASE_TAG) --reviewers "$(IMAGE_REVIEWERS)" --fork $(USER_FORK) --image cluster-api-helm-controller
 
 ## --------------------------------------
 ## Docker
