@@ -30,5 +30,5 @@ YQ_PATH=hack/tools/bin/${YQ_BIN}
 cd "${REPO_ROOT}" && make ${YQ_BIN} >/dev/null
 
 KEYS=()
-while IFS='' read -r line; do KEYS+=("$line"); done < <(${YQ_PATH} e '.aliases["cluster-api-maintainers"][]' OWNERS_ALIASES)
+while IFS='' read -r line; do KEYS+=("$line"); done < <(${YQ_PATH} e '.aliases["cluster-api-helm-maintainers"][]' OWNERS_ALIASES)
 echo "${KEYS[@]/#/@}"
