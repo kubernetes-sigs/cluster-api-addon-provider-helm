@@ -7,5 +7,5 @@ spec:
   template:
     spec:
       containers:
-      - image: gcr.io/k8s-staging-cluster-api-helm/cluster-api-helm-controller-s390x:dev
+      - image: gcr.io/k8s-staging-cluster-api-helm/cluster-api-helm-controller:latest
         name: manager
