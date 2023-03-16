@@ -309,7 +309,7 @@ verify-container-images: ## Verify container images
 
 .PHONY: manager
 manager: ## Build the manager binary into the ./bin folder
-	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/manager sigs.k8s.io/cluster-api-addon-provider-helm
+	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/manager .
 
 .PHONY: docker-pull-prerequisites
 docker-pull-prerequisites:
