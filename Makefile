@@ -434,6 +434,7 @@ release: clean-release ## Build and push container images using the latest git t
 	git checkout "${RELEASE_TAG}"
 	# Set the manifest images to the staging/production bucket and Builds the manifests to publish with a release.
 	$(MAKE) release-manifests-all
+	$(MAKE) release-metadata
 
 .PHONY: release-manifests-all
 release-manifests-all: # Set the manifest images to the staging/production bucket and Builds the manifests to publish with a release.
@@ -455,6 +456,10 @@ manifest-modification: # Set the manifest images to the staging/production bucke
 .PHONY: release-manifests
 release-manifests: $(RELEASE_DIR) $(KUSTOMIZE) ## Build the manifests to publish with a release
 	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/add-on-components.yaml
+
+.PHONY: release-metadata
+release-metadata: $(RELEASE_DIR)
+	cp metadata.yaml $(RELEASE_DIR)/metadata.yaml
 
 .PHONY: release-binary
 release-binary: $(RELEASE_DIR)
