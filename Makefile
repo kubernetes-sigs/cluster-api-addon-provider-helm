@@ -441,10 +441,6 @@ release-manifests-all: # Set the manifest images to the staging/production bucke
 	$(MAKE) manifest-modification REGISTRY=$(PROD_REGISTRY)
 	## Build the manifests
 	$(MAKE) release-manifests
-	# Set the development manifest image to the staging bucket.
-	$(MAKE) manifest-modification-dev REGISTRY=$(STAGING_REGISTRY)
-	## Build the development manifests
-	$(MAKE) release-manifests-dev
 	## Clean the git artifacts modified in the release process
 	$(MAKE) clean-release-git
 
@@ -486,10 +482,6 @@ release-staging-nightly: ## Tag and push container images to the staging bucket.
 	$(MAKE) manifest-modification REGISTRY=$(STAGING_REGISTRY) RELEASE_TAG=$(NEW_RELEASE_ALIAS_TAG)
 	## Build the manifests
 	$(MAKE) release-manifests
-	# Set the manifest image to the staging bucket.
-	$(MAKE) manifest-modification-dev REGISTRY=$(STAGING_REGISTRY) RELEASE_TAG=$(NEW_RELEASE_ALIAS_TAG)
-	## Build the dev manifests
-	$(MAKE) release-manifests-dev
 	# Example manifest location: artifacts.k8s-staging-cluster-api-helm.appspot.com/components/nightly_main_20210121/bootstrap-components.yaml
 	gsutil cp $(RELEASE_DIR)/* gs://$(STAGING_BUCKET)/components/$(NEW_RELEASE_ALIAS_TAG)
 
