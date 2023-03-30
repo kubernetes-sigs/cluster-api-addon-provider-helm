@@ -370,6 +370,33 @@ test-cover: ## Run unit and integration tests and generate a coverage report
 # 	    -e2e.skip-resource-cleanup=$(SKIP_RESOURCE_CLEANUP) -e2e.use-existing-cluster=$(USE_EXISTING_CLUSTER)
 
 ## --------------------------------------
+## Deployment
+## --------------------------------------
+
+##@ deployment:
+
+ifndef ignore-not-found
+  ignore-not-found = false
+endif
+
+.PHONY: install
+install: generate-manifests $(KUSTOMIZE) ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+
+.PHONY: uninstall
+uninstall: generate-manifests $(KUSTOMIZE) ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy
+deploy: generate-manifests $(KUSTOMIZE) ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	$(MAKE) manifest-modification RELEASE_TAG=$(TAG)
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+.PHONY: undeploy
+undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+
+## --------------------------------------
 ## Release
 ## --------------------------------------
 
@@ -405,8 +432,6 @@ release: clean-release ## Build and push container images using the latest git t
 	@if [ -z "${RELEASE_TAG}" ]; then echo "RELEASE_TAG is not set"; exit 1; fi
 	@if ! [ -z "$$(git status --porcelain)" ]; then echo "Your local git repository contains uncommitted changes, use git clean before proceeding."; exit 1; fi
 	git checkout "${RELEASE_TAG}"
-	# Build binaries first.
-	GIT_VERSION=$(RELEASE_TAG) $(MAKE) release-binaries
 	# Set the manifest images to the staging/production bucket and Builds the manifests to publish with a release.
 	$(MAKE) release-manifests-all
 
@@ -433,7 +458,7 @@ manifest-modification: # Set the manifest images to the staging/production bucke
 
 .PHONY: release-manifests
 release-manifests: $(RELEASE_DIR) $(KUSTOMIZE) ## Build the manifests to publish with a release
-	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/addon-components.yaml
+	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/add-on-components.yaml
 
 .PHONY: release-binary
 release-binary: $(RELEASE_DIR)

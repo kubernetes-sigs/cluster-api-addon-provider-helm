@@ -1,6 +1,6 @@
 name: helm
 config:
-  image: jont828/cluster-api-addon-provider-helm:latest
+  image: gcr.io/k8s-staging-cluster-api-helm/cluster-api-helm-controller
   live_reload_deps:
     - main.go
     - go.mod
