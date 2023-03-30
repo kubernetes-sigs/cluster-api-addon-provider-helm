@@ -39,7 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
 // GetActionConfig returns a new Helm action configuration.

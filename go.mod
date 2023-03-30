@@ -1,4 +1,4 @@
-module cluster-api-addon-provider-helm
+module sigs.k8s.io/cluster-api-addon-provider-helm
 
 go 1.19
 

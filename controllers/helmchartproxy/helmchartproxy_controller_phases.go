@@ -17,10 +17,12 @@ limitations under the License.
 package helmchartproxy
 
 import (
-	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
-	"cluster-api-addon-provider-helm/internal"
 	"context"
 	"fmt"
+
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+
+	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
