@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	addonsv1alpha1 "cluster-api-addon-provider-helm/api/v1alpha1"
-	hcpController "cluster-api-addon-provider-helm/controllers/helmchartproxy"
-	hrpController "cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	hcpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
+	hrpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
