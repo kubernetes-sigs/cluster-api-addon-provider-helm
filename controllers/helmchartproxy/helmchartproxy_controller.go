@@ -340,7 +340,7 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 
 	listOpts := []client.ListOption{
 		client.MatchingLabels{
-			clusterv1.ClusterLabelName: cluster.Name,
+			clusterv1.ClusterNameLabel: cluster.Name,
 		},
 	}
 

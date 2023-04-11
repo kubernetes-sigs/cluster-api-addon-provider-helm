@@ -103,7 +103,7 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 
 	listOpts := []client.ListOption{
 		client.MatchingLabels{
-			clusterv1.ClusterLabelName:             cluster.Name,
+			clusterv1.ClusterNameLabel:             cluster.Name,
 			addonsv1alpha1.HelmChartProxyLabelName: helmChartProxy.Name,
 		},
 	}
@@ -175,7 +175,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		helmReleaseProxy.OwnerReferences = util.EnsureOwnerRef(helmReleaseProxy.OwnerReferences, *metav1.NewControllerRef(helmChartProxy, helmChartProxy.GroupVersionKind()))
 
 		newLabels := map[string]string{}
-		newLabels[clusterv1.ClusterLabelName] = cluster.Name
+		newLabels[clusterv1.ClusterNameLabel] = cluster.Name
 		newLabels[addonsv1alpha1.HelmChartProxyLabelName] = helmChartProxy.Name
 		helmReleaseProxy.Labels = newLabels
 
