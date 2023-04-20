@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -324,10 +325,7 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 	)
 }
 
-// ClusterToHelmChartProxiesMapper is a mapper function that maps a Cluster to the HelmReleaseProxies that are associated with it.
-// This is used to trigger an update of all HelmChartProxies associated with a Cluster when that Cluster is changed.
-// Note: this finds every HelmReleaseProxy associated with a Cluster and returns a Request for its parent HelmChartProxy.
-// This will not trigger an update if the HelmChartProxy selected a Cluster but ran into an error before creating the HelmReleaseProxy.
+// ClusterToHelmChartProxiesMapper is a mapper function that maps a Cluster to the HelmChartProxies that would select the Cluster.
 func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Object) []ctrl.Request {
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
@@ -336,26 +334,28 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 		return nil
 	}
 
-	helmReleaseProxies := &addonsv1alpha1.HelmReleaseProxyList{}
-
-	listOpts := []client.ListOption{
-		client.MatchingLabels{
-			clusterv1.ClusterNameLabel: cluster.Name,
-		},
-	}
+	helmChartProxies := &addonsv1alpha1.HelmChartProxyList{}
 
 	// TODO: Figure out if we want this search to be cross-namespaces.
 
-	if err := r.Client.List(context.TODO(), helmReleaseProxies, listOpts...); err != nil {
+	if err := r.Client.List(context.TODO(), helmChartProxies, client.InNamespace(cluster.Namespace)); err != nil {
 		return nil
 	}
 
 	results := []ctrl.Request{}
-	for _, helmReleaseProxy := range helmReleaseProxies.Items {
-		results = append(results, ctrl.Request{
-			// The HelmReleaseProxy is always in the same namespace as the HelmChartProxy.
-			NamespacedName: client.ObjectKey{Namespace: helmReleaseProxy.GetNamespace(), Name: helmReleaseProxy.Labels[addonsv1alpha1.HelmChartProxyLabelName]},
-		})
+	for _, helmChartProxy := range helmChartProxies.Items {
+		selector, err := metav1.LabelSelectorAsSelector(&helmChartProxy.Spec.ClusterSelector)
+		if err != nil {
+			// Suppress the error for now
+			return nil
+		}
+
+		if selector.Matches(labels.Set(cluster.Labels)) {
+			results = append(results, ctrl.Request{
+				// The HelmReleaseProxy is always in the same namespace as the HelmChartProxy.
+				NamespacedName: client.ObjectKey{Namespace: helmChartProxy.Namespace, Name: helmChartProxy.Name},
+			})
+		}
 	}
 
 	return results
