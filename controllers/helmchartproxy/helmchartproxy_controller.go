@@ -250,8 +250,13 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 // listClustersWithLabels returns a list of Clusters that match the given label selector.
 func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, namespace string, selector metav1.LabelSelector) (*clusterv1.ClusterList, error) {
 	clusterList := &clusterv1.ClusterList{}
-	// TODO: validate empty key or empty value to make sure it doesn't match everything.
-	if err := r.Client.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabels(selector.MatchLabels)); err != nil {
+	// To support for the matchExpressions field, convert LabelSelector to labels.Selector to specify labels.Selector for ListOption. (Issue #15)
+	labelselector, err := metav1.LabelSelectorAsSelector(&selector)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.Client.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: labelselector}); err != nil {
 		return nil, err
 	}
 
