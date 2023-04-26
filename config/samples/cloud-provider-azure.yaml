@@ -14,5 +14,4 @@ spec:
     infra:
       clusterName: {{ .Cluster.metadata.name }}
     cloudControllerManager:
-      clusterCIDR:{{range $i, $cidr := .Cluster.spec.clusterNetwork.pods.cidrBlocks }}
-      - {{ $cidr }}{{end}}
+      clusterCIDR: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join "," }}
