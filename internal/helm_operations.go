@@ -31,7 +31,7 @@ import (
 
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/release"
+	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
@@ -104,7 +104,7 @@ func HelmInit(ctx context.Context, namespace string, kubeconfig string) (*helmCl
 
 // InstallOrUpgradeHelmRelease installs a Helm release if it does not exist, or upgrades it if it does and differs from the spec.
 // It returns a boolean indicating whether an install or upgrade was performed.
-func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, bool, error) {
+func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Installing or upgrading Helm release")
@@ -115,21 +115,17 @@ func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec ad
 	existingRelease, err := GetHelmRelease(ctx, kubeconfig, spec)
 	if err != nil {
 		if err == helmDriver.ErrReleaseNotFound {
-			release, err := InstallHelmRelease(ctx, kubeconfig, spec)
-			if err != nil {
-				return nil, false, err
-			}
-			return release, true, nil
+			return InstallHelmRelease(ctx, kubeconfig, spec)
 		}
 
-		return nil, false, err
+		return nil, err
 	}
 
 	return UpgradeHelmReleaseIfChanged(ctx, kubeconfig, spec, existingRelease)
 }
 
 // InstallHelmRelease installs a Helm release.
-func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
+func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
@@ -186,23 +182,17 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 		return nil, err
 	}
 	log.V(2).Info("Installing with Helm...")
-	release, err := installClient.RunWithContext(ctx, chartRequested, vals)
-	if err != nil {
-		return nil, err
-	}
 
-	log.V(2).Info("Released", "name", release.Name)
-
-	return release, nil
+	return installClient.RunWithContext(ctx, chartRequested, vals) // Can return error and a release
 }
 
-// UpgradeHelmReleaseIfChanged upgrades a Helm release.
-func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *release.Release) (*release.Release, bool, error) {
+// UpgradeHelmReleaseIfChanged upgrades a Helm release. The boolean refers to if an upgrade was attempted.
+func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *helmRelease.Release) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	upgradeClient := helmAction.NewUpgrade(actionConfig)
 	upgradeClient.RepoURL = spec.RepoURL
@@ -211,20 +201,20 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 	log.V(2).Info("Locating chart...")
 	cp, err := upgradeClient.ChartPathOptions.LocateChart(spec.ChartName, settings)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	log.V(2).Info("Located chart at path", "path", cp)
 
 	log.V(2).Info("Writing values to file")
 	filename, err := writeValuesToFile(ctx, spec)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	defer os.Remove(filename)
 	log.V(2).Info("Values written to file", "path", filename)
 	content, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	klog.V(2).Infof("Values written to file %s are:\n%s\n", filename, string(content))
@@ -235,33 +225,31 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 	}
 	vals, err := valueOpts.MergeValues(p)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	chartRequested, err := helmLoader.Load(cp)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if chartRequested == nil {
-		return nil, false, errors.Errorf("failed to load request chart %s", spec.ChartName)
+		return nil, errors.Errorf("failed to load request chart %s", spec.ChartName)
 	}
 
 	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if !shouldUpgrade {
 		log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried, revision = %d", existing.Name, existing.Version))
-		return existing, false, nil
+		return existing, nil
 	}
 
 	log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
 	// upgrader.DryRun = true
 	release, err := upgradeClient.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
-	if err != nil {
-		return nil, false, err
-	}
 
-	return release, true, nil
+	return release, err
+	// Should we force upgrade if it failed previously?
 }
 
 // writeValuesToFile writes the Helm values to a temporary file.
@@ -281,7 +269,7 @@ func writeValuesToFile(ctx context.Context, spec addonsv1alpha1.HelmReleaseProxy
 }
 
 // shouldUpgradeHelmRelease determines if a Helm release should be upgraded.
-func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {
+func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	if existing.Chart == nil || existing.Chart.Metadata == nil {
@@ -291,6 +279,12 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 		log.V(3).Info("Versions are different, upgrading")
 		return true, nil
 	}
+
+	if existing.Info.Status == helmRelease.StatusFailed {
+		log.Info("Release is in failed state, attempting upgrade to fix it")
+		return true, nil
+	}
+
 	klog.V(2).Infof("Diff between values is:\n%s", cmp.Diff(existing.Config, values))
 
 	// TODO: Comparing yaml is not ideal, but it's the best we can do since DeepEquals fails. This is because int64 types
@@ -308,7 +302,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing release.Release, cha
 }
 
 // GetHelmRelease returns a Helm release if it exists.
-func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
+func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	if spec.ReleaseName == "" {
 		return nil, helmDriver.ErrReleaseNotFound
 	}
@@ -327,7 +321,7 @@ func GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.
 }
 
 // ListHelmReleases lists all Helm releases in a namespace.
-func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) ([]*release.Release, error) {
+func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) ([]*helmRelease.Release, error) {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
@@ -342,7 +336,7 @@ func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha
 }
 
 // UninstallHelmRelease uninstalls a Helm release.
-func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*release.UninstallReleaseResponse, error) {
+func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error) {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err

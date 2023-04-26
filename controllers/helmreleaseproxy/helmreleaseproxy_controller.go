@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
@@ -50,6 +52,7 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.HelmReleaseProxy{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		// Watches(
 		// 	&source.Kind{Type: &v1alpha1.HelmReleaseProxy{}},
 		// 	handler.EnqueueRequestsFromMapFunc(r.findProxyForSecret),
@@ -93,8 +96,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	initalizeConditions(ctx, patchHelper, helmReleaseProxy)
 
 	defer func() {
-		log.V(2).Info("Preparing to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
-		log.V(2).Info("HelmReleaseProxy return error is", "reterr", reterr)
+		log.V(2).Info("Preparing to patch HelmReleaseProxy with return error", "helmReleaseProxy", helmReleaseProxy.Name, "reterr", reterr)
 		if err := patchHelmReleaseProxy(ctx, patchHelper, helmReleaseProxy); err != nil && reterr == nil {
 			reterr = err
 			log.Error(err, "failed to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
@@ -203,27 +205,31 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 	}
 
 	log.V(2).Info(fmt.Sprintf("Preparing to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
-	release, changed, err := internal.InstallOrUpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
+	release, err := internal.InstallOrUpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
 	if err != nil {
-		log.V(2).Error(err, "error installing or updating chart with Helm on cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
+		log.Error(err, fmt.Sprintf("Failed to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, err.Error())
-
-		return errors.Wrapf(err, "error installing or updating chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
 	}
 	if release != nil {
-		if changed {
-			log.V(2).Info((fmt.Sprintf("Release '%s' successfully installed or updated on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
-		} else {
-			log.V(2).Info((fmt.Sprintf("Release '%s' is up to date on cluster %s, no upgrade required, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
-		}
+		log.V(2).Info((fmt.Sprintf("Release '%s' exists on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
 
-		helmReleaseProxy.SetReleaseStatus(release.Info.Status.String())
+		status := release.Info.Status
+		helmReleaseProxy.SetReleaseStatus(status.String())
 		helmReleaseProxy.SetReleaseRevision(release.Version)
 		helmReleaseProxy.SetReleaseName(release.Name)
-		conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
+
+		if status == helmRelease.StatusDeployed {
+			conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
+		} else if status.IsPending() {
+			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleasePendingReason, clusterv1.ConditionSeverityInfo, fmt.Sprintf("Helm release is in a pending state: %s", status))
+		} else if status == helmRelease.StatusFailed && err == nil {
+			log.Info("Helm release failed without error, this might be unexpected", "release", release.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
+			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, fmt.Sprintf("Helm release failed: %s", status))
+			// TODO: should we set the error state again here?
+		}
 	}
 
-	return nil
+	return err
 }
 
 // reconcileDelete handles HelmReleaseProxy deletion. This will uninstall the HelmReleaseProxy on the Cluster or return nil if the HelmReleaseProxy is not found.
