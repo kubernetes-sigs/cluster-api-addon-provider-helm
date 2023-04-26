@@ -52,6 +52,9 @@ const (
 	// PreparingToHelmInstallReason indicates that the HelmReleaseProxy is preparing to install the Helm release.
 	PreparingToHelmInstallReason = "PreparingToHelmInstall"
 
+	// HelmReleasePendingReason indicates that the HelmReleaseProxy is pending either install, upgrade, or rollback.
+	HelmReleasePendingReason = "HelmReleasePending"
+
 	// HelmInstallOrUpgradeFailedReason indicates that the HelmReleaseProxy failed to install or upgrade the Helm release.
 	HelmInstallOrUpgradeFailedReason = "HelmInstallOrUpgradeFailed"
 
