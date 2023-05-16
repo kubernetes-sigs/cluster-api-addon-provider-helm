@@ -461,7 +461,7 @@ manifest-modification: # Set the manifest images to the staging/production bucke
 
 .PHONY: release-manifests
 release-manifests: $(RELEASE_DIR) $(KUSTOMIZE) ## Build the manifests to publish with a release
-	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/add-on-components.yaml
+	$(KUSTOMIZE) build config/default > $(RELEASE_DIR)/addon-components.yaml
 
 .PHONY: release-metadata
 release-metadata: $(RELEASE_DIR)
