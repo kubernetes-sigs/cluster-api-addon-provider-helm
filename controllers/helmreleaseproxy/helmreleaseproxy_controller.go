@@ -37,27 +37,27 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/cluster-api/util/predicates"
 )
 
 // HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object
 type HelmReleaseProxyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// WatchFilterValue is the label value used to filter events prior to reconciliation.
+	WatchFilterValue string
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
-	_ = ctrl.LoggerFrom(ctx)
+	log := ctrl.LoggerFrom(ctx)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.HelmReleaseProxy{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		// Watches(
-		// 	&source.Kind{Type: &v1alpha1.HelmReleaseProxy{}},
-		// 	handler.EnqueueRequestsFromMapFunc(r.findProxyForSecret),
-		// 	builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		// ).
+		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
 		Complete(r)
 }
 
