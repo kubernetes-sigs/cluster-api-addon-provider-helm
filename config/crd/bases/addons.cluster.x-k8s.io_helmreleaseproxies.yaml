@@ -59,7 +59,9 @@ spec:
             description: HelmReleaseProxySpec defines the desired state of HelmReleaseProxy.
             properties:
               chartName:
-                description: ChartName is the name of the Helm chart in the repository.
+                description: 'ChartName is the name of the Helm chart in the repository.
+                  e.g. chart-path oci://repo-url/chart-name as chartName: chart-name
+                  and https://repo-url/chart-name as chartName: chart-name'
                 type: string
               clusterRef:
                 description: ClusterRef is a reference to the Cluster to install the
@@ -109,7 +111,9 @@ spec:
                   chart. If it is not specified, a name will be generated.
                 type: string
               repoURL:
-                description: RepoURL is the URL of the Helm chart repository.
+                description: 'RepoURL is the URL of the Helm chart repository. e.g.
+                  chart-path oci://repo-url/chart-name as repoURL: oci://repo-url
+                  and https://repo-url/chart-name as repoURL: https://repo-url'
                 type: string
               values:
                 description: Values is an inline YAML representing the values for

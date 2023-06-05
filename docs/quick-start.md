@@ -88,7 +88,9 @@ spec:
 
 We use the `clusterSelector` to select the workload cluster to install the chart to. In this case, we install the chart to any workload cluster with the label `nginxIngressChart: enabled` found in the same namespace as `HelmChartProxy` resource. To provide specific namespace to install the chart to set `spec.namespace` field.
 
-The `repoURL` and `chartName` are used to specify the chart to install. The `valuesTemplate` is used to specify the values to use when installing the chart. It supports Go templating, and here we set `controller.name` to the name of the selected cluster + `-nginx`. We also set `controller.nginxStatus.allowCidrs` to include the first entry in the workload cluster's pod CIDR blocks.
+The `repoURL` and `chartName` are used to specify the chart to install.
+User shall specify chart-path `oci://repo-url/chart-name` as `repoURL: oci://repo-url` and `chartName: chart-name` in HCP CR. This format is consistent with other types of charts as well (e.g. `https://repo-url/chart-name` as `repoURL: https://repo-url` and `chartName: chart-name`).
+The `valuesTemplate` is used to specify the values to use when installing the chart. It supports Go templating, and here we set `controller.name` to the name of the selected cluster + `-nginx`. We also set `controller.nginxStatus.allowCidrs` to include the first entry in the workload cluster's pod CIDR blocks.
 
 ### 6. Verify that the chart was installed
 

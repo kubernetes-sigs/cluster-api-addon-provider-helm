@@ -35,9 +35,11 @@ type HelmChartProxySpec struct {
 	ClusterSelector metav1.LabelSelector `json:"clusterSelector"`
 
 	// ChartName is the name of the Helm chart in the repository.
+	// e.g. chart-path oci://repo-url/chart-name as chartName: chart-name and https://repo-url/chart-name as chartName: chart-name
 	ChartName string `json:"chartName"`
 
 	// RepoURL is the URL of the Helm chart repository.
+	// e.g. chart-path oci://repo-url/chart-name as repoURL: oci://repo-url and https://repo-url/chart-name as repoURL: https://repo-url
 	RepoURL string `json:"repoURL"`
 
 	// ReleaseName is the release name of the installed Helm chart. If it is not specified, a name will be generated.
