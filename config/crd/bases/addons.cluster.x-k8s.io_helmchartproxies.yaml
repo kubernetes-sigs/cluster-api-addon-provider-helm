@@ -106,6 +106,119 @@ spec:
                   be installed on each selected Cluster. If it is not specified, it
                   will be set to the default namespace.
                 type: string
+              options:
+                description: Options represents CLI flags passed to Helm operations
+                  (i.e. install, upgrade, delete) and include options such as wait,
+                  skipCRDs, timeout, waitForJobs, etc.
+                properties:
+                  atomic:
+                    description: Atomic indicates the installation/upgrade process
+                      to delete the installation or rollback on failure. If 'Atomic'
+                      is set, wait will be enabled automatically during helm install/upgrade
+                      operation.
+                    type: boolean
+                  dependencyUpdate:
+                    description: DependencyUpdate indicates the Helm install/upgrade
+                      action to get missing dependencies.
+                    type: boolean
+                  disableHooks:
+                    description: DisableHooks prevents hooks from running during the
+                      Helm install action.
+                    type: boolean
+                  disableOpenAPIValidation:
+                    description: DisableOpenAPIValidation controls whether OpenAPI
+                      validation is enforced.
+                    type: boolean
+                  install:
+                    description: Install represents CLI flags passed to Helm install
+                      operation which can be used to control behaviour of helm Install
+                      operations via options like wait, skipCrds, timeout, waitForJobs,
+                      etc.
+                    properties:
+                      createNamespace:
+                        description: CreateNamespace indicates the Helm install/upgrade
+                          action to create the HelmChartProxySpec.ReleaseNamespace
+                          if it does not exist yet. On uninstall, the namespace will
+                          not be garbage collected. If it is not specified by user,
+                          will be set to default 'true'.
+                        type: boolean
+                      includeCRDs:
+                        description: IncludeCRDs determines whether CRDs stored as
+                          a part of helm templates directory should be installed.
+                        type: boolean
+                    type: object
+                  options:
+                    description: SubNotes determines whether sub-notes should be rendered
+                      in the chart.
+                    type: boolean
+                  skipCRDs:
+                    description: SkipCRDs controls whether CRDs should be installed
+                      during install/upgrade operation. By default, CRDs are installed
+                      if not already present. If set, no CRDs will be installed.
+                    type: boolean
+                  timeout:
+                    description: Timeout is the time to wait for any individual Kubernetes
+                      operation (like resource creation, Jobs for hooks, etc.) during
+                      the performance of a Helm install action. Defaults to '10 min'.
+                    type: string
+                  uninstall:
+                    description: Uninstall represents CLI flags passed to Helm uninstall
+                      operation which can be used to control behaviour of helm Uninstall
+                      operation via options like wait, timeout, etc.
+                    properties:
+                      description:
+                        description: Description represents human readable information
+                          to be shown on release uninstall.
+                        type: string
+                      keepHistory:
+                        description: KeepHistory defines whether historical revisions
+                          of a release should be saved. If it's set, helm uninstall
+                          operation will not delete the history of the release. The
+                          helm storage backend (secret, configmap, etc) will be retained
+                          in the cluster.
+                        type: boolean
+                    type: object
+                  upgrade:
+                    description: Upgrade represents CLI flags passed to Helm upgrade
+                      operation which can be used to control behaviour of helm Upgrade
+                      operations via options like wait, skipCrds, timeout, waitForJobs,
+                      etc.
+                    properties:
+                      cleanupOnFail:
+                        description: CleanupOnFail indicates the upgrade action to
+                          delete newly-created resources on a failed update operation.
+                        type: boolean
+                      force:
+                        description: Force indicates to ignore certain warnings and
+                          perform the helm release upgrade anyway. This should be
+                          used with caution.
+                        type: boolean
+                      maxHistory:
+                        description: MaxHistory limits the maximum number of revisions
+                          saved per release
+                        type: integer
+                      recreate:
+                        description: Recreate will (if true) recreate pods after a
+                          rollback.
+                        type: boolean
+                      resetValues:
+                        description: ResetValues will reset the values to the chart's
+                          built-ins rather than merging with existing.
+                        type: boolean
+                      reuseValues:
+                        description: ReuseValues will re-use the user's last supplied
+                          values.
+                        type: boolean
+                    type: object
+                  wait:
+                    description: Wait enables the waiting for resources to be ready
+                      after a Helm install/upgrade has been performed.
+                    type: boolean
+                  waitForJobs:
+                    description: WaitForJobs enables waiting for jobs to complete
+                      after a Helm install/upgrade has been performed.
+                    type: boolean
+                type: object
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
                   chart. If it is not specified, a name will be generated.

@@ -17,7 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"net/url"
+	"time"
+
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -38,12 +44,28 @@ func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.Defaulter = &HelmChartProxy{}
 
+const helmTimeoutSeconds = time.Second * 600
+
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (p *HelmChartProxy) Default() {
 	helmchartproxylog.Info("default", "name", p.Name)
 
 	if p.Spec.ReleaseNamespace == "" {
 		p.Spec.ReleaseNamespace = "default"
+	}
+
+	// If 'Wait' is set, we need to set default 'Timeout' to make install successful.
+	if p.Spec.Options != nil && p.Spec.Options.Wait && p.Spec.Options.Timeout == nil {
+		p.Spec.Options.Timeout = &metaV1.Duration{Duration: helmTimeoutSeconds}
+	}
+
+	// If 'CreateNamespace' is not specified by user, set default value to 'true'
+	if p.Spec.Options != nil {
+		if p.Spec.Options.Install == nil {
+			p.Spec.Options.Install = &HelmInstallOptions{CreateNamespace: pointer.Bool(true)}
+		} else if p.Spec.Options.Install.CreateNamespace == nil {
+			p.Spec.Options.Install.CreateNamespace = pointer.Bool(true)
+		}
 	}
 }
 
@@ -56,7 +78,10 @@ var _ webhook.Validator = &HelmChartProxy{}
 func (r *HelmChartProxy) ValidateCreate() error {
 	helmchartproxylog.Info("validate create", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
+	if err := isUrlValid(r.Spec.RepoURL); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -64,7 +89,10 @@ func (r *HelmChartProxy) ValidateCreate() error {
 func (r *HelmChartProxy) ValidateUpdate(old runtime.Object) error {
 	helmchartproxylog.Info("validate update", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object update.
+	if err := isUrlValid(r.Spec.RepoURL); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -73,5 +101,15 @@ func (r *HelmChartProxy) ValidateDelete() error {
 	helmchartproxylog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
+	return nil
+}
+
+// isUrlValid returns true if specifed repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.
+func isUrlValid(repoURL string) error {
+	_, err := url.ParseRequestURI(repoURL)
+	if err != nil {
+		return fmt.Errorf("specified repoURL: %s is not valid. Error - %s", repoURL, err)
+	}
+
 	return nil
 }

@@ -190,6 +190,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
 		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
 		helmReleaseProxy.Spec.ReleaseNamespace = helmChartProxy.Spec.ReleaseNamespace
+		helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
 
 		// helmChartProxy.ObjectMeta.SetAnnotations(helmReleaseProxy.Annotations)
 	} else {
@@ -209,6 +210,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 	helmReleaseProxy.Spec.Values = parsedValues
+	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
 
 	return helmReleaseProxy
 }
