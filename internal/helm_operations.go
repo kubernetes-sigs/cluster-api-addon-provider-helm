@@ -19,7 +19,9 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -28,6 +30,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/registry"
 
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
@@ -132,15 +135,28 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 	if err != nil {
 		return nil, err
 	}
+
+	registryClient, err := newDefaultRegistryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	actionConfig.RegistryClient = registryClient
+
+	chartName, repoURL, err := getHelmChartAndRepoName(spec.ChartName, spec.RepoURL)
+	if err != nil {
+		return nil, err
+	}
+
 	installClient := helmAction.NewInstall(actionConfig)
-	installClient.RepoURL = spec.RepoURL
+	installClient.RepoURL = repoURL
 	installClient.Version = spec.Version
 	installClient.Namespace = spec.ReleaseNamespace
 	installClient.CreateNamespace = true
 
 	if spec.ReleaseName == "" {
 		installClient.GenerateName = true
-		spec.ReleaseName, _, err = installClient.NameAndChart([]string{spec.ChartName})
+		spec.ReleaseName, _, err = installClient.NameAndChart([]string{chartName})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to generate release name for chart %s on cluster %s", spec.ChartName, spec.ClusterRef.Name)
 		}
@@ -148,7 +164,7 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 	installClient.ReleaseName = spec.ReleaseName
 
 	log.V(2).Info("Locating chart...")
-	cp, err := installClient.ChartPathOptions.LocateChart(spec.ChartName, settings)
+	cp, err := installClient.ChartPathOptions.LocateChart(chartName, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +202,38 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 	return installClient.RunWithContext(ctx, chartRequested, vals) // Can return error and a release
 }
 
+// newDefaultRegistryClient creates registry client object with default config which can be used to install/upgrade helm charts.
+func newDefaultRegistryClient() (*registry.Client, error) {
+	// Create a new registry client
+	registryClient, err := registry.NewClient(
+		registry.ClientOptDebug(true),
+		registry.ClientOptEnableCache(true),
+		registry.ClientOptWriter(os.Stderr),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return registryClient, nil
+}
+
+// getHelmChartAndRepoName returns chartName, repoURL as per the format requirred in helm install/upgrade config.
+// For OCI charts, chartName needs to have whole URL path. e.g. oci://repo-url/chart-name
+func getHelmChartAndRepoName(chartName, repoURL string) (string, string, error) {
+	if registry.IsOCI(repoURL) {
+		u, err := url.Parse(repoURL)
+		if err != nil {
+			return "", "", err
+		}
+
+		u.Path = path.Join(u.Path, chartName)
+		chartName = u.String()
+		repoURL = ""
+	}
+
+	return chartName, repoURL, nil
+}
+
 // UpgradeHelmReleaseIfChanged upgrades a Helm release. The boolean refers to if an upgrade was attempted.
 func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *helmRelease.Release) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
@@ -194,12 +242,26 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 	if err != nil {
 		return nil, err
 	}
+
+	registryClient, err := newDefaultRegistryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	actionConfig.RegistryClient = registryClient
+
+	chartName, repoURL, err := getHelmChartAndRepoName(spec.ChartName, spec.RepoURL)
+	if err != nil {
+		return nil, err
+	}
+
 	upgradeClient := helmAction.NewUpgrade(actionConfig)
-	upgradeClient.RepoURL = spec.RepoURL
+	upgradeClient.RepoURL = repoURL
 	upgradeClient.Version = spec.Version
 	upgradeClient.Namespace = spec.ReleaseNamespace
+
 	log.V(2).Info("Locating chart...")
-	cp, err := upgradeClient.ChartPathOptions.LocateChart(spec.ChartName, settings)
+	cp, err := upgradeClient.ChartPathOptions.LocateChart(chartName, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +294,7 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 		return nil, err
 	}
 	if chartRequested == nil {
-		return nil, errors.Errorf("failed to load request chart %s", spec.ChartName)
+		return nil, errors.Errorf("failed to load request chart %s", chartName)
 	}
 
 	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)

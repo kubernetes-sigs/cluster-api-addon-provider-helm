@@ -49,7 +49,9 @@ spec:
             description: HelmChartProxySpec defines the desired state of HelmChartProxy.
             properties:
               chartName:
-                description: ChartName is the name of the Helm chart in the repository.
+                description: 'ChartName is the name of the Helm chart in the repository.
+                  e.g. chart-path oci://repo-url/chart-name as chartName: chart-name
+                  and https://repo-url/chart-name as chartName: chart-name'
                 type: string
               clusterSelector:
                 description: ClusterSelector selects Clusters in the same namespace
@@ -109,7 +111,9 @@ spec:
                   chart. If it is not specified, a name will be generated.
                 type: string
               repoURL:
-                description: RepoURL is the URL of the Helm chart repository.
+                description: 'RepoURL is the URL of the Helm chart repository. e.g.
+                  chart-path oci://repo-url/chart-name as repoURL: oci://repo-url
+                  and https://repo-url/chart-name as repoURL: https://repo-url'
                 type: string
               valuesTemplate:
                 description: ValuesTemplate is an inline YAML representing the values
