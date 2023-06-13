@@ -65,6 +65,11 @@ type HelmReleaseProxySpec struct {
 	// Go templating with the values from the referenced workload Cluster.
 	// +optional
 	Values string `json:"values,omitempty"`
+
+	// Options represents the helm setting options which can be used to control behaviour of helm operations(Install, Upgrade, Delete, etc)
+	// via options like wait, skipCrds, timeout, waitForJobs, etc.
+	// +optional
+	Options *HelmOptions `json:"options,omitempty"`
 }
 
 // HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.

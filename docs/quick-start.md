@@ -79,6 +79,12 @@ spec:
       nginxIngressChart: enabled
   repoURL: https://helm.nginx.com/stable
   chartName: nginx-ingress
+  options:
+    waitForJobs: true
+    wait: true
+    timeout: 5m
+    install:
+      createNamespace: true
   valuesTemplate: |
     controller:
       name: "{{ .ControlPlane.metadata.name }}-nginx"
@@ -91,6 +97,8 @@ We use the `clusterSelector` to select the workload cluster to install the chart
 The `repoURL` and `chartName` are used to specify the chart to install.
 User shall specify chart-path `oci://repo-url/chart-name` as `repoURL: oci://repo-url` and `chartName: chart-name` in HCP CR. This format is consistent with other types of charts as well (e.g. `https://repo-url/chart-name` as `repoURL: https://repo-url` and `chartName: chart-name`).
 The `valuesTemplate` is used to specify the values to use when installing the chart. It supports Go templating, and here we set `controller.name` to the name of the selected cluster + `-nginx`. We also set `controller.nginxStatus.allowCidrs` to include the first entry in the workload cluster's pod CIDR blocks.
+
+Helm options like `wait`, `skipCrds`, `timeout`, `waitForJobs`, etc. can be specified with `options` field as shown in above mentioned example, to control behaviour of helm operations(Install, Upgrade, Delete, etc). Please check CRD spec for all supported helm options and its behaviour.
 
 ### 6. Verify that the chart was installed
 

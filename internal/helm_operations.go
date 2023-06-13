@@ -127,6 +127,66 @@ func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec ad
 	return UpgradeHelmReleaseIfChanged(ctx, kubeconfig, spec, existingRelease)
 }
 
+// generateHelmInstallConfig generates default helm install config using helmOptions specified in HCP CR spec.
+func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Install {
+	installClient := helmAction.NewInstall(actionConfig)
+	installClient.CreateNamespace = true
+
+	if helmOptions == nil {
+		return installClient
+	}
+
+	installClient.DisableHooks = helmOptions.DisableHooks
+	installClient.Wait = helmOptions.Wait
+	installClient.WaitForJobs = helmOptions.WaitForJobs
+	if helmOptions.Timeout != nil {
+		installClient.Timeout = helmOptions.Timeout.Duration
+	}
+	installClient.SkipCRDs = helmOptions.SkipCRDs
+	installClient.SubNotes = helmOptions.SubNotes
+	installClient.DisableOpenAPIValidation = helmOptions.DisableOpenAPIValidation
+	installClient.Atomic = helmOptions.Atomic
+
+	if helmOptions.Install != nil {
+		installClient.IncludeCRDs = helmOptions.Install.IncludeCRDs
+		// Safety check to avoid panic in case webhook is disabled.
+		if helmOptions.Install.CreateNamespace != nil {
+			installClient.CreateNamespace = *helmOptions.Install.CreateNamespace
+		}
+	}
+
+	return installClient
+}
+
+// generateHelmUpgradeConfig generates default helm upgrade config using helmOptions specified in HCP CR spec.
+func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Upgrade {
+	upgradeClient := helmAction.NewUpgrade(actionConfig)
+	if helmOptions == nil {
+		return upgradeClient
+	}
+
+	upgradeClient.DisableHooks = helmOptions.DisableHooks
+	upgradeClient.Wait = helmOptions.Wait
+	upgradeClient.WaitForJobs = helmOptions.WaitForJobs
+	if helmOptions.Timeout != nil {
+		upgradeClient.Timeout = helmOptions.Timeout.Duration
+	}
+	upgradeClient.SkipCRDs = helmOptions.SkipCRDs
+	upgradeClient.SubNotes = helmOptions.SubNotes
+	upgradeClient.DisableOpenAPIValidation = helmOptions.DisableOpenAPIValidation
+	upgradeClient.Atomic = helmOptions.Atomic
+
+	if helmOptions.Upgrade != nil {
+		upgradeClient.Force = helmOptions.Upgrade.Force
+		upgradeClient.ResetValues = helmOptions.Upgrade.ResetValues
+		upgradeClient.ReuseValues = helmOptions.Upgrade.ReuseValues
+		upgradeClient.MaxHistory = helmOptions.Upgrade.MaxHistory
+		upgradeClient.CleanupOnFail = helmOptions.Upgrade.CleanupOnFail
+	}
+
+	return upgradeClient
+}
+
 // InstallHelmRelease installs a Helm release.
 func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
@@ -148,11 +208,10 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 		return nil, err
 	}
 
-	installClient := helmAction.NewInstall(actionConfig)
+	installClient := generateHelmInstallConfig(actionConfig, spec.Options)
 	installClient.RepoURL = repoURL
 	installClient.Version = spec.Version
 	installClient.Namespace = spec.ReleaseNamespace
-	installClient.CreateNamespace = true
 
 	if spec.ReleaseName == "" {
 		installClient.GenerateName = true
@@ -197,7 +256,7 @@ func InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alp
 	if err != nil {
 		return nil, err
 	}
-	log.V(2).Info("Installing with Helm...")
+	log.V(1).Info("Installing with Helm", "chart", spec.ChartName, "repo", spec.RepoURL)
 
 	return installClient.RunWithContext(ctx, chartRequested, vals) // Can return error and a release
 }
@@ -255,7 +314,7 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 		return nil, err
 	}
 
-	upgradeClient := helmAction.NewUpgrade(actionConfig)
+	upgradeClient := generateHelmUpgradeConfig(actionConfig, spec.Options)
 	upgradeClient.RepoURL = repoURL
 	upgradeClient.Version = spec.Version
 	upgradeClient.Namespace = spec.ReleaseNamespace
@@ -306,8 +365,7 @@ func UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec ad
 		return existing, nil
 	}
 
-	log.V(2).Info(fmt.Sprintf("Upgrading release `%s` with Helm", spec.ReleaseName))
-	// upgrader.DryRun = true
+	log.V(1).Info("Upgrading with Helm", "release", spec.ReleaseName, "repo", spec.RepoURL)
 	release, err := upgradeClient.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
 
 	return release, err
@@ -397,6 +455,23 @@ func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha
 	return releases, nil
 }
 
+// generateHelmUninstallConfig generates default helm uninstall config using helmOptions specified in HCP CR spec.
+func generateHelmUninstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Uninstall {
+	uninstallClient := helmAction.NewUninstall(actionConfig)
+	uninstallClient.DisableHooks = helmOptions.DisableHooks
+	uninstallClient.Wait = helmOptions.Wait
+	if helmOptions.Timeout != nil {
+		uninstallClient.Timeout = helmOptions.Timeout.Duration
+	}
+
+	if helmOptions.Uninstall != nil {
+		uninstallClient.KeepHistory = helmOptions.Uninstall.KeepHistory
+		uninstallClient.Description = helmOptions.Uninstall.Description
+	}
+
+	return uninstallClient
+}
+
 // UninstallHelmRelease uninstalls a Helm release.
 func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error) {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
@@ -404,7 +479,8 @@ func UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1a
 		return nil, err
 	}
 
-	uninstallClient := helmAction.NewUninstall(actionConfig)
+	uninstallClient := generateHelmUninstallConfig(actionConfig, spec.Options)
+
 	response, err := uninstallClient.Run(spec.ReleaseName)
 	if err != nil {
 		return nil, err
