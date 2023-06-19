@@ -9,10 +9,10 @@ require (
 	github.com/onsi/gomega v1.27.5
 	github.com/pkg/errors v0.9.1
 	gopkg.in/yaml.v2 v2.4.0
-	helm.sh/helm/v3 v3.10.0
+	helm.sh/helm/v3 v3.11.0
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
-	k8s.io/cli-runtime v0.25.0
+	k8s.io/cli-runtime v0.26.0
 	k8s.io/client-go v0.26.1
 	k8s.io/klog/v2 v2.80.1
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
@@ -120,7 +120,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rubenv/sql-migrate v1.2.0 // indirect
-	github.com/russross/blackfriday v1.6.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
@@ -162,7 +162,7 @@ require (
 	k8s.io/cluster-bootstrap v0.25.0 // indirect
 	k8s.io/component-base v0.26.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	k8s.io/kubectl v0.25.0 // indirect
+	k8s.io/kubectl v0.26.0 // indirect
 	oras.land/oras-go v1.2.2 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
