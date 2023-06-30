@@ -11,22 +11,31 @@ The prerequisites include:
 - [Docker](https://www.docker.com/)
 - [Kind](https://kind.sigs.k8s.io/)
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- [clusterctl](https://cluster-api.sigs.k8s.io/user/quick-start.html#install-clusterctl)
 
 You may need to install additional prerequisites to create a Cluster API management cluster.
 
-### 2. Create a management cluster and workload cluster
+### 2. Create a management cluster
 
-Create a management cluster using kind and then create a workload cluster running on the management cluster. Alternatively, you can use an existing management cluster with your workload clusters as well.
+Create a management cluster using kind.
 
-### 3. Clone the CAAPH repository
+### 3. Install Cluster API and CAAPH using clusterctl
+
+Run `clusterctl init` with the `--addon helm` flag to include CAAPH when installing Cluster API. For example,
+
+```
+clusterctl init --infrastructure <your-infra> --addon helm
+```
+
+Note that this will only work starting from Cluster API/clusterctl version 1.5. For earlier versions, follow the alternative install steps below.
+
+##### Alternative installation steps: 
 
 Run the following command to clone the CAAPH repository into your Go src folder:
 
 ```bash
 $ git clone git@github.com:kubernetes-sigs/cluster-api-addon-provider-helm.git ${GOPATH}/src/cluster-api-addon-provider-helm
 ```
-
-### 4. Install CAAPH to the management cluster
 
 From `src/cluster-api-addon-provider-helm` install the CRDs by running:
 
@@ -46,12 +55,23 @@ Finally, deploy the controller and webhook to the management cluster:
 $ make deploy REGISTRY=<my-registry>
 ```
 
-### 5. Example: install `nginx-ingress` to the workload cluster
+### 4. Example: install `nginx-ingress` to the workload cluster
 
-Add the following label to the workload cluster:
+Add the label `nginxIngressChart: enabled` to the workload cluster, for example:
 
 ```yaml
-nginxIngressChart: enabled
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: my-cluster
+  namespace: default
+  labels:
+    nginxIngressChart: enabled
+spec:
+  clusterNetwork:
+    services:
+      cidrBlocks:
+      - 192.168.0.0/16
 ```
 
 Then, from `src/cluster-api-addon-provider-helm` run:
@@ -100,7 +120,7 @@ The `valuesTemplate` is used to specify the values to use when installing the ch
 
 Helm options like `wait`, `skipCrds`, `timeout`, `waitForJobs`, etc. can be specified with `options` field as shown in above mentioned example, to control behaviour of helm operations(Install, Upgrade, Delete, etc). Please check CRD spec for all supported helm options and its behaviour.
 
-### 6. Verify that the chart was installed
+### 5. Verify that the chart was installed
 
 Run the following command to verify that the HelmChartProxy is ready. The output should be similar to the following
 
@@ -163,7 +183,7 @@ spec:
 
 Notice that a release name is generated for us, and the Go template we specified in `valuesTemplate` has been replaced with the actual values from the Cluster definition.
 
-### 7. Uninstall `nginx-ingress` from the workload cluster
+### 6. Uninstall `nginx-ingress` from the workload cluster
 
 Remove the label `nginxIngressChart: enabled` from the workload cluster. On the next reconciliation, the HelmChartProxy will notice that the workload cluster no longer matches the `clusterSelector` and will delete the HelmReleaseProxy associated with the Cluster and uninstall the chart.
 
@@ -191,7 +211,7 @@ status:
   matchingClusters: []
 ```
 
-### 8. Uninstall CAAPH
+### 7. Uninstall CAAPH
 
 To uninstall CAAPH, run the following command from `src/cluster-api-addon-provider-helm`:
 
