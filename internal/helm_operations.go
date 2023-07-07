@@ -131,7 +131,6 @@ func InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec ad
 func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Install {
 	installClient := helmAction.NewInstall(actionConfig)
 	installClient.CreateNamespace = true
-
 	if helmOptions == nil {
 		return installClient
 	}
@@ -458,6 +457,10 @@ func ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha
 // generateHelmUninstallConfig generates default helm uninstall config using helmOptions specified in HCP CR spec.
 func generateHelmUninstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Uninstall {
 	uninstallClient := helmAction.NewUninstall(actionConfig)
+	if helmOptions == nil {
+		return uninstallClient
+	}
+
 	uninstallClient.DisableHooks = helmOptions.DisableHooks
 	uninstallClient.Wait = helmOptions.Wait
 	if helmOptions.Timeout != nil {
