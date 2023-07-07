@@ -228,12 +228,16 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 	switch {
 	case existing.Spec.ChartName != helmChartProxy.Spec.ChartName:
 		log.V(2).Info("ChartName changed", "existing", existing.Spec.ChartName, "helmChartProxy", helmChartProxy.Spec.ChartName)
+		return true
 	case existing.Spec.RepoURL != helmChartProxy.Spec.RepoURL:
 		log.V(2).Info("RepoURL changed", "existing", existing.Spec.RepoURL, "helmChartProxy", helmChartProxy.Spec.RepoURL)
+		return true
 	case isReleaseNameGenerated && helmChartProxy.Spec.ReleaseName != "":
 		log.V(2).Info("Generated ReleaseName changed", "existing", existing.Spec.ReleaseName, "helmChartProxy", helmChartProxy.Spec.ReleaseName)
+		return true
 	case !isReleaseNameGenerated && existing.Spec.ReleaseName != helmChartProxy.Spec.ReleaseName:
 		log.V(2).Info("Non-generated ReleaseName changed", "existing", existing.Spec.ReleaseName, "helmChartProxy", helmChartProxy.Spec.ReleaseName)
+		return true
 	case existing.Spec.ReleaseNamespace != helmChartProxy.Spec.ReleaseNamespace:
 		log.V(2).Info("ReleaseNamespace changed", "existing", existing.Spec.ReleaseNamespace, "helmChartProxy", helmChartProxy.Spec.ReleaseNamespace)
 		return true
