@@ -22,8 +22,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -37,6 +40,17 @@ import (
 // var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+
+var (
+	ctx        = ctrl.SetupSignalHandler()
+	fakeScheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = scheme.AddToScheme(fakeScheme)
+	_ = clusterv1.AddToScheme(fakeScheme)
+	_ = addonsv1alpha1.AddToScheme(fakeScheme)
+}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
