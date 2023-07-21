@@ -103,6 +103,10 @@ KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
 KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v4
 
+MOCKGEN_VER := v1.6.0
+MOCKGEN_BIN := mockgen
+MOCKGEN := $(TOOLS_BIN_DIR)/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
+
 SETUP_ENVTEST_VER := v0.0.0-20211110210527-619e6b92dab9
 SETUP_ENVTEST_BIN := setup-envtest
 SETUP_ENVTEST := $(abspath $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)-$(SETUP_ENVTEST_VER))
@@ -234,14 +238,14 @@ generate-manifests: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.g. CR
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate-go
-generate-go: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.generatego.txt" paths="./..."
+generate-go: $(CONTROLLER_GEN) $(MOCKGEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.generatego.txt" paths="./api/..."
+	go generate ./...
 
 .PHONY: generate-modules
 generate-modules: ## Run go mod tidy to ensure modules are up to date
 	go mod tidy
 	cd $(TOOLS_DIR); go mod tidy
-	cd $(TEST_DIR); go mod tidy
 
 ## --------------------------------------
 ## Lint / Verify
@@ -632,6 +636,9 @@ $(ENVSUBST_BIN): $(ENVSUBST) ## Build a local copy of envsubst.
 .PHONY: $(KUSTOMIZE_BIN)
 $(KUSTOMIZE_BIN): $(KUSTOMIZE) ## Build a local copy of kustomize.
 
+.PHONY: $(MOCKGEN_BIN)
+$(MOCKGEN_BIN): $(MOCKGEN) ## Build a local copy of mockgen.
+
 .PHONY: $(SETUP_ENVTEST_BIN)
 $(SETUP_ENVTEST_BIN): $(SETUP_ENVTEST) ## Build a local copy of setup-envtest.
 
@@ -685,6 +692,9 @@ $(ENVSUBST): # Build gotestsum from tools folder.
 
 $(KUSTOMIZE): # Build kustomize from tools folder.
 	CGO_ENABLED=0 GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(KUSTOMIZE_PKG) $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
+
+$(MOCKGEN): ## Build mockgen from tools folder.
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/golang/mock/mockgen $(MOCKGEN_BIN) $(MOCKGEN_VER)
 
 $(SETUP_ENVTEST): # Build setup-envtest from tools folder.
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(SETUP_ENVTEST_PKG) $(SETUP_ENVTEST_BIN) $(SETUP_ENVTEST_VER)
