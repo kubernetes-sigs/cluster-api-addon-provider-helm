@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
+	github.com/golang/mock v1.5.0
 	github.com/google/go-cmp v0.5.9
 	github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega v1.27.5
