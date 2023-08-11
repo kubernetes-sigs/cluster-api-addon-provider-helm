@@ -195,7 +195,7 @@ type HelmChartProxyStatus struct {
 // +kubebuilder:printcolumn:name="Message",type="string",priority=1,JSONPath=".status.conditions[?(@.type=='Ready')].message"
 // +kubebuilder:resource:shortName=hcp
 
-// HelmChartProxy is the Schema for the helmchartproxies API
+// HelmChartProxy is the Schema for the helmchartproxies API.
 type HelmChartProxy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -206,7 +206,7 @@ type HelmChartProxy struct {
 
 //+kubebuilder:object:root=true
 
-// HelmChartProxyList contains a list of HelmChartProxy
+// HelmChartProxyList contains a list of HelmChartProxy.
 type HelmChartProxyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

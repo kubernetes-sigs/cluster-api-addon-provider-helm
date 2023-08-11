@@ -97,7 +97,7 @@ type HelmReleaseProxyStatus struct {
 // +kubebuilder:printcolumn:name="Revision",type="string",JSONPath=".status.revision"
 // +kubebuilder:resource:shortName=hrp
 
-// HelmReleaseProxy is the Schema for the helmreleaseproxies API
+// HelmReleaseProxy is the Schema for the helmreleaseproxies API.
 type HelmReleaseProxy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -108,7 +108,7 @@ type HelmReleaseProxy struct {
 
 //+kubebuilder:object:root=true
 
-// HelmReleaseProxyList contains a list of HelmReleaseProxy
+// HelmReleaseProxyList contains a list of HelmReleaseProxy.
 type HelmReleaseProxyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

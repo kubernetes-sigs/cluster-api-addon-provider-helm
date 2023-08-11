@@ -17,16 +17,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // log is for logging in this package.
@@ -44,7 +44,7 @@ func (r *HelmReleaseProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.Defaulter = &HelmReleaseProxy{}
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
+// Default implements webhook.Defaulter so a webhook will be registered for the type.
 func (p *HelmReleaseProxy) Default() {
 	helmreleaseproxylog.Info("default", "name", p.Name)
 
@@ -58,7 +58,7 @@ func (p *HelmReleaseProxy) Default() {
 
 var _ webhook.Validator = &HelmReleaseProxy{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
+// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (r *HelmReleaseProxy) ValidateCreate() (admission.Warnings, error) {
 	helmreleaseproxylog.Info("validate create", "name", r.Name)
 
@@ -66,12 +66,15 @@ func (r *HelmReleaseProxy) ValidateCreate() (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 func (r *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
 	helmreleaseproxylog.Info("validate update", "name", r.Name)
 
 	var allErrs field.ErrorList
-	old := oldRaw.(*HelmReleaseProxy)
+	old, ok := oldRaw.(*HelmReleaseProxy)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", old))
+	}
 
 	if !reflect.DeepEqual(r.Spec.RepoURL, old.Spec.RepoURL) {
 		allErrs = append(allErrs,
@@ -103,7 +106,7 @@ func (r *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warn
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
 func (r *HelmReleaseProxy) ValidateDelete() (admission.Warnings, error) {
 	helmreleaseproxylog.Info("validate delete", "name", r.Name)
 
