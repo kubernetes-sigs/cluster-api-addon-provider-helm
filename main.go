@@ -35,6 +35,7 @@ import (
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	hcpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
 	hrpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
+	"sigs.k8s.io/cluster-api-addon-provider-helm/version"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
@@ -143,7 +144,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("starting manager", "version", version.Get().String())
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
