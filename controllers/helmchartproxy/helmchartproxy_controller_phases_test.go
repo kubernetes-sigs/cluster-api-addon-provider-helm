@@ -279,7 +279,12 @@ func TestReconcileForCluster(t *testing.T) {
 				objects = append(objects, tc.existingHelmReleaseProxy)
 			}
 			r := &HelmChartProxyReconciler{
-				Client: fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(objects...).Build(),
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithObjects(objects...).
+					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
 			}
 			err := r.reconcileForCluster(ctx, tc.helmChartProxy, *tc.cluster)
 

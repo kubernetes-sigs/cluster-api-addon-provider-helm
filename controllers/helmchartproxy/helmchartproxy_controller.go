@@ -18,7 +18,6 @@ package helmchartproxy
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -68,7 +67,7 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 
 	// Add a watch on clusterv1.Cluster object for changes.
 	if err = c.Watch(
-		&source.Kind{Type: &clusterv1.Cluster{}},
+		source.Kind(mgr.GetCache(), &clusterv1.Cluster{}),
 		handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
 		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
 	); err != nil {
@@ -77,7 +76,7 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 
 	// Add a watch on HelmReleaseProxy object for changes.
 	if err = c.Watch(
-		&source.Kind{Type: &addonsv1alpha1.HelmReleaseProxy{}},
+		source.Kind(mgr.GetCache(), &addonsv1alpha1.HelmReleaseProxy{}),
 		handler.EnqueueRequestsFromMapFunc(HelmReleaseProxyToHelmChartProxyMapper),
 		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
 	); err != nil {
@@ -331,11 +330,13 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 }
 
 // ClusterToHelmChartProxiesMapper is a mapper function that maps a Cluster to the HelmChartProxies that would select the Cluster.
-func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Object) []ctrl.Request {
+func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(ctx context.Context, o client.Object) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
 		// Suppress the error for now
-		fmt.Printf("Expected a Cluster but got %T\n", o)
+		log.Error(errors.Errorf("expected a Cluster but got %T", o), "failed to map object to HelmChartProxy")
 		return nil
 	}
 
@@ -343,7 +344,7 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 
 	// TODO: Figure out if we want this search to be cross-namespaces.
 
-	if err := r.Client.List(context.TODO(), helmChartProxies, client.InNamespace(cluster.Namespace)); err != nil {
+	if err := r.Client.List(ctx, helmChartProxies, client.InNamespace(cluster.Namespace)); err != nil {
 		return nil
 	}
 
@@ -352,6 +353,7 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 		selector, err := metav1.LabelSelectorAsSelector(&helmChartProxy.Spec.ClusterSelector)
 		if err != nil {
 			// Suppress the error for now
+			log.Error(err, "failed to parse ClusterSelector for HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
 			return nil
 		}
 
@@ -368,11 +370,13 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(o client.Obje
 
 // HelmReleaseProxyToHelmChartProxyMapper is a mapper function that maps a HelmReleaseProxy to the HelmChartProxy that owns it.
 // This is used to trigger an update of the HelmChartProxy when a HelmReleaseProxy is changed.
-func HelmReleaseProxyToHelmChartProxyMapper(o client.Object) []ctrl.Request {
+func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object) []ctrl.Request {
+	log := ctrl.LoggerFrom(ctx)
+
 	helmReleaseProxy, ok := o.(*addonsv1alpha1.HelmReleaseProxy)
 	if !ok {
 		// Suppress the error for now
-		fmt.Printf("Expected a HelmReleaseProxy but got %T\n", o)
+		log.Error(errors.Errorf("expected a HelmReleaseProxy but got %T", o), "failed to map object to HelmChartProxy")
 		return nil
 	}
 
