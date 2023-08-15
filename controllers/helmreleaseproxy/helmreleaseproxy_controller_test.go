@@ -232,7 +232,10 @@ func TestReconcileNormal(t *testing.T) {
 			tc.clientExpect(g, clientMock.EXPECT())
 
 			r := &HelmReleaseProxyReconciler{
-				Client: fake.NewClientBuilder().WithScheme(fakeScheme).Build(),
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
 			}
 
 			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, kubeconfig)
@@ -321,7 +324,10 @@ func TestReconcileDelete(t *testing.T) {
 			tc.clientExpect(g, clientMock.EXPECT())
 
 			r := &HelmReleaseProxyReconciler{
-				Client: fake.NewClientBuilder().WithScheme(fakeScheme).Build(),
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
 			}
 
 			err := r.reconcileDelete(ctx, tc.helmReleaseProxy, clientMock, kubeconfig)

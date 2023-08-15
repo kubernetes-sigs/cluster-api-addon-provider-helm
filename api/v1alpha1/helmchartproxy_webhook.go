@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -75,33 +76,33 @@ func (p *HelmChartProxy) Default() {
 var _ webhook.Validator = &HelmChartProxy{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *HelmChartProxy) ValidateCreate() error {
+func (r *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 	helmchartproxylog.Info("validate create", "name", r.Name)
 
 	if err := isUrlValid(r.Spec.RepoURL); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *HelmChartProxy) ValidateUpdate(old runtime.Object) error {
+func (r *HelmChartProxy) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate update", "name", r.Name)
 
 	if err := isUrlValid(r.Spec.RepoURL); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *HelmChartProxy) ValidateDelete() error {
+func (r *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
 	helmchartproxylog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
-	return nil
+	return nil, nil
 }
 
 // isUrlValid returns true if specifed repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.

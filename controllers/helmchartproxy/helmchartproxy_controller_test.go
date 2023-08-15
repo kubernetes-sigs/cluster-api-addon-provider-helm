@@ -321,7 +321,12 @@ func TestReconcileNormal(t *testing.T) {
 
 			tc.objects = append(tc.objects, tc.helmChartProxy)
 			r := &HelmChartProxyReconciler{
-				Client: fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(tc.objects...).Build(),
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithObjects(tc.objects...).
+					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
 			}
 			result, err := r.Reconcile(ctx, request)
 
