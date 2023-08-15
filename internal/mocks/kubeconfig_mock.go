@@ -23,7 +23,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	v1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
