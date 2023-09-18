@@ -8,7 +8,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
 	github.com/pkg/errors v0.9.1
-	go.uber.org/mock v0.2.0
+	go.uber.org/mock v0.3.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.12.3
 	k8s.io/api v0.27.3
