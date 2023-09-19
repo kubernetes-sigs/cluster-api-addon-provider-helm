@@ -25,22 +25,20 @@ import (
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
+	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
-
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
-	"sigs.k8s.io/cluster-api/util/patch"
-	"sigs.k8s.io/cluster-api/util/predicates"
 )
 
-// HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object
+// HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object.
 type HelmReleaseProxyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -75,7 +73,7 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Beginning reconcilation for HelmReleaseProxy", "requestNamespace", req.Namespace, "requestName", req.Name)
+	log.V(2).Info("Beginning reconciliation for HelmReleaseProxy", "requestNamespace", req.Namespace, "requestName", req.Name)
 
 	// Fetch the HelmReleaseProxy instance.
 	helmReleaseProxy := &addonsv1alpha1.HelmReleaseProxy{}
@@ -84,6 +82,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.V(2).Info("HelmReleaseProxy resource not found, skipping reconciliation", "helmReleaseProxy", req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
+
 		return ctrl.Result{}, err
 	}
 
@@ -100,6 +99,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if err := patchHelmReleaseProxy(ctx, patchHelper, helmReleaseProxy); err != nil && reterr == nil {
 			reterr = err
 			log.Error(err, "failed to patch HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
+
 			return
 		}
 		log.V(2).Info("Successfully patched HelmReleaseProxy", "helmReleaseProxy", helmReleaseProxy.Name)
@@ -220,11 +220,12 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		helmReleaseProxy.SetReleaseRevision(release.Version)
 		helmReleaseProxy.SetReleaseName(release.Name)
 
-		if status == helmRelease.StatusDeployed {
+		switch {
+		case status == helmRelease.StatusDeployed:
 			conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
-		} else if status.IsPending() {
+		case status.IsPending():
 			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleasePendingReason, clusterv1.ConditionSeverityInfo, fmt.Sprintf("Helm release is in a pending state: %s", status))
-		} else if status == helmRelease.StatusFailed && err == nil {
+		case status == helmRelease.StatusFailed && err == nil:
 			log.Info("Helm release failed without error, this might be unexpected", "release", release.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, fmt.Sprintf("Helm release failed: %s", status))
 			// TODO: should we set the error state again here?
@@ -244,7 +245,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	if err != nil {
 		log.V(2).Error(err, "error getting release from cluster", "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
-		if err == helmDriver.ErrReleaseNotFound {
+		if errors.Is(err, helmDriver.ErrReleaseNotFound) {
 			log.V(2).Info(fmt.Sprintf("Release '%s' not found on cluster %s, nothing to do for uninstall", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
 			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseDeletedReason, clusterv1.ConditionSeverityInfo, "")
 
@@ -262,6 +263,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	if err != nil {
 		log.V(2).Info("Error uninstalling chart with Helm:", err)
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseDeletionFailedReason, clusterv1.ConditionSeverityError, err.Error())
+
 		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
 	}
 

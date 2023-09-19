@@ -23,26 +23,21 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/conditions"
+	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
-	"sigs.k8s.io/cluster-api/util/patch"
-	"sigs.k8s.io/cluster-api/util/predicates"
-	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
-	// "sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 )
 
-// HelmChartProxyReconciler reconciles a HelmChartProxy object
+// HelmChartProxyReconciler reconciles a HelmChartProxy object.
 type HelmChartProxyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -100,7 +95,7 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Beginning reconcilation for HelmChartProxy", "requestNamespace", req.Namespace, "requestName", req.Name)
+	log.V(2).Info("Beginning reconciliation for HelmChartProxy", "requestNamespace", req.Namespace, "requestName", req.Name)
 
 	// Fetch the HelmChartProxy instance.
 	helmChartProxy := &addonsv1alpha1.HelmChartProxy{}
@@ -109,6 +104,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			log.V(2).Info("HelmChartProxy resource not found, skipping reconciliation", "helmChartProxy", req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
+
 		return ctrl.Result{}, err
 	}
 
@@ -123,6 +119,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := patchHelmChartProxy(ctx, patchHelper, helmChartProxy); err != nil && reterr == nil {
 			reterr = err
 			log.Error(err, "failed to patch HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
+
 			return
 		}
 		log.V(2).Info("Successfully patched HelmChartProxy", "helmChartProxy", helmChartProxy.Name)
@@ -235,7 +232,9 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 
 	log.V(2).Info("Deleting all HelmReleaseProxies as part of HelmChartProxy deletion", "helmChartProxy", helmChartProxy.Name)
 
-	for _, release := range releases {
+	for i := range releases {
+		release := releases[i]
+
 		log.V(2).Info("Deleting release", "releaseName", release.Name, "cluster", release.Spec.ClusterRef.Name)
 		if err := r.deleteHelmReleaseProxy(ctx, &release); err != nil {
 			// TODO: will this fail if clusterRef is nil
@@ -297,8 +296,8 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 	}
 
 	getters := make([]conditions.Getter, 0, len(releaseList.Items))
-	for _, r := range releaseList.Items {
-		getters = append(getters, &r)
+	for i := range releaseList.Items {
+		getters = append(getters, &releaseList.Items[i])
 	}
 
 	conditions.SetAggregate(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition, getters, conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
@@ -388,6 +387,7 @@ func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object
 				Namespace: helmReleaseProxy.GetNamespace(),
 				Name:      ref.Name,
 			}
+
 			return []ctrl.Request{
 				{
 					NamespacedName: name,

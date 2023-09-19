@@ -76,13 +76,10 @@ func initInClusterKubeconfig(ctx context.Context) (*cluster.Kubeconfig, error) {
 	log.V(2).Info("Generating kubeconfig file")
 	restConfig := configclient.GetConfigOrDie()
 
-	apiConfig, err := constructInClusterKubeconfig(ctx, restConfig, "")
-	if err != nil {
-		log.Error(err, "error constructing in-cluster kubeconfig")
-		return nil, err
-	}
+	apiConfig := constructInClusterKubeconfig(ctx, restConfig, "")
+
 	filePath := "tmp/management.kubeconfig"
-	if err = writeInClusterKubeconfigToFile(ctx, filePath, *apiConfig); err != nil {
+	if err := writeInClusterKubeconfigToFile(ctx, filePath, *apiConfig); err != nil {
 		log.Error(err, "error writing kubeconfig to file")
 		return nil, err
 	}
@@ -95,7 +92,7 @@ func initInClusterKubeconfig(ctx context.Context) (*cluster.Kubeconfig, error) {
 // GetClusterKubeconfig generates a kubeconfig file for the management cluster using a rest.Config. This is a bit of a workaround
 // since the k8s.io/client-go/tools/clientcmd/api expects to be run from a CLI context, but within a pod we don't have that.
 // As a result, we have to manually fill in the fields that would normally be present in ~/.kube/config. This seems to work for now.
-func constructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, namespace string) (*clientcmdapi.Config, error) {
+func constructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, namespace string) *clientcmdapi.Config {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Constructing kubeconfig file from rest.Config")
@@ -133,7 +130,7 @@ func constructInClusterKubeconfig(ctx context.Context, restConfig *rest.Config, 
 		Contexts:       contexts,
 		CurrentContext: contextName,
 		AuthInfos:      authInfos,
-	}, nil
+	}
 }
 
 // writeInClusterKubeconfigToFile writes the clientcmdapi.Config to a kubeconfig file.

@@ -24,17 +24,16 @@ import (
 	"github.com/Masterminds/sprig"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
 // initializeBuiltins takes a map of keys to object references, attempts to get the referenced objects, and returns a map of keys to the actual objects.
 // These objects are a map[string]interface{} so that they can be used as values in the template.
-func initializeBuiltins(ctx context.Context, c ctrlClient.Client, referenceMap map[string]corev1.ObjectReference, spec addonsv1alpha1.HelmChartProxySpec, cluster *clusterv1.Cluster) (map[string]interface{}, error) {
+func initializeBuiltins(ctx context.Context, c ctrlClient.Client, referenceMap map[string]corev1.ObjectReference, cluster *clusterv1.Cluster) (map[string]interface{}, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	valueLookUp := make(map[string]interface{})
@@ -73,7 +72,7 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 	}
 	// TODO: would we want to add ControlPlaneMachineTemplate?
 
-	valueLookUp, err := initializeBuiltins(ctx, c, references, spec, cluster)
+	valueLookUp, err := initializeBuiltins(ctx, c, references, cluster)
 	if err != nil {
 		return "", err
 	}

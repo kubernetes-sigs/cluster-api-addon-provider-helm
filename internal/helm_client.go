@@ -30,19 +30,17 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
 	helmCli "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/registry"
-
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/registry"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	ctrl "sigs.k8s.io/controller-runtime"
-
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type Client interface {
@@ -85,6 +83,7 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	if err := actionConfig.Init(cliConfig, namespace, "secret", klog.V(4).Infof); err != nil {
 		return nil, err
 	}
+
 	return actionConfig, nil
 }
 
@@ -125,7 +124,7 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig
 	// if _, err := historyClient.Run(spec.ReleaseName); err == helmDriver.ErrReleaseNotFound {
 	existingRelease, err := c.GetHelmRelease(ctx, kubeconfig, spec)
 	if err != nil {
-		if err == helmDriver.ErrReleaseNotFound {
+		if errors.Is(err, helmDriver.ErrReleaseNotFound) {
 			return c.InstallHelmRelease(ctx, kubeconfig, spec)
 		}
 
@@ -241,7 +240,14 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, 
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(filename)
+
+	defer func() {
+		err := os.Remove(filename)
+		if err != nil {
+			log.Error(err, "Cannot remove file", "path", filename)
+		}
+	}()
+
 	log.V(2).Info("Values written to file", "path", filename)
 	content, err := os.ReadFile(filename)
 	if err != nil {
@@ -259,7 +265,6 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, 
 		return nil, err
 	}
 	chartRequested, err := helmLoader.Load(cp)
-
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +343,14 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(filename)
+
+	defer func() {
+		err := os.Remove(filename)
+		if err != nil {
+			log.Error(err, "Cannot remove file", "path", filename)
+		}
+	}()
+
 	log.V(2).Info("Values written to file", "path", filename)
 	content, err := os.ReadFile(filename)
 	if err != nil {
@@ -368,7 +380,7 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig
 		return nil, err
 	}
 	if !shouldUpgrade {
-		log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade requried, revision = %d", existing.Name, existing.Version))
+		log.V(2).Info(fmt.Sprintf("Release `%s` is up to date, no upgrade required, revision = %d", existing.Name, existing.Version))
 		return existing, nil
 	}
 
@@ -508,5 +520,6 @@ func (c *HelmClient) RollbackHelmRelease(ctx context.Context, kubeconfig string,
 	}
 
 	rollbackClient := helmAction.NewRollback(actionConfig)
+
 	return rollbackClient.Run(spec.ReleaseName)
 }

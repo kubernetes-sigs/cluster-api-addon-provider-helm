@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"time"
 
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,9 +45,9 @@ func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.Defaulter = &HelmChartProxy{}
 
-const helmTimeoutSeconds = time.Second * 600
+const helmTimeout = time.Second * 600
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
+// Default implements webhook.Defaulter so a webhook will be registered for the type.
 func (p *HelmChartProxy) Default() {
 	helmchartproxylog.Info("default", "name", p.Name)
 
@@ -57,7 +57,7 @@ func (p *HelmChartProxy) Default() {
 
 	// If 'Wait' is set, we need to set default 'Timeout' to make install successful.
 	if p.Spec.Options != nil && p.Spec.Options.Wait && p.Spec.Options.Timeout == nil {
-		p.Spec.Options.Timeout = &metaV1.Duration{Duration: helmTimeoutSeconds}
+		p.Spec.Options.Timeout = &metav1.Duration{Duration: helmTimeout}
 	}
 
 	// If 'CreateNamespace' is not specified by user, set default value to 'true'
@@ -75,7 +75,7 @@ func (p *HelmChartProxy) Default() {
 
 var _ webhook.Validator = &HelmChartProxy{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
+// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (r *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 	helmchartproxylog.Info("validate create", "name", r.Name)
 
@@ -86,7 +86,7 @@ func (r *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 func (r *HelmChartProxy) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate update", "name", r.Name)
 
@@ -97,7 +97,7 @@ func (r *HelmChartProxy) ValidateUpdate(old runtime.Object) (admission.Warnings,
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
 func (r *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
 	helmchartproxylog.Info("validate delete", "name", r.Name)
 
@@ -105,11 +105,11 @@ func (r *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-// isUrlValid returns true if specifed repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.
+// isUrlValid returns true if specified repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.
 func isUrlValid(repoURL string) error {
 	_, err := url.ParseRequestURI(repoURL)
 	if err != nil {
-		return fmt.Errorf("specified repoURL: %s is not valid. Error - %s", repoURL, err)
+		return fmt.Errorf("specified repoURL %s is not valid: %w", repoURL, err)
 	}
 
 	return nil

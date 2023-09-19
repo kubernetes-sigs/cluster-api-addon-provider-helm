@@ -191,6 +191,8 @@ var (
 )
 
 func TestReconcileForCluster(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		name                          string
 		helmChartProxy                *addonsv1alpha1.HelmChartProxy
@@ -207,7 +209,6 @@ func TestReconcileForCluster(t *testing.T) {
 			expectHelmReleaseProxyToExist: true,
 			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 6443"))
-
 			},
 			expectedError: "",
 		},
@@ -219,7 +220,6 @@ func TestReconcileForCluster(t *testing.T) {
 			expectHelmReleaseProxyToExist: true,
 			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 1234"))
-
 			},
 			expectedError: "",
 		},
@@ -231,7 +231,6 @@ func TestReconcileForCluster(t *testing.T) {
 			expectHelmReleaseProxyToExist: true,
 			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(hrp.Spec.Values).To(Equal("cidrBlockList: 10.0.0.0/16,20.0.0.0/16"))
-
 			},
 			expectedError: "",
 		},

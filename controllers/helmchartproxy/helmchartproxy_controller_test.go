@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
@@ -226,6 +225,8 @@ var (
 )
 
 func TestReconcileNormal(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		name           string
 		helmChartProxy *addonsv1alpha1.HelmChartProxy
@@ -256,7 +257,6 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				// This is false as the HelmReleaseProxies won't be ready until the HelmReleaseProxy controller runs.
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeFalse())
-
 			},
 			expectedError: "",
 		},
@@ -304,7 +304,6 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
-
 			},
 			expectedError: "",
 		},

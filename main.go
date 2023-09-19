@@ -21,25 +21,21 @@ import (
 	"os"
 	"time"
 
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	hcpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
 	hrpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/version"
-
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
-	//+kubebuilder:scaffold:imports
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
 var (

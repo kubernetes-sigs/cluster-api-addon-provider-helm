@@ -20,15 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-
-	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -42,7 +40,9 @@ func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.
 
 	releasesToDelete := getOrphanedHelmReleaseProxies(ctx, clusters, helmReleaseProxies)
 	log.V(2).Info("Deleting orphaned releases")
-	for _, release := range releasesToDelete {
+	for i := range releasesToDelete {
+		release := releasesToDelete[i]
+
 		log.V(2).Info("Deleting release", "release", release)
 		if err := r.deleteHelmReleaseProxy(ctx, &release); err != nil {
 			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, err.Error())
@@ -75,6 +75,7 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 		// TODO: Add a check on requeue to make sure that the HelmReleaseProxy isn't still deleting
 		log.V(2).Info("Successfully deleted HelmReleaseProxy on cluster, returning to requeue for reconcile", "cluster", cluster.Name)
 		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyReinstallingReason, clusterv1.ConditionSeverityInfo, "HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", cluster.Name)
+
 		return nil // Try returning early so it will requeue
 		// TODO: should we continue in the loop or just requeue?
 	}
@@ -92,6 +93,7 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 
 		return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
 	}
+
 	return nil
 }
 
@@ -111,7 +113,7 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 	// TODO: Figure out if we want this search to be cross-namespaces.
 
 	log.V(2).Info("Attempting to fetch existing HelmReleaseProxy with Cluster and HelmChartProxy labels", "cluster", cluster.Name, "helmChartProxy", helmChartProxy.Name)
-	if err := r.Client.List(context.TODO(), helmReleaseProxyList, listOpts...); err != nil {
+	if err := r.Client.List(ctx, helmReleaseProxyList, listOpts...); err != nil {
 		return nil, err
 	}
 
@@ -159,6 +161,7 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 			log.V(2).Info("HelmReleaseProxy already deleted, nothing to do", "helmReleaseProxy", helmReleaseProxy.Name)
 			return nil
 		}
+
 		return errors.Wrapf(err, "failed to delete helmReleaseProxy: %s", helmReleaseProxy.Name)
 	}
 
@@ -268,8 +271,8 @@ func getOrphanedHelmReleaseProxies(ctx context.Context, clusters []clusterv1.Clu
 	}
 
 	names := make([]string, len(releasesToDelete))
-	for _, release := range releasesToDelete {
-		names = append(names, release.Name)
+	for i, release := range releasesToDelete {
+		names[i] = release.Name
 	}
 	log.V(2).Info("Releases to delete", "releases", names)
 
