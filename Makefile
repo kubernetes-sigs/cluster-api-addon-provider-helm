@@ -202,6 +202,12 @@ TAG ?= dev
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
+# Allow overriding manifest generation destination directory
+MANIFEST_ROOT ?= config
+CRD_ROOT ?= $(MANIFEST_ROOT)/crd/bases
+WEBHOOK_ROOT ?= $(MANIFEST_ROOT)/webhook
+RBAC_ROOT ?= $(MANIFEST_ROOT)/rbac
+
 # Allow overriding the imagePullPolicy
 PULL_POLICY ?= Always
 
@@ -234,8 +240,17 @@ generate: ## Run all generate-* targets
 
 .PHONY: generate-manifests
 generate-manifests: $(CONTROLLER_GEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
-	# $(MAKE) clean-generated-yaml SRC_DIRS="./config/crd/bases"
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) \
+		paths=./api/... \
+		crd:crdVersions=v1 \
+		rbac:roleName=manager-role \
+		output:crd:dir=$(CRD_ROOT) \
+		output:webhook:dir=$(WEBHOOK_ROOT) \
+		webhook
+	$(CONTROLLER_GEN) \
+		paths=./controllers/... \
+		output:rbac:dir=$(RBAC_ROOT) \
+		rbac:roleName=manager-role
 
 .PHONY: generate-go
 generate-go: $(CONTROLLER_GEN) $(MOCKGEN) $(KUSTOMIZE) ## Generate manifests e.g. CRD, RBAC etc. for core
@@ -561,7 +576,6 @@ set-manifest-image:
 .PHONY: clean
 clean: ## Remove generated binaries, GitBook files, Helm charts, and Tilt build files
 	$(MAKE) clean-bin
-	$(MAKE) clean-book
 	$(MAKE) clean-charts
 	$(MAKE) clean-tilt
 
