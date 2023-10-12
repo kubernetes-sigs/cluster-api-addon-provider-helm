@@ -28,14 +28,16 @@ import (
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object.
@@ -51,11 +53,27 @@ type HelmReleaseProxyReconciler struct {
 func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
 	log := ctrl.LoggerFrom(ctx)
 
+	clusterToHelmReleaseProxies, err := util.ClusterToTypedObjectsMapper(mgr.GetClient(), &addonsv1alpha1.HelmReleaseProxyList{}, mgr.GetScheme())
+	if err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.HelmReleaseProxy{}).
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
+		Watches(
+			&clusterv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(clusterToHelmReleaseProxies),
+			builder.WithPredicates(
+				predicates.All(ctrl.LoggerFrom(ctx),
+					predicates.Any(ctrl.LoggerFrom(ctx),
+						predicates.ClusterUnpaused(ctrl.LoggerFrom(ctx)),
+						predicates.ClusterControlPlaneInitialized(ctrl.LoggerFrom(ctx)),
+					),
+					predicates.ResourceHasFilterLabel(ctrl.LoggerFrom(ctx), r.WatchFilterValue),
+				),
+			)).
 		Complete(r)
 }
 
@@ -177,6 +195,15 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, wrappedErr
 	}
 
+	if !conditions.IsTrue(cluster, clusterv1.ControlPlaneInitializedCondition) {
+		log.Info("Waiting for the control plane to be initialized")
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, clusterv1.WaitingForControlPlaneAvailableReason, clusterv1.ConditionSeverityInfo, "")
+
+		// Return since the kubeconfig won't be available or useable until the API server is reachable.
+		// The controller watches the Cluster for control plane initialization in SetupWithManager, so a requeue is not necessary.
+		return ctrl.Result{}, nil
+	}
+
 	log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
 	kubeconfig, err := k.GetClusterKubeconfig(ctx, cluster)
 	if err != nil {
@@ -291,8 +318,8 @@ func initalizeConditions(ctx context.Context, patchHelper *patch.Helper, helmRel
 func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) error {
 	conditions.SetSummary(helmReleaseProxy,
 		conditions.WithConditions(
-			addonsv1alpha1.HelmReleaseReadyCondition,
 			addonsv1alpha1.ClusterAvailableCondition,
+			addonsv1alpha1.HelmReleaseReadyCondition,
 		),
 	)
 
@@ -302,8 +329,8 @@ func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmR
 		helmReleaseProxy,
 		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
 			clusterv1.ReadyCondition,
-			addonsv1alpha1.HelmReleaseReadyCondition,
 			addonsv1alpha1.ClusterAvailableCondition,
+			addonsv1alpha1.HelmReleaseReadyCondition,
 		}},
 		patch.WithStatusObservedGeneration{},
 	)
