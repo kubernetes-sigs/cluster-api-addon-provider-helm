@@ -67,18 +67,18 @@ func (mr *MockClientMockRecorder) GetHelmRelease(ctx, kubeconfig, spec interface
 }
 
 // InstallOrUpgradeHelmRelease mocks base method.
-func (m *MockClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec v1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
+func (m *MockClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig, credentialsPath string, spec v1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InstallOrUpgradeHelmRelease", ctx, kubeconfig, spec)
+	ret := m.ctrl.Call(m, "InstallOrUpgradeHelmRelease", ctx, kubeconfig, credentialsPath, spec)
 	ret0, _ := ret[0].(*release.Release)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // InstallOrUpgradeHelmRelease indicates an expected call of InstallOrUpgradeHelmRelease.
-func (mr *MockClientMockRecorder) InstallOrUpgradeHelmRelease(ctx, kubeconfig, spec interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) InstallOrUpgradeHelmRelease(ctx, kubeconfig, credentialsPath, spec interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallOrUpgradeHelmRelease", reflect.TypeOf((*MockClient)(nil).InstallOrUpgradeHelmRelease), ctx, kubeconfig, spec)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallOrUpgradeHelmRelease", reflect.TypeOf((*MockClient)(nil).InstallOrUpgradeHelmRelease), ctx, kubeconfig, credentialsPath, spec)
 }
 
 // UninstallHelmRelease mocks base method.

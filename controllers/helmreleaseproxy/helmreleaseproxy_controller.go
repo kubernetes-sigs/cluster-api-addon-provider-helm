@@ -19,12 +19,15 @@ package helmreleaseproxy
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -214,15 +217,24 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition)
 
+	credentialsPath, err := r.getCredentials(ctx, helmReleaseProxy)
+	if err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to get credentials for cluster")
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetCredentialsFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
+
+		return ctrl.Result{}, wrappedErr
+	}
+	defer os.Remove(credentialsPath)
+
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
-	err = r.reconcileNormal(ctx, helmReleaseProxy, client, kubeconfig)
+	err = r.reconcileNormal(ctx, helmReleaseProxy, client, credentialsPath, kubeconfig)
 
 	return ctrl.Result{}, err
 }
 
 // reconcileNormal handles HelmReleaseProxy reconciliation when it is not being deleted. This will install or upgrade the HelmReleaseProxy on the Cluster.
 // It will set the ReleaseName on the HelmReleaseProxy if the name is generated and also set the release status and release revision.
-func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, client internal.Client, kubeconfig string) error {
+func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, client internal.Client, credentialsPath string, kubeconfig string) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
@@ -234,7 +246,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		})
 	}
 
-	release, err := client.InstallOrUpgradeHelmRelease(ctx, kubeconfig, helmReleaseProxy.Spec)
+	release, err := client.InstallOrUpgradeHelmRelease(ctx, kubeconfig, credentialsPath, helmReleaseProxy.Spec)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("Failed to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, err.Error())
@@ -334,4 +346,60 @@ func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmR
 		}},
 		patch.WithStatusObservedGeneration{},
 	)
+}
+
+// getCredentials fetches the OCI credentials from a Secret and writes them to a temporary file it returns the path to the temporary file.
+func (r *HelmReleaseProxyReconciler) getCredentials(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) (string, error) {
+	credentialsPath := ""
+	if helmReleaseProxy.Spec.Credentials != nil && helmReleaseProxy.Spec.Credentials.Secret.Name != "" {
+		// By default, the secret is in the same namespace as the HelmReleaseProxy
+		if helmReleaseProxy.Spec.Credentials.Secret.Namespace == "" {
+			helmReleaseProxy.Spec.Credentials.Secret.Namespace = helmReleaseProxy.Namespace
+		}
+		credentialsValues, err := r.getCredentialsFromSecret(ctx, helmReleaseProxy.Spec.Credentials.Secret.Name, helmReleaseProxy.Spec.Credentials.Secret.Namespace, helmReleaseProxy.Spec.Credentials.Key)
+		if err != nil {
+			return "", err
+		}
+
+		// Write to a file
+		filename, err := writeCredentialsToFile(ctx, credentialsValues)
+		if err != nil {
+			return "", err
+		}
+
+		credentialsPath = filename
+	}
+
+	return credentialsPath, nil
+}
+
+// getCredentialsFromSecret returns the OCI credentials from a Secret.
+func (r *HelmReleaseProxyReconciler) getCredentialsFromSecret(ctx context.Context, name, namespace, key string) ([]byte, error) {
+	secret := &corev1.Secret{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
+		return nil, err
+	}
+
+	credentials, ok := secret.Data[key]
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("key %s not found in secret %s/%s", key, namespace, name))
+	}
+
+	return credentials, nil
+}
+
+// writeCredentialsToFile writes the OCI credentials to a temporary file.
+func writeCredentialsToFile(ctx context.Context, credentials []byte) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("Writing credentials to file")
+	credentialsFile, err := os.CreateTemp("", "oci-credentials-*.json")
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := credentialsFile.Write(credentials); err != nil {
+		return "", err
+	}
+
+	return credentialsFile.Name(), nil
 }

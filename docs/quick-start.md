@@ -120,6 +120,43 @@ The `valuesTemplate` is used to specify the values to use when installing the ch
 
 Helm options like `wait`, `skipCrds`, `timeout`, `waitForJobs`, etc. can be specified with `options` field as shown in above mentioned example, to control behaviour of helm operations(Install, Upgrade, Delete, etc). Please check CRD spec for all supported helm options and its behaviour.
 
+#### 4.1 Using a private OCI registry using credentials stored in a secret
+
+If you are using a private OCI registry, you will need to create a secret containing the credentials to access the registry. You can use the ``helm login`` command to create the secret. For example:
+
+```bash
+$ HELM_REGISTRY_CONFIG=/tmp/oci-creds.json helm login <my-registry>
+```
+
+Then, create a secret containing the credentials:
+
+```bash
+$ kubectl create secret generic oci-creds --from-file=/tmp/oci-creds.json -n caaph-system
+```
+
+You can then use your OCI registry by setting the `repoURL` to `oci://<my-registry>` and the credentials secret reference to `oci-creds`. For example:
+
+```yaml
+spec:
+  repoURL: oci://<my-registry>
+  credentialsSecretRef:
+    name: oci-creds
+    namespace: caaph-system
+```
+
+Note that in this case the credentials in the secret must be stored in a file named `config.json` at the root of the secret, e.g:
+
+```yaml
+kind: Secret
+apiVersion: v1
+metadata:
+  name: oci-creds
+  namespace: caaph-system
+  data:
+    config.json: <base64-encoded-credentials>
+  type: Opaque
+```
+
 ### 5. Verify that the chart was installed
 
 Run the following command to verify that the HelmChartProxy is ready. The output should be similar to the following

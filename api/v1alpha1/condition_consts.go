@@ -75,4 +75,7 @@ const (
 
 	// GetKubeconfigFailedReason indicates that the HelmReleaseProxy failed to get the kubeconfig for the Cluster.
 	GetKubeconfigFailedReason = "GetKubeconfigFailed"
+
+	// GetCredentialsFailedReason indicates that the HelmReleaseProxy failed to get the credentials for the Helm registry.
+	GetCredentialsFailedReason = "GetCredentialsFailed"
 )
