@@ -186,6 +186,10 @@ type HelmChartProxyStatus struct {
 	// MatchingClusters is the list of references to Clusters selected by the ClusterSelector.
 	// +optional
 	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
+
+	// ObservedGeneration is the latest generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +kubebuilder:object:root=true

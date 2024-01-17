@@ -18,6 +18,7 @@ package helmchartproxy
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -297,7 +298,12 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 
 	getters := make([]conditions.Getter, 0, len(releaseList.Items))
 	for i := range releaseList.Items {
-		getters = append(getters, &releaseList.Items[i])
+		helmReleaseProxy := &releaseList.Items[i]
+		if helmReleaseProxy.Generation != helmReleaseProxy.Status.ObservedGeneration {
+			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxySpecsUpdatingReason, clusterv1.ConditionSeverityInfo, fmt.Sprintf("Helm release proxy '%s' is not updated yet", helmReleaseProxy.Name))
+			return nil
+		}
+		getters = append(getters, helmReleaseProxy)
 	}
 
 	conditions.SetAggregate(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition, getters, conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
@@ -306,7 +312,7 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 }
 
 // patchHelmChartProxy patches the HelmChartProxy object and sets the ReadyCondition as an aggregate of the other condition set.
-// TODO: Is this preferrable to client.Update() calls? Based on testing it seems like it avoids race conditions.
+// TODO: Is this preferable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmChartProxy *addonsv1alpha1.HelmChartProxy) error {
 	conditions.SetSummary(helmChartProxy,
 		conditions.WithConditions(

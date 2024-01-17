@@ -285,6 +285,7 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
 			},
 			expectedError: "",
 		},
@@ -304,6 +305,7 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
 			},
 			expectedError: "",
 		},

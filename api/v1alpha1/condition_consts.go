@@ -24,6 +24,9 @@ const (
 	// meaning that the HelmReleaseProxies are created/updated, value template parsing succeeded, and the orphaned HelmReleaseProxies are deleted.
 	HelmReleaseProxySpecsUpToDateCondition clusterv1.ConditionType = "HelmReleaseProxySpecsUpToDate"
 
+	// HelmReleaseProxySpecsUpdatingReason indicates that the HelmReleaseProxy entity is not yet updated by the corresponding controller.
+	HelmReleaseProxySpecsUpdatingReason = "HelmReleaseProxySpecsUpdating"
+
 	// HelmReleaseProxyCreationFailedReason indicates that the HelmChartProxy controller failed to create a HelmReleaseProxy.
 	HelmReleaseProxyCreationFailedReason = "HelmReleaseProxyCreationFailed"
 
