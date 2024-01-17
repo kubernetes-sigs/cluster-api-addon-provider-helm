@@ -210,7 +210,7 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, 
 	settings.RegistryConfig = credentialsPath
 
 	enableClientCache := true
-	if spec.Options.EnableClientCache != nil {
+	if spec.Options != nil && spec.Options.EnableClientCache != nil {
 		enableClientCache = *spec.Options.EnableClientCache
 	}
 	log.V(2).Info("Creating install registry client", "enableClientCache", enableClientCache, "credentialsPath", credentialsPath)
@@ -343,7 +343,7 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig
 	settings.RegistryConfig = credentialsPath
 
 	enableClientCache := true
-	if spec.Options.EnableClientCache != nil {
+	if spec.Options != nil && spec.Options.EnableClientCache != nil {
 		enableClientCache = *spec.Options.EnableClientCache
 	}
 	log.V(2).Info("Creating upgrade registry client", "enableClientCache", enableClientCache, "credentialsPath", credentialsPath)

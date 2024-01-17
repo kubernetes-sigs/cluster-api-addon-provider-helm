@@ -230,6 +230,10 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	}
 
 	// Set the default value for EnableClientCache if it is not set
+	if helmReleaseProxy.Spec.Options == nil {
+		helmReleaseProxy.Spec.Options = &addonsv1alpha1.HelmOptions{}
+	}
+
 	if helmReleaseProxy.Spec.Options.EnableClientCache == nil {
 		helmReleaseProxy.Spec.Options.EnableClientCache = &defaultEnableClientCache
 	}

@@ -224,7 +224,12 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		return ctrl.Result{}, wrappedErr
 	}
-	defer os.Remove(credentialsPath)
+
+	defer func() {
+		if err := os.Remove(credentialsPath); err != nil {
+			log.Error(err, "failed to remove credentials file in path", "credentialsPath", credentialsPath)
+		}
+	}()
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
 	err = r.reconcileNormal(ctx, helmReleaseProxy, client, credentialsPath, kubeconfig)
