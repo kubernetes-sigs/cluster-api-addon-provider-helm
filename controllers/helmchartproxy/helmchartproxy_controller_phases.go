@@ -34,6 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var defaultEnableClientCache = true
+
 // deleteOrphanedHelmReleaseProxies deletes any HelmReleaseProxy resources that belong to a Cluster that is not selected by its parent HelmChartProxy.
 func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
@@ -193,7 +195,6 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		helmReleaseProxy.Spec.ChartName = helmChartProxy.Spec.ChartName
 		helmReleaseProxy.Spec.RepoURL = helmChartProxy.Spec.RepoURL
 		helmReleaseProxy.Spec.ReleaseNamespace = helmChartProxy.Spec.ReleaseNamespace
-		helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
 
 		// helmChartProxy.ObjectMeta.SetAnnotations(helmReleaseProxy.Annotations)
 	} else {
@@ -214,6 +215,24 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
+	helmReleaseProxy.Spec.Credentials = helmChartProxy.Spec.Credentials
+
+	if helmReleaseProxy.Spec.Credentials != nil {
+		// If the namespace is not set, set it to the namespace of the HelmChartProxy
+		if helmReleaseProxy.Spec.Credentials.Secret.Namespace == "" {
+			helmReleaseProxy.Spec.Credentials.Secret.Namespace = helmChartProxy.Namespace
+		}
+
+		// If the key is not set, set it to the default key
+		if helmReleaseProxy.Spec.Credentials.Key == "" {
+			helmReleaseProxy.Spec.Credentials.Key = addonsv1alpha1.DefaultOCIKey
+		}
+	}
+
+	// Set the default value for EnableClientCache if it is not set
+	if helmReleaseProxy.Spec.Options.EnableClientCache == nil {
+		helmReleaseProxy.Spec.Options.EnableClientCache = &defaultEnableClientCache
+	}
 
 	return helmReleaseProxy
 }

@@ -44,7 +44,7 @@ import (
 )
 
 type Client interface {
-	InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
+	InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, credentialsPath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
 	GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
 	UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
 }
@@ -114,7 +114,7 @@ func HelmInit(ctx context.Context, namespace string, kubeconfig string) (*helmCl
 
 // InstallOrUpgradeHelmRelease installs a Helm release if it does not exist, or upgrades it if it does and differs from the spec.
 // It returns a boolean indicating whether an install or upgrade was performed.
-func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, credentialsPath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Installing or upgrading Helm release")
@@ -125,19 +125,22 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig
 	existingRelease, err := c.GetHelmRelease(ctx, kubeconfig, spec)
 	if err != nil {
 		if errors.Is(err, helmDriver.ErrReleaseNotFound) {
-			return c.InstallHelmRelease(ctx, kubeconfig, spec)
+			return c.InstallHelmRelease(ctx, kubeconfig, credentialsPath, spec)
 		}
 
 		return nil, err
 	}
 
-	return c.UpgradeHelmReleaseIfChanged(ctx, kubeconfig, spec, existingRelease)
+	return c.UpgradeHelmReleaseIfChanged(ctx, kubeconfig, credentialsPath, spec, existingRelease)
 }
 
 // generateHelmInstallConfig generates default helm install config using helmOptions specified in HCP CR spec.
 func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Install {
 	installClient := helmAction.NewInstall(actionConfig)
 	installClient.CreateNamespace = true
+	if actionConfig.RegistryClient != nil {
+		installClient.SetRegistryClient(actionConfig.RegistryClient)
+	}
 	if helmOptions == nil {
 		return installClient
 	}
@@ -167,6 +170,9 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 // generateHelmUpgradeConfig generates default helm upgrade config using helmOptions specified in HCP CR spec.
 func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Upgrade {
 	upgradeClient := helmAction.NewUpgrade(actionConfig)
+	if actionConfig.RegistryClient != nil {
+		upgradeClient.SetRegistryClient(actionConfig.RegistryClient)
+	}
 	if helmOptions == nil {
 		return upgradeClient
 	}
@@ -194,15 +200,21 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 }
 
 // InstallHelmRelease installs a Helm release.
-func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, credentialsPath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
+	settings.RegistryConfig = credentialsPath
 
-	registryClient, err := newDefaultRegistryClient()
+	enableClientCache := true
+	if spec.Options.EnableClientCache != nil {
+		enableClientCache = *spec.Options.EnableClientCache
+	}
+	log.V(2).Info("Creating install registry client", "enableClientCache", enableClientCache, "credentialsPath", credentialsPath)
+	registryClient, err := newDefaultRegistryClient(credentialsPath, enableClientCache)
 	if err != nil {
 		return nil, err
 	}
@@ -274,15 +286,30 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, 
 }
 
 // newDefaultRegistryClient creates registry client object with default config which can be used to install/upgrade helm charts.
-func newDefaultRegistryClient() (*registry.Client, error) {
-	// Create a new registry client
-	registryClient, err := registry.NewClient(
-		registry.ClientOptDebug(true),
-		registry.ClientOptEnableCache(true),
-		registry.ClientOptWriter(os.Stderr),
-	)
-	if err != nil {
-		return nil, err
+func newDefaultRegistryClient(credentialsPath string, enableCache bool) (*registry.Client, error) {
+	var err error
+	var registryClient *registry.Client
+	if credentialsPath == "" {
+		// Create a new registry client
+		registryClient, err = registry.NewClient(
+			registry.ClientOptDebug(true),
+			registry.ClientOptEnableCache(enableCache),
+			registry.ClientOptWriter(os.Stderr),
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Create a new registry client with credentials
+		registryClient, err = registry.NewClient(
+			registry.ClientOptDebug(true),
+			registry.ClientOptEnableCache(enableCache),
+			registry.ClientOptWriter(os.Stderr),
+			registry.ClientOptCredentialsFile(credentialsPath),
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return registryClient, nil
@@ -306,15 +333,21 @@ func getHelmChartAndRepoName(chartName, repoURL string) (string, string, error) 
 }
 
 // UpgradeHelmReleaseIfChanged upgrades a Helm release. The boolean refers to if an upgrade was attempted.
-func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *helmRelease.Release) (*helmRelease.Release, error) {
+func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, credentialsPath string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *helmRelease.Release) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
 	if err != nil {
 		return nil, err
 	}
+	settings.RegistryConfig = credentialsPath
 
-	registryClient, err := newDefaultRegistryClient()
+	enableClientCache := true
+	if spec.Options.EnableClientCache != nil {
+		enableClientCache = *spec.Options.EnableClientCache
+	}
+	log.V(2).Info("Creating upgrade registry client", "enableClientCache", enableClientCache, "credentialsPath", credentialsPath)
+	registryClient, err := newDefaultRegistryClient(credentialsPath, enableClientCache)
 	if err != nil {
 		return nil, err
 	}

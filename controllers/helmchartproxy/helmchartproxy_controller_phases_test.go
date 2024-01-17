@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -127,7 +127,7 @@ var (
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: pointer.Int32(6443),
+				APIServerPort: ptr.To(int32(6443)),
 				Pods: &clusterv1.NetworkRanges{
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
@@ -146,7 +146,7 @@ var (
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: pointer.Int32(1234),
+				APIServerPort: ptr.To(int32(1234)),
 				Pods: &clusterv1.NetworkRanges{
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
@@ -163,8 +163,8 @@ var (
 					APIVersion:         addonsv1alpha1.GroupVersion.String(),
 					Kind:               "HelmChartProxy",
 					Name:               "test-hcp",
-					Controller:         pointer.Bool(true),
-					BlockOwnerDeletion: pointer.Bool(true),
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				},
 			},
 			Labels: map[string]string{
@@ -325,8 +325,8 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 							APIVersion:         addonsv1alpha1.GroupVersion.String(),
 							Kind:               "HelmChartProxy",
 							Name:               "test-hcp",
-							Controller:         pointer.Bool(true),
-							BlockOwnerDeletion: pointer.Bool(true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -421,8 +421,8 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 							APIVersion:         addonsv1alpha1.GroupVersion.String(),
 							Kind:               "HelmChartProxy",
 							Name:               "test-hcp",
-							Controller:         pointer.Bool(true),
-							BlockOwnerDeletion: pointer.Bool(true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -442,7 +442,147 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
+				},
+			},
+		},
+		{
+			name:     "construct helm release proxy without existing disable client cache",
+			existing: nil,
+			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: addonsv1alpha1.GroupVersion.String(),
+					Kind:       "HelmChartProxy",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(false),
+					},
+				},
+			},
+			parsedValues: "test-parsed-values",
+			cluster: &clusterv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+			},
+			expected: &addonsv1alpha1.HelmReleaseProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-chart-name-test-cluster-",
+					Namespace:    "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         addonsv1alpha1.GroupVersion.String(),
+							Kind:               "HelmChartProxy",
+							Name:               "test-hcp",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						},
+					},
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel:             "test-cluster",
+						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+					},
+				},
+				Spec: addonsv1alpha1.HelmReleaseProxySpec{
+					ClusterRef: corev1.ObjectReference{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster",
+						Namespace:  "test-namespace",
+					},
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Values:           "test-parsed-values",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(false),
+					},
+				},
+			},
+		},
+		{
+			name:     "construct helm release proxy without existing enable client cache",
+			existing: nil,
+			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: addonsv1alpha1.GroupVersion.String(),
+					Kind:       "HelmChartProxy",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
+				},
+			},
+			parsedValues: "test-parsed-values",
+			cluster: &clusterv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "test-namespace",
+				},
+			},
+			expected: &addonsv1alpha1.HelmReleaseProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-chart-name-test-cluster-",
+					Namespace:    "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         addonsv1alpha1.GroupVersion.String(),
+							Kind:               "HelmChartProxy",
+							Name:               "test-hcp",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						},
+					},
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel:             "test-cluster",
+						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+					},
+				},
+				Spec: addonsv1alpha1.HelmReleaseProxySpec{
+					ClusterRef: corev1.ObjectReference{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster",
+						Namespace:  "test-namespace",
+					},
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Values:           "test-parsed-values",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
 				},
 			},
 		},
@@ -457,8 +597,8 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 							APIVersion:         addonsv1alpha1.GroupVersion.String(),
 							Kind:               "HelmChartProxy",
 							Name:               "test-hcp",
-							Controller:         pointer.Bool(true),
-							BlockOwnerDeletion: pointer.Bool(true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -520,8 +660,8 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 							APIVersion:         addonsv1alpha1.GroupVersion.String(),
 							Kind:               "HelmChartProxy",
 							Name:               "test-hcp",
-							Controller:         pointer.Bool(true),
-							BlockOwnerDeletion: pointer.Bool(true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -542,7 +682,9 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
 					Version:          "another-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
 				},
 			},
 		},
@@ -557,8 +699,8 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 							APIVersion:         addonsv1alpha1.GroupVersion.String(),
 							Kind:               "HelmChartProxy",
 							Name:               "test-hcp",
-							Controller:         pointer.Bool(true),
-							BlockOwnerDeletion: pointer.Bool(true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -620,8 +762,8 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 							APIVersion:         addonsv1alpha1.GroupVersion.String(),
 							Kind:               "HelmChartProxy",
 							Name:               "test-hcp",
-							Controller:         pointer.Bool(true),
-							BlockOwnerDeletion: pointer.Bool(true),
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
 						},
 					},
 					Labels: map[string]string{
@@ -642,7 +784,242 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "updated-parsed-values",
 					Version:          "test-version",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
+				},
+			},
+		},
+		{
+			name:     "construct helm release proxy with secret",
+			existing: nil,
+			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: addonsv1alpha1.GroupVersion.String(),
+					Kind:       "HelmChartProxy",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
 					Options:          &addonsv1alpha1.HelmOptions{},
+					Credentials: &addonsv1alpha1.Credentials{
+						Secret: corev1.SecretReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			parsedValues: "test-parsed-values",
+			cluster: &clusterv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+			expected: &addonsv1alpha1.HelmReleaseProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-chart-name-test-cluster-",
+					Namespace:    "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         addonsv1alpha1.GroupVersion.String(),
+							Kind:               "HelmChartProxy",
+							Name:               "test-hcp",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						},
+					},
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel:             "test-cluster",
+						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+					},
+				},
+				Spec: addonsv1alpha1.HelmReleaseProxySpec{
+					ClusterRef: corev1.ObjectReference{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster",
+					},
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Values:           "test-parsed-values",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
+					Credentials: &addonsv1alpha1.Credentials{
+						Secret: corev1.SecretReference{
+							Name:      "test-secret",
+							Namespace: "test-namespace",
+						},
+						Key: "config.json",
+					},
+				},
+			},
+		},
+		{
+			name:     "construct helm release proxy with secret and custom namespace",
+			existing: nil,
+			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: addonsv1alpha1.GroupVersion.String(),
+					Kind:       "HelmChartProxy",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Options:          &addonsv1alpha1.HelmOptions{},
+					Credentials: &addonsv1alpha1.Credentials{
+						Secret: corev1.SecretReference{
+							Name:      "test-secret",
+							Namespace: "my-namespace",
+						},
+					},
+				},
+			},
+			parsedValues: "test-parsed-values",
+			cluster: &clusterv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+			expected: &addonsv1alpha1.HelmReleaseProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-chart-name-test-cluster-",
+					Namespace:    "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         addonsv1alpha1.GroupVersion.String(),
+							Kind:               "HelmChartProxy",
+							Name:               "test-hcp",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						},
+					},
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel:             "test-cluster",
+						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+					},
+				},
+				Spec: addonsv1alpha1.HelmReleaseProxySpec{
+					ClusterRef: corev1.ObjectReference{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster",
+					},
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Values:           "test-parsed-values",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
+					Credentials: &addonsv1alpha1.Credentials{
+						Secret: corev1.SecretReference{
+							Name:      "test-secret",
+							Namespace: "my-namespace",
+						},
+						Key: "config.json",
+					},
+				},
+			},
+		},
+		{
+			name:     "construct helm release proxy with secret and custom key",
+			existing: nil,
+			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: addonsv1alpha1.GroupVersion.String(),
+					Kind:       "HelmChartProxy",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Options:          &addonsv1alpha1.HelmOptions{},
+					Credentials: &addonsv1alpha1.Credentials{
+						Secret: corev1.SecretReference{
+							Name: "test-secret",
+						},
+						Key: "custom-key.json",
+					},
+				},
+			},
+			parsedValues: "test-parsed-values",
+			cluster: &clusterv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+			expected: &addonsv1alpha1.HelmReleaseProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-chart-name-test-cluster-",
+					Namespace:    "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         addonsv1alpha1.GroupVersion.String(),
+							Kind:               "HelmChartProxy",
+							Name:               "test-hcp",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						},
+					},
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel:             "test-cluster",
+						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+					},
+				},
+				Spec: addonsv1alpha1.HelmReleaseProxySpec{
+					ClusterRef: corev1.ObjectReference{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster",
+					},
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Values:           "test-parsed-values",
+					Options: &addonsv1alpha1.HelmOptions{
+						EnableClientCache: ptr.To(true),
+					},
+					Credentials: &addonsv1alpha1.Credentials{
+						Secret: corev1.SecretReference{
+							Name:      "test-secret",
+							Namespace: "test-namespace",
+						},
+						Key: "custom-key.json",
+					},
 				},
 			},
 		},

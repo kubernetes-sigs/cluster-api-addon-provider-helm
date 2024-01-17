@@ -70,6 +70,10 @@ type HelmReleaseProxySpec struct {
 	// via options like wait, skipCrds, timeout, waitForJobs, etc.
 	// +optional
 	Options *HelmOptions `json:"options,omitempty"`
+
+	// Credentials is a reference to an object containing the OCI credentials. If it is not specified, no credentials will be used.
+	// +optional
+	Credentials *Credentials `json:"credentials,omitempty"`
 }
 
 // HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.

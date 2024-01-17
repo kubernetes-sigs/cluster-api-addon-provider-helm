@@ -26,6 +26,9 @@ const (
 	// HelmChartProxyFinalizer is the finalizer used by the HelmChartProxy controller to cleanup add-on resources when
 	// a HelmChartProxy is being deleted.
 	HelmChartProxyFinalizer = "helmchartproxy.addons.cluster.x-k8s.io"
+
+	// DefaultOCIKey is the default file name of the OCI secret key.
+	DefaultOCIKey = "config.json"
 )
 
 // HelmChartProxySpec defines the desired state of HelmChartProxy.
@@ -65,6 +68,10 @@ type HelmChartProxySpec struct {
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
 	// +optional
 	Options *HelmOptions `json:"options,omitempty"`
+
+	// Credentials is a reference to an object containing the OCI credentials. If it is not specified, no credentials will be used.
+	// +optional
+	Credentials *Credentials `json:"credentials,omitempty"`
 }
 
 type HelmOptions struct {
@@ -123,6 +130,10 @@ type HelmOptions struct {
 	// behaviour of helm Uninstall operation via options like wait, timeout, etc.
 	// +optional
 	Uninstall *HelmUninstallOptions `json:"uninstall,omitempty"`
+
+	// EnableClientCache is a flag to enable Helm client cache. If it is not specified, it will be set to true.
+	// +optional
+	EnableClientCache *bool `json:"enableClientCache,omitempty"`
 }
 
 type HelmInstallOptions struct {
@@ -175,6 +186,14 @@ type HelmUninstallOptions struct {
 	// Description represents human readable information to be shown on release uninstall.
 	// +optional
 	Description string `json:"description,omitempty"`
+}
+
+type Credentials struct {
+	// Secret is a reference to a Secret containing the OCI credentials.
+	Secret corev1.SecretReference `json:"secret"`
+
+	// Key is the key in the Secret containing the OCI credentials.
+	Key string `json:"key"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy.

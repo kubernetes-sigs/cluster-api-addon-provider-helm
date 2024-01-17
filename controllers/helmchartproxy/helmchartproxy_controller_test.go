@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
@@ -74,7 +74,7 @@ var (
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: pointer.Int32(1234),
+				APIServerPort: ptr.To(int32(1234)),
 			},
 		},
 	}
@@ -94,7 +94,7 @@ var (
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: pointer.Int32(5678),
+				APIServerPort: ptr.To(int32(5678)),
 			},
 		},
 	}
@@ -113,7 +113,7 @@ var (
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: pointer.Int32(6443),
+				APIServerPort: ptr.To(int32(6443)),
 			},
 		},
 	}
@@ -132,7 +132,7 @@ var (
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: pointer.Int32(6443),
+				APIServerPort: ptr.To(int32(6443)),
 			},
 		},
 	}
@@ -146,8 +146,8 @@ var (
 					APIVersion:         addonsv1alpha1.GroupVersion.String(),
 					Kind:               "HelmChartProxy",
 					Name:               "test-hcp",
-					Controller:         pointer.Bool(true),
-					BlockOwnerDeletion: pointer.Bool(true),
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				},
 			},
 			Labels: map[string]string{
@@ -189,8 +189,8 @@ var (
 					APIVersion:         addonsv1alpha1.GroupVersion.String(),
 					Kind:               "HelmChartProxy",
 					Name:               "test-hcp",
-					Controller:         pointer.Bool(true),
-					BlockOwnerDeletion: pointer.Bool(true),
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				},
 			},
 			Labels: map[string]string{
