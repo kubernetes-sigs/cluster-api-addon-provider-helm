@@ -402,7 +402,7 @@ func TestReconcileDelete(t *testing.T) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
 				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
-				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseReadyCondition))
+				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseGetFailedReason))
 				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
 			},
 			expectedError: errInternal.Error(),

@@ -23,7 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -63,9 +63,9 @@ func (p *HelmChartProxy) Default() {
 	// If 'CreateNamespace' is not specified by user, set default value to 'true'
 	if p.Spec.Options != nil {
 		if p.Spec.Options.Install == nil {
-			p.Spec.Options.Install = &HelmInstallOptions{CreateNamespace: pointer.Bool(true)}
+			p.Spec.Options.Install = &HelmInstallOptions{CreateNamespace: ptr.To(true)}
 		} else if p.Spec.Options.Install.CreateNamespace == nil {
-			p.Spec.Options.Install.CreateNamespace = pointer.Bool(true)
+			p.Spec.Options.Install.CreateNamespace = ptr.To(true)
 		}
 	}
 }
