@@ -18,28 +18,49 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	hcpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
-	hrpController "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
+	chartcontroller "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
+	releasecontroller "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/version"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/util/flags"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+
+	enableLeaderElection        bool
+	leaderElectionLeaseDuration time.Duration
+	leaderElectionRenewDeadline time.Duration
+	leaderElectionRetryPeriod   time.Duration
+	watchNamespace              string
+	watchFilterValue            string
+	profilerAddress             string
+	helmChartProxyConcurrency   int
+	helmReleaseProxyConcurrency int
+	syncPeriod                  time.Duration
+	healthAddr                  string
+	webhookPort                 int
+	webhookCertDir              string
+	diagnosticsOptions          = flags.DiagnosticsOptions{}
 )
 
 func init() {
@@ -49,53 +70,99 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var leaderElectionLeaseDuration time.Duration
-	var leaderElectionRenewDeadline time.Duration
-	var leaderElectionRetryPeriod time.Duration
-	var probeAddr string
-	var helmChartProxyConcurrency int
-	var helmReleaseProxyConcurrency int
-	var syncPeriod time.Duration
+// InitFlags initializes the flags.
+func InitFlags(fs *pflag.FlagSet) {
+	fs.BoolVar(&enableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 
-	klog.InitFlags(nil)
-
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.DurationVar(&leaderElectionLeaseDuration, "leader-elect-lease-duration", 15*time.Second,
+	fs.DurationVar(&leaderElectionLeaseDuration, "leader-elect-lease-duration", 15*time.Second,
 		"Interval at which non-leader candidates will wait to force acquire leadership (duration string)")
-	flag.DurationVar(&leaderElectionRenewDeadline, "leader-elect-renew-deadline", 10*time.Second,
+
+	fs.DurationVar(&leaderElectionRenewDeadline, "leader-elect-renew-deadline", 10*time.Second,
 		"Duration that the leading controller manager will retry refreshing leadership before giving up (duration string)")
-	flag.DurationVar(&leaderElectionRetryPeriod, "leader-elect-retry-period", 2*time.Second,
+
+	fs.DurationVar(&leaderElectionRetryPeriod, "leader-elect-retry-period", 2*time.Second,
 		"Duration the LeaderElector clients should wait between tries of actions (duration string)")
-	flag.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 10, "The number of HelmChartProxies to process concurrently.")
-	flag.IntVar(&helmReleaseProxyConcurrency, "helm-release-proxy-concurrency", 10, "The number of HelmReleaseProxies to process concurrently.")
-	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
-		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
+
+	fs.StringVar(&watchNamespace, "namespace", "",
+		"Namespace that the controller watches to reconcile cluster-api objects. If unspecified, the controller watches for cluster-api objects across all namespaces.")
+
+	fs.StringVar(&watchFilterValue, "watch-filter", "",
+		fmt.Sprintf("Label value that the controller watches to reconcile cluster-api objects. The label key is always %s. If unspecified, the controller watches for all cluster-api objects.", clusterv1.WatchLabel))
+
+	fs.StringVar(&profilerAddress, "profiler-address", "",
+		"Bind address to expose the pprof profiler (e.g. localhost:6060)")
+
+	fs.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 10,
+		"Number of HelmChartProxies to process concurrently.")
+
+	fs.IntVar(&helmReleaseProxyConcurrency, "helm-release-proxy-concurrency", 10,
+		"Number of HelmReleaseProxies to process concurrently.")
+
+	fs.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
+		"Minimum interval at which watched resources are reconciled (e.g. 15m)")
+
+	fs.IntVar(&webhookPort, "webhook-port", 9443,
+		"Webhook Server port")
+
+	fs.StringVar(&webhookCertDir, "webhook-cert-dir", "/tmp/k8s-webhook-server/serving-certs/",
+		"Webhook cert dir, only used when webhook-port is specified.")
+
+	fs.StringVar(&healthAddr, "health-addr", ":9440",
+		"Address the health endpoint binds to.")
+
+	flags.AddDiagnosticsOptions(fs, &diagnosticsOptions)
+
+	feature.MutableGates.AddFlag(fs)
+}
+
+// Add RBAC for the authorized diagnostics endpoint.
+// +kubebuilder:rbac:groups=authentication.k8s.io,resources=tokenreviews,verbs=create
+// +kubebuilder:rbac:groups=authorization.k8s.io,resources=subjectaccessreviews,verbs=create
+
+func main() {
+	InitFlags(pflag.CommandLine)
+	klog.InitFlags(flag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Set log level 2 as default.
-	if err := flag.Set("v", "2"); err != nil {
+	if err := pflag.CommandLine.Set("v", "2"); err != nil {
 		setupLog.Error(err, "failed to set log level: %v")
 		os.Exit(1)
 	}
-	flag.Parse()
+	pflag.Parse()
 
+	diagnosticsOpts := flags.GetDiagnosticsOptions(diagnosticsOptions)
+
+	var watchNamespaces map[string]cache.Config
+	if watchNamespace != "" {
+		watchNamespaces = map[string]cache.Config{
+			watchNamespace: {},
+		}
+	}
+
+	// klog.Background will automatically use the right logger.
 	ctrl.SetLogger(klog.Background())
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "5a2dee3e.cluster.x-k8s.io",
+		LeaderElectionID:       "controller-leader-election-caaph",
 		LeaseDuration:          &leaderElectionLeaseDuration,
 		RenewDeadline:          &leaderElectionRenewDeadline,
+		HealthProbeBindAddress: healthAddr,
+		PprofBindAddress:       profilerAddress,
+		Metrics:                diagnosticsOpts,
 		RetryPeriod:            &leaderElectionRetryPeriod,
-		SyncPeriod:             &syncPeriod,
+		Cache: cache.Options{
+			DefaultNamespaces: watchNamespaces,
+			SyncPeriod:        &syncPeriod,
+		},
+		WebhookServer: webhook.NewServer(
+			webhook.Options{
+				Port:    webhookPort,
+				CertDir: webhookCertDir,
+			},
+		),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -109,9 +176,10 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	if err = (&hcpController.HelmChartProxyReconciler{
-		Client: mgr.GetClient(),
-		Scheme: scheme,
+	if err = (&chartcontroller.HelmChartProxyReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           scheme,
+		WatchFilterValue: watchFilterValue,
 	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmChartProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChartProxy")
 		os.Exit(1)
@@ -122,9 +190,10 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err = (&hrpController.HelmReleaseProxyReconciler{
-		Client: mgr.GetClient(),
-		Scheme: scheme,
+	if err = (&releasecontroller.HelmReleaseProxyReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           scheme,
+		WatchFilterValue: watchFilterValue,
 	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmReleaseProxy")
 		os.Exit(1)
