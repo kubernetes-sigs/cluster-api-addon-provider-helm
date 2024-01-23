@@ -48,7 +48,7 @@ func (k *KubeconfigGetter) GetClusterKubeconfig(ctx context.Context, cluster *cl
 		return "", errors.Wrapf(err, "failed to initialize management cluster kubeconfig")
 	}
 
-	c, err := client.New("")
+	c, err := client.New(ctx, "")
 	if err != nil {
 		return "", err
 	}
@@ -60,7 +60,7 @@ func (k *KubeconfigGetter) GetClusterKubeconfig(ctx context.Context, cluster *cl
 	}
 
 	log.V(4).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
-	kubeconfig, err := c.GetKubeconfig(options)
+	kubeconfig, err := c.GetKubeconfig(ctx, options)
 	if err != nil {
 		return "", err
 	}

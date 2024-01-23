@@ -29,22 +29,32 @@ spec:
       containers:
         - args:
           - --leader-elect
+          - "--diagnostics-address=${CAAPH_DIAGNOSTICS_ADDRESS:=:8443}"
+          - "--insecure-diagnostics=${CAAPH_INSECURE_DIAGNOSTICS:=false}"
+          - "--v=2"
           image: controller:latest
           imagePullPolicy: Always
           name: manager
           # securityContext:
           #   allowPrivilegeEscalation: false
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 15
-            periodSeconds: 20
+          ports:
+            - containerPort: 9440
+              name: healthz
+              protocol: TCP
+            - containerPort: 8443
+              name: metrics
+              protocol: TCP
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8081
-            initialDelaySeconds: 5
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
             periodSeconds: 10
           # TODO(user): Configure the resources accordingly based on the project requirements.
           # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
