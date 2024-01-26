@@ -46,7 +46,9 @@ import (
 // HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object.
 type HelmReleaseProxyReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme           *runtime.Scheme
+	KubeconfigGetter internal.Getter
+	HelmClient       internal.Client
 
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
@@ -113,7 +115,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, errors.Wrapf(err, "failed to init patch helper")
 	}
 
-	initalizeConditions(ctx, patchHelper, helmReleaseProxy)
+	initializeConditions(ctx, patchHelper, helmReleaseProxy)
 
 	defer func() {
 		log.V(2).Info("Preparing to patch HelmReleaseProxy with return error", "helmReleaseProxy", helmReleaseProxy.Name, "reterr", reterr)
@@ -131,9 +133,6 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Namespace: helmReleaseProxy.Spec.ClusterRef.Namespace,
 		Name:      helmReleaseProxy.Spec.ClusterRef.Name,
 	}
-
-	k := internal.KubeconfigGetter{}
-	client := &internal.HelmClient{}
 
 	// examine DeletionTimestamp to determine if object is under deletion
 	if helmReleaseProxy.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -153,7 +152,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// our finalizer is present, so lets handle any external dependency
 			if err := r.Client.Get(ctx, clusterKey, cluster); err == nil {
 				log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
-				kubeconfig, err := k.GetClusterKubeconfig(ctx, cluster)
+				kubeconfig, err := r.KubeconfigGetter.GetClusterKubeconfig(ctx, clusterKey)
 				if err != nil {
 					wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
 					conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
@@ -162,7 +161,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				}
 				conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition)
 
-				if err := r.reconcileDelete(ctx, helmReleaseProxy, client, kubeconfig); err != nil {
+				if err := r.reconcileDelete(ctx, helmReleaseProxy, r.HelmClient, kubeconfig); err != nil {
 					// if fail to delete the external dependency here, return with error
 					// so that it can be retried
 					return ctrl.Result{}, err
@@ -208,7 +207,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
-	kubeconfig, err := k.GetClusterKubeconfig(ctx, cluster)
+	kubeconfig, err := r.KubeconfigGetter.GetClusterKubeconfig(ctx, clusterKey)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
@@ -232,7 +231,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}()
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
-	err = r.reconcileNormal(ctx, helmReleaseProxy, client, credentialsPath, kubeconfig)
+	err = r.reconcileNormal(ctx, helmReleaseProxy, r.HelmClient, credentialsPath, kubeconfig)
 
 	return ctrl.Result{}, err
 }
@@ -257,7 +256,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, err.Error())
 	}
 	if release != nil {
-		log.V(2).Info((fmt.Sprintf("Release '%s' exists on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version)))
+		log.V(2).Info(fmt.Sprintf("Release '%s' exists on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version))
 
 		status := release.Info.Status
 		helmReleaseProxy.SetReleaseStatus(status.String())
@@ -311,7 +310,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
 	}
 
-	log.V(2).Info((fmt.Sprintf("Chart '%s' successfully uninstalled on cluster %s", helmReleaseProxy.Spec.ChartName, helmReleaseProxy.Spec.ClusterRef.Name)))
+	log.V(2).Info(fmt.Sprintf("Chart '%s' successfully uninstalled on cluster %s", helmReleaseProxy.Spec.ChartName, helmReleaseProxy.Spec.ClusterRef.Name))
 	conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseDeletedReason, clusterv1.ConditionSeverityInfo, "")
 	if response != nil && response.Info != "" {
 		log.V(2).Info(fmt.Sprintf("Response is %s", response.Info))
@@ -320,7 +319,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	return nil
 }
 
-func initalizeConditions(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) {
+func initializeConditions(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) {
 	log := ctrl.LoggerFrom(ctx)
 	if len(helmReleaseProxy.GetConditions()) == 0 {
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.PreparingToHelmInstallReason, clusterv1.ConditionSeverityInfo, "Preparing to to install Helm chart")
