@@ -81,7 +81,8 @@ GINKGO_NODES ?= 1
 GINKGO_TIMEOUT ?= 2h
 GINKGO_POLL_PROGRESS_AFTER ?= 60m
 GINKGO_POLL_PROGRESS_INTERVAL ?= 5m
-# E2E_CONF_FILE ?= $(ROOT_DIR)/$(TEST_DIR)/e2e/config/docker.yaml
+E2E_CONF_FILE ?= $(ROOT_DIR)/$(TEST_DIR)/e2e/config/helm.yaml
+E2E_CONF_FILE_ENVSUBST := $(ROOT_DIR)/test/e2e/config/helm-envsubst.yaml
 SKIP_RESOURCE_CLEANUP ?= false
 USE_EXISTING_CLUSTER ?= false
 GINKGO_NOCOLOR ?= false
@@ -263,6 +264,16 @@ generate-modules: ## Run go mod tidy to ensure modules are up to date
 	go mod tidy
 	cd $(TOOLS_DIR); go mod tidy
 
+DOCKER_TEMPLATES := test/e2e/data/addons-helm
+
+.PHONY: generate-e2e-templates
+generate-e2e-templates: $(KUSTOMIZE) ## Generate templates for e2e tests
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template.yaml
+
+.PHONY: generate-flavors
+generate-flavors: $(KUSTOMIZE)  ## Generate template flavors.
+	./hack/gen-flavors.sh
+
 ## --------------------------------------
 ## Lint / Verify
 ## --------------------------------------
@@ -383,15 +394,34 @@ test-cover: ## Run unit and integration tests and generate a coverage report
 	go tool cover -func=out/coverage.out -o out/coverage.txt
 	go tool cover -html=out/coverage.out -o out/coverage.html
 
-# .PHONY: test-e2e
-# test-e2e: $(GINKGO) generate-e2e-templates generate-test-extension-deployment ## Run the end-to-end tests
-# 	$(GINKGO) -v --trace -poll-progress-after=$(GINKGO_POLL_PROGRESS_AFTER) \
-# 		-poll-progress-interval=$(GINKGO_POLL_PROGRESS_INTERVAL) --tags=e2e --focus="$(GINKGO_FOCUS)" \
-# 		$(_SKIP_ARGS) --nodes=$(GINKGO_NODES) --timeout=$(GINKGO_TIMEOUT) --no-color=$(GINKGO_NOCOLOR) \
-# 		--output-dir="$(ARTIFACTS)" --junit-report="junit.e2e_suite.1.xml" $(GINKGO_ARGS) $(ROOT_DIR)/$(TEST_DIR)/e2e -- \
-# 	    -e2e.artifacts-folder="$(ARTIFACTS)" \
-# 	    -e2e.config="$(E2E_CONF_FILE)" \
-# 	    -e2e.skip-resource-cleanup=$(SKIP_RESOURCE_CLEANUP) -e2e.use-existing-cluster=$(USE_EXISTING_CLUSTER)
+
+.PHONY: test-e2e
+test-e2e: ## Run "docker-build" and "docker-push" rules then run e2e tests.
+	PULL_POLICY=IfNotPresent MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
+	$(MAKE) docker-build docker-push \
+	test-e2e-run
+
+.PHONY: test-e2e-run-skip-manifest
+test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates ## Run the end-to-end tests
+	$(ENVSUBST) < $(E2E_CONF_FILE) > $(E2E_CONF_FILE_ENVSUBST) && \
+	$(GINKGO) -v --trace -poll-progress-after=$(GINKGO_POLL_PROGRESS_AFTER) \
+		-poll-progress-interval=$(GINKGO_POLL_PROGRESS_INTERVAL) --tags=e2e --focus="$(GINKGO_FOCUS)" \
+		$(_SKIP_ARGS) --nodes=$(GINKGO_NODES) --timeout=$(GINKGO_TIMEOUT) --no-color=$(GINKGO_NOCOLOR) \
+		--output-dir="$(ARTIFACTS)" --junit-report="junit.e2e_suite.1.xml" $(GINKGO_ARGS) $(ROOT_DIR)/$(TEST_DIR)/e2e -- \
+	    -e2e.artifacts-folder="$(ARTIFACTS)" \
+	    -e2e.config="$(E2E_CONF_FILE_ENVSUBST)" \
+	    -e2e.skip-resource-cleanup=$(SKIP_RESOURCE_CLEANUP) -e2e.use-existing-cluster=$(USE_EXISTING_CLUSTER)
+
+.PHONY: test-e2e-run
+test-e2e-run:
+	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
+	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml" PULL_POLICY=IfNotPresent
+	MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
+	$(MAKE) test-e2e-run-skip-manifest
+
+.PHONY: get-e2e-kubeconfig
+get-e2e-kubeconfig:
+	@kind get kubeconfig --name caaph-e2e
 
 ## --------------------------------------
 ## Deployment
