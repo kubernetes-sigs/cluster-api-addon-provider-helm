@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2024 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,87 +14,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: This needs to be set up for this repo once e2e tests have been implemented.
+###############################################################################
 
 set -o errexit
+set -o nounset
 set -o pipefail
 
-REPO_ROOT=$(git rev-parse --show-toplevel)
-cd "${REPO_ROOT}" || exit 1
+REPO_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# shellcheck source=./scripts/ci-e2e-lib.sh
-source "${REPO_ROOT}/scripts/ci-e2e-lib.sh"
-
-# shellcheck source=./hack/ensure-go.sh
+# shellcheck source=hack/ensure-go.sh
 source "${REPO_ROOT}/hack/ensure-go.sh"
-# shellcheck source=./hack/ensure-kubectl.sh
-source "${REPO_ROOT}/hack/ensure-kubectl.sh"
-# shellcheck source=./hack/ensure-kind.sh
-source "${REPO_ROOT}/hack/ensure-kind.sh"
 
-# Make sure the tools binaries are on the path.
-export PATH="${REPO_ROOT}/hack/tools/bin:${PATH}"
+export LOCAL_ONLY=${LOCAL_ONLY:-"true"}
+export USE_LOCAL_KIND_REGISTRY=${USE_LOCAL_KIND_REGISTRY:-${LOCAL_ONLY}} 
+export BUILD_MANAGER_IMAGE=${BUILD_MANAGER_IMAGE:-"true"}
 
-# Builds CAPI (and CAPD) images.
-capi:buildDockerImages
+export REGISTRY=${REGISTRY:-"localhost:5000/ci-e2e"}
 
-# Prepare kindest/node images for all the required Kubernetes version; this implies
-# 1. Kubernetes version labels (e.g. latest) to the corresponding version numbers.
-# 2. Pre-pulling the corresponding kindest/node image if available; if not, building the image locally.
-# Following variables are currently checked (if defined):
-# - KUBERNETES_VERSION
-# - KUBERNETES_VERSION_UPGRADE_TO
-# - KUBERNETES_VERSION_UPGRADE_FROM
-k8s::prepareKindestImages
+if [[ "${BUILD_MANAGER_IMAGE}" == "true" ]]; then
+  defaultTag=$(date -u '+%Y%m%d%H%M%S')
+  export TAG="${defaultTag:-dev}"
+fi
 
-# pre-pull all the images that will be used in the e2e, thus making the actual test run
-# less sensible to the network speed. This includes:
-# - cert-manager images
-kind:prepullAdditionalImages
+export GINKGO_NODES=10
 
-# Configure e2e tests
-export GINKGO_NODES=3
-export GINKGO_NOCOLOR=true
-export GINKGO_ARGS="--fail-fast" # Other ginkgo args that need to be appended to the command.
-export E2E_CONF_FILE="${REPO_ROOT}/test/e2e/config/docker.yaml"
-export ARTIFACTS="${ARTIFACTS:-${REPO_ROOT}/_artifacts}"
-export SKIP_RESOURCE_CLEANUP=false
-export USE_EXISTING_CLUSTER=false
-
-# Setup local output directory
-ARTIFACTS_LOCAL="${ARTIFACTS}/localhost"
-mkdir -p "${ARTIFACTS_LOCAL}"
-echo "This folder contains logs from the local host where the tests ran." > "${ARTIFACTS_LOCAL}/README.md"
-
-# Configure the containerd socket, otherwise 'ctr' would not work
-export CONTAINERD_ADDRESS=/var/run/docker/containerd/containerd.sock
-
-# ensure we retrieve additional info for debugging when we leave the script
-cleanup() {
-  # shellcheck disable=SC2046
-  kill $(pgrep -f 'docker events') || true
-  # shellcheck disable=SC2046
-  kill $(pgrep -f 'ctr -n moby events') || true
-
-  cp /var/log/docker.log "${ARTIFACTS_LOCAL}/docker.log" || true
-  docker ps -a > "${ARTIFACTS_LOCAL}/docker-ps.txt" || true
-  docker images > "${ARTIFACTS_LOCAL}/docker-images.txt" || true
-  docker info > "${ARTIFACTS_LOCAL}/docker-info.txt" || true
-  docker system df > "${ARTIFACTS_LOCAL}/docker-system-df.txt" || true
-  docker version > "${ARTIFACTS_LOCAL}/docker-version.txt" || true
-
-  ctr namespaces list > "${ARTIFACTS_LOCAL}/containerd-namespaces.txt" || true
-  ctr -n moby tasks list > "${ARTIFACTS_LOCAL}/containerd-tasks.txt" || true
-  ctr -n moby containers list > "${ARTIFACTS_LOCAL}/containerd-containers.txt" || true
-  ctr -n moby images list > "${ARTIFACTS_LOCAL}/containerd-images.txt" || true
-  ctr -n moby version > "${ARTIFACTS_LOCAL}/containerd-version.txt" || true
-}
-trap "cleanup" EXIT SIGINT
-
-docker events > "${ARTIFACTS_LOCAL}/docker-events.txt" 2>&1 &
-ctr -n moby events > "${ARTIFACTS_LOCAL}/containerd-events.txt" 2>&1 &
-
-# Run e2e tests
-mkdir -p "$ARTIFACTS"
-echo "+ run tests!"
-make test-e2e
+# Image is configured as `${CONTROLLER_IMG}-${ARCH}:${TAG}` where `CONTROLLER_IMG` is defaulted to `${REGISTRY}/${IMAGE_NAME}`.
+if [[ "${BUILD_MANAGER_IMAGE}" == "false" ]]; then
+  # Load an existing image, skip docker-build and docker-push.
+  make test-e2e-run
+else
+  # Build an image and push to the registry. TAG is set to `$(date -u '+%Y%m%d%H%M%S')`.
+  make test-e2e
+fi
