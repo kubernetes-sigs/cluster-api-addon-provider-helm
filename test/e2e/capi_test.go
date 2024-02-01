@@ -49,4 +49,36 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 			}
 		})
 	})
+
+	// TODO: figure out if we can run this locally.
+	// if os.Getenv("USE_LOCAL_KIND_REGISTRY") != "true" {
+	Context("API Version Upgrade", func() {
+
+		Context("upgrade from an old version of v1beta1 to current, and scale workload clusters created in the old version", func() {
+
+			capi_e2e.ClusterctlUpgradeSpec(context.TODO(), func() capi_e2e.ClusterctlUpgradeSpecInput {
+				return capi_e2e.ClusterctlUpgradeSpecInput{
+					E2EConfig:             e2eConfig,
+					ClusterctlConfigPath:  clusterctlConfigPath,
+					BootstrapClusterProxy: bootstrapClusterProxy,
+					ArtifactFolder:        artifactFolder,
+					SkipCleanup:           skipCleanup,
+					// PreInit:                   getPreInitFunc(ctx),
+					InitWithProvidersContract: "v1beta1",
+					ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
+						WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+					},
+					InitWithKubernetesVersion:       "v1.27.3",
+					InitWithBinary:                  "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/clusterctl-{OS}-{ARCH}",
+					InitWithCoreProvider:            "cluster-api:v1.5.0",
+					InitWithBootstrapProviders:      []string{"kubeadm:v1.5.0"},
+					InitWithControlPlaneProviders:   []string{"kubeadm:v1.5.0"},
+					InitWithInfrastructureProviders: []string{"docker:v1.5.0"},
+					InitWithAddonProviders:          []string{"helm:v0.1.1-alpha.0"},
+				}
+			})
+		})
+	})
+	// }
+
 })

@@ -1,0 +1,4 @@
+bases:
+- ../bases/calico.yaml
+- ../bases/md.yaml
+- ../bases/cluster-with-kcp.yaml
