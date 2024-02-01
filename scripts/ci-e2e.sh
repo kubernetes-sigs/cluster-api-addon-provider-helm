@@ -25,11 +25,12 @@ REPO_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # shellcheck source=hack/ensure-go.sh
 source "${REPO_ROOT}/hack/ensure-go.sh"
 
-export LOCAL_ONLY=${LOCAL_ONLY:-"true"}
-export USE_LOCAL_KIND_REGISTRY=${USE_LOCAL_KIND_REGISTRY:-${LOCAL_ONLY}} 
+export USE_LOCAL_KIND_REGISTRY=${USE_LOCAL_KIND_REGISTRY:-"true"} 
 export BUILD_MANAGER_IMAGE=${BUILD_MANAGER_IMAGE:-"true"}
 
-export REGISTRY=${REGISTRY:-"localhost:5000/ci-e2e"}
+if [[ "${USE_LOCAL_KIND_REGISTRY}" == "true" ]]; then
+  export REGISTRY="localhost:5000/ci-e2e"
+fi
 
 if [[ "${BUILD_MANAGER_IMAGE}" == "true" ]]; then
   defaultTag=$(date -u '+%Y%m%d%H%M%S')
@@ -42,6 +43,9 @@ export GINKGO_NODES=10
 if [[ "${BUILD_MANAGER_IMAGE}" == "false" ]]; then
   # Load an existing image, skip docker-build and docker-push.
   make test-e2e-run
+elif [[ "${USE_LOCAL_KIND_REGISTRY}" == "true" ]]; then
+  # Build an image with kind local registry, skip docker-push. REGISTRY is set to `localhost:5000/ci-e2e`. TAG is set to `$(date -u '+%Y%m%d%H%M%S')`.
+  make test-e2e-local
 else
   # Build an image and push to the registry. TAG is set to `$(date -u '+%Y%m%d%H%M%S')`.
   make test-e2e

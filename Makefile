@@ -396,13 +396,19 @@ test-cover: ## Run unit and integration tests and generate a coverage report
 
 
 .PHONY: test-e2e
-test-e2e: ## Run "docker-build" and "docker-push" rules then run e2e tests.
+test-e2e: ## Run `docker-build` and `docker-push` rules then run e2e tests.
 	PULL_POLICY=IfNotPresent MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
 	$(MAKE) docker-build docker-push \
 	test-e2e-run
 
+.PHONY: test-e2e-local
+test-e2e-local: ## Run `docker-build` rule then run e2e tests.
+	PULL_POLICY=IfNotPresent MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
+	$(MAKE) docker-build \
+	test-e2e-run
+
 .PHONY: test-e2e-run-skip-manifest
-test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates ## Run the end-to-end tests
+test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates ## Run the end-to-end tests without updating the manifest.
 	$(ENVSUBST) < $(E2E_CONF_FILE) > $(E2E_CONF_FILE_ENVSUBST) && \
 	$(GINKGO) -v --trace -poll-progress-after=$(GINKGO_POLL_PROGRESS_AFTER) \
 		-poll-progress-interval=$(GINKGO_POLL_PROGRESS_INTERVAL) --tags=e2e --focus="$(GINKGO_FOCUS)" \
@@ -413,7 +419,7 @@ test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates ## Run 
 	    -e2e.skip-resource-cleanup=$(SKIP_RESOURCE_CLEANUP) -e2e.use-existing-cluster=$(USE_EXISTING_CLUSTER)
 
 .PHONY: test-e2e-run
-test-e2e-run:
+test-e2e-run: ## Run the end-to-end tests and set controller image and pull policy in the manifest.
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml" PULL_POLICY=IfNotPresent
 	MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
