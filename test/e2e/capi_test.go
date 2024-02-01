@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	"k8s.io/utils/ptr"
@@ -65,13 +66,13 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 					ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
 						WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
 					},
-					InitWithKubernetesVersion:       "v1.27.3",
-					InitWithBinary:                  "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/clusterctl-{OS}-{ARCH}",
-					InitWithCoreProvider:            "cluster-api:v1.5.0",
-					InitWithBootstrapProviders:      []string{"kubeadm:v1.5.0"},
-					InitWithControlPlaneProviders:   []string{"kubeadm:v1.5.0"},
-					InitWithInfrastructureProviders: []string{"docker:v1.5.0"},
-					InitWithAddonProviders:          []string{"helm:v0.1.1-alpha.0"},
+					InitWithKubernetesVersion:       e2eConfig.GetVariable(KubernetesVersionAPIUpgradeFrom),
+					InitWithBinary:                  fmt.Sprintf("https://github.com/kubernetes-sigs/cluster-api/releases/download/%s/clusterctl-{OS}-{ARCH}", e2eConfig.GetVariable(OldCAPIUpgradeVersion)),
+					InitWithCoreProvider:            "cluster-api:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion),
+					InitWithBootstrapProviders:      []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
+					InitWithControlPlaneProviders:   []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
+					InitWithInfrastructureProviders: []string{"docker:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
+					InitWithAddonProviders:          []string{"helm:" + e2eConfig.GetVariable(OldProviderUpgradeVersion)},
 				}
 			})
 		})

@@ -25,10 +25,11 @@ import (
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 )
 
+// Test suite constants for e2e config variables
 const (
-	kubesystem  = "kube-system"
-	activitylog = "azure-activity-logs"
-	nodesDir    = "nodes"
+	OldProviderUpgradeVersion       = "OLD_PROVIDER_UPGRADE_VERSION"
+	OldCAPIUpgradeVersion           = "OLD_CAPI_UPGRADE_VERSION"
+	KubernetesVersionAPIUpgradeFrom = "KUBERNETES_VERSION_API_UPGRADE_FROM"
 )
 
 // Test suite flags
