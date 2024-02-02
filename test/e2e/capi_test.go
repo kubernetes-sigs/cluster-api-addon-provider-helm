@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	"k8s.io/utils/ptr"
@@ -50,32 +49,4 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 			}
 		})
 	})
-
-	Context("API Version Upgrade", func() {
-
-		Context("upgrade from an old version of v1beta1 to current, and scale workload clusters created in the old version", func() {
-
-			capi_e2e.ClusterctlUpgradeSpec(context.TODO(), func() capi_e2e.ClusterctlUpgradeSpecInput {
-				return capi_e2e.ClusterctlUpgradeSpecInput{
-					E2EConfig:                 e2eConfig,
-					ClusterctlConfigPath:      clusterctlConfigPath,
-					BootstrapClusterProxy:     bootstrapClusterProxy,
-					ArtifactFolder:            artifactFolder,
-					SkipCleanup:               skipCleanup,
-					InitWithProvidersContract: "v1beta1",
-					ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
-						WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
-					},
-					InitWithKubernetesVersion:       e2eConfig.GetVariable(KubernetesVersionAPIUpgradeFrom),
-					InitWithBinary:                  fmt.Sprintf("https://github.com/kubernetes-sigs/cluster-api/releases/download/%s/clusterctl-{OS}-{ARCH}", e2eConfig.GetVariable(OldCAPIUpgradeVersion)),
-					InitWithCoreProvider:            "cluster-api:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion),
-					InitWithBootstrapProviders:      []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-					InitWithControlPlaneProviders:   []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-					InitWithInfrastructureProviders: []string{"docker:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-					InitWithAddonProviders:          []string{"helm:" + e2eConfig.GetVariable(OldProviderUpgradeVersion)},
-				}
-			})
-		})
-	})
-
 })

@@ -32,10 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	kubesystem = "kube-system"
-)
-
 // EnsureControlPlaneInitialized waits for the cluster KubeadmControlPlane object to be initialized
 // and then installs cloud-provider-azure components via Helm.
 // Fulfills the clusterctl.Waiter type so that it can be used as ApplyClusterTemplateAndWaitInput data
