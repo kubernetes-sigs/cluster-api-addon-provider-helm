@@ -17,6 +17,15 @@ providers:
 - name: cluster-api
   type: CoreProvider
   versions:
+  - name: v1.5.0 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/core-components.yaml"
+    type: "url"
+    contract: v1beta1
+    replacements:
+    - old: --metrics-addr=127.0.0.1:8080
+      new: --metrics-addr=:8080
+    files:
+    - sourcePath: "../data/shared/v1beta1/metadata.yaml"
   - name: v1.6.0
     value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.6.0/core-components.yaml
     type: url
@@ -31,6 +40,15 @@ providers:
 - name: kubeadm
   type: BootstrapProvider
   versions:
+  - name: v1.5.0 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/bootstrap-components.yaml"
+    type: "url"
+    contract: v1beta1
+    replacements:
+    - old: --metrics-addr=127.0.0.1:8080
+      new: --metrics-addr=:8080
+    files:
+    - sourcePath: "../data/shared/v1beta1/metadata.yaml"
   - name: v1.6.0
     value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.6.0/bootstrap-components.yaml
     type: url
@@ -44,6 +62,15 @@ providers:
 - name: kubeadm
   type: ControlPlaneProvider
   versions:
+  - name: v1.5.0 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/control-plane-components.yaml"
+    type: "url"
+    contract: v1beta1
+    replacements:
+    - old: --metrics-addr=127.0.0.1:8080
+      new: --metrics-addr=:8080
+    files:
+    - sourcePath: "../data/shared/v1beta1/metadata.yaml"
   - name: v1.6.0
     value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.6.0/control-plane-components.yaml
     type: url
@@ -57,6 +84,17 @@ providers:
 - name: docker
   type: InfrastructureProvider
   versions:
+  - name: v1.5.0 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/infrastructure-components-development.yaml"
+    type: "url"
+    contract: v1beta1
+    replacements:
+    - old: --metrics-addr=127.0.0.1:8080
+      new: --metrics-addr=:8080
+    files:
+    - sourcePath: "${PWD}/test/e2e/data/shared/v1beta1/metadata.yaml"
+    - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1.5/cluster-template.yaml"
+      targetName: "cluster-template.yaml"
   - name: "v1.6.0" # latest published release in the v1beta1 series; this is used for v1beta1 --> main clusterctl upgrades test only.
     value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.6.0/infrastructure-components-development.yaml"
     type: "url"
@@ -71,6 +109,17 @@ providers:
 - name: helm
   type: AddonProvider
   versions:
+  - name: v0.1.1-alpha.0 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases/download/v0.1.1-alpha.0/addon-components.yaml
+    type: "url"
+    contract: v1beta1
+    files:
+    - sourcePath: "${PWD}/test/e2e/data/shared/v1beta1-provider/metadata.yaml"
+    replacements:
+    - old: "imagePullPolicy: Always"
+      new: "imagePullPolicy: IfNotPresent"
+    - old: "--v=0"
+      new: "--v=2"
   - name: v0.2.99 # "vNext"; use manifests from local source files
     value: "${PWD}/config/default"
     contract: v1beta1
@@ -91,6 +140,7 @@ variables:
   KUBERNETES_VERSION: "v1.29.0"
   KUBERNETES_VERSION_UPGRADE_FROM: "v1.28.0"
   KUBERNETES_VERSION_UPGRADE_TO: "v1.29.0"
+  KUBERNETES_VERSION_API_UPGRADE_FROM: "v1.27.3"
   ETCD_VERSION_UPGRADE_TO: "3.5.10-0"
   COREDNS_VERSION_UPGRADE_TO: "v1.11.1"
   DOCKER_SERVICE_DOMAIN: "cluster.local"
@@ -112,7 +162,9 @@ variables:
   EXP_MACHINE_SET_PREFLIGHT_CHECKS: "true"
   CAPI_DIAGNOSTICS_ADDRESS: ":8080"
   CAPI_INSECURE_DIAGNOSTICS: "true"
-  
+  OLD_CAPI_UPGRADE_VERSION: "v1.5.0"
+  OLD_PROVIDER_UPGRADE_VERSION: "v0.1.1-alpha.0"
+
 intervals:
   default/wait-controllers: ["3m", "10s"]
   default/wait-cluster: ["5m", "10s"]
