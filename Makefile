@@ -276,6 +276,7 @@ generate-e2e-templates-v1.5: $(KUSTOMIZE)
 .PHONY: generate-e2e-templates-main
 generate-e2e-templates-main: $(KUSTOMIZE) ## Generate templates for e2e tests on main branch.
 	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template.yaml
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades.yaml
 
 .PHONY: generate-flavors
 generate-flavors: $(KUSTOMIZE)  ## Generate template flavors.

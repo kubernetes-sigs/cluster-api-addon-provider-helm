@@ -51,6 +51,22 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 		})
 	})
 
+	Context("Running the workload cluster K8s version upgrade spec [K8s-Upgrade]", func() {
+		capi_e2e.ClusterUpgradeConformanceSpec(context.TODO(), func() capi_e2e.ClusterUpgradeConformanceSpecInput {
+			return capi_e2e.ClusterUpgradeConformanceSpecInput{
+				E2EConfig:             e2eConfig,
+				ClusterctlConfigPath:  clusterctlConfigPath,
+				BootstrapClusterProxy: bootstrapClusterProxy,
+				ArtifactFolder:        artifactFolder,
+				SkipCleanup:           skipCleanup,
+				SkipConformanceTests:  true,
+				ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				},
+			}
+		})
+	})
+
 	Context("API Version Upgrade", func() {
 
 		Context("upgrade from an old version of v1beta1 to current, and scale workload clusters created in the old version", func() {
@@ -77,5 +93,4 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 			})
 		})
 	})
-
 })

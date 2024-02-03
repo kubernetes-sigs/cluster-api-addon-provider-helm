@@ -1,0 +1,105 @@
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: calico
+spec:
+  chartName: tigera-operator
+  clusterSelector:
+    matchLabels:
+      cni: calico
+  namespace: tigera-operator
+  releaseName: projectcalico
+  repoURL: https://docs.tigera.io/calico/charts
+  valuesTemplate: |
+    installation:
+      cni:
+        type: Calico
+      calicoNetwork:
+        bgp: Disabled
+        mtu: 1350
+        ipPools:
+        ipPools:{{range $i, $cidr := .Cluster.spec.clusterNetwork.pods.cidrBlocks }}
+        - cidr: {{ $cidr }}
+          encapsulation: VXLAN{{end}}
+      registry: mcr.microsoft.com/oss
+    # Image and registry configuration for the tigera/operator pod.
+    tigeraOperator:
+      image: tigera/operator
+      registry: mcr.microsoft.com/oss
+    calicoctl:
+      image: mcr.microsoft.com/oss/calico/ctl
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  labels:
+    cni: calico
+  name: ${CLUSTER_NAME}
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - ${DOCKER_POD_CIDRS}
+    serviceDomain: ${DOCKER_SERVICE_DOMAIN}
+    services:
+      cidrBlocks:
+      - ${DOCKER_SERVICE_CIDRS}
+  topology:
+    class: quick-start
+    controlPlane:
+      metadata:
+        annotations:
+          Cluster.topology.controlPlane.annotation: Cluster.topology.controlPlane.annotationValue
+        labels:
+          Cluster.topology.controlPlane.label: Cluster.topology.controlPlane.labelValue
+          Cluster.topology.controlPlane.label.node.cluster.x-k8s.io: Cluster.topology.controlPlane.nodeLabelValue
+      nodeDeletionTimeout: 30s
+      nodeVolumeDetachTimeout: 5m
+      replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+    variables:
+    - name: etcdImageTag
+      value: ""
+    - name: coreDNSImageTag
+      value: ""
+    - name: preLoadImages
+      value: ${DOCKER_PRELOAD_IMAGES:-[]}
+    - name: podSecurityStandard
+      value:
+        enabled: false
+    version: ${KUBERNETES_VERSION}
+    workers:
+      machineDeployments:
+      - class: default-worker
+        failureDomain: fd4
+        metadata:
+          annotations:
+            Cluster.topology.machineDeployment.annotation: Cluster.topology.machineDeployment.annotationValue
+          labels:
+            Cluster.topology.machineDeployment.label: Cluster.topology.machineDeployment.labelValue
+            Cluster.topology.machineDeployment.label.node.cluster.x-k8s.io: Cluster.topology.machineDeployment.nodeLabelValue
+        minReadySeconds: 5
+        name: md-0
+        nodeDeletionTimeout: 30s
+        nodeVolumeDetachTimeout: 5m
+        replicas: ${WORKER_MACHINE_COUNT}
+        strategy:
+          rollingUpdate:
+            maxSurge: 20%
+            maxUnavailable: 0
+          type: RollingUpdate
+      machinePools:
+      - class: default-worker
+        failureDomains:
+        - fd4
+        metadata:
+          annotations:
+            Cluster.topology.machinePool.annotation: Cluster.topology.machinePool.annotationValue
+          labels:
+            Cluster.topology.machinePool.label: Cluster.topology.machinePool.labelValue
+            Cluster.topology.machinePool.label.node.cluster.x-k8s.io: Cluster.topology.machinePool.nodeLabelValue
+        minReadySeconds: 5
+        name: mp-0
+        nodeDeletionTimeout: 30s
+        nodeVolumeDetachTimeout: 5m
+        replicas: ${WORKER_MACHINE_COUNT}
