@@ -89,6 +89,10 @@ type HelmReleaseProxyStatus struct {
 	// Revision is the current revision of the Helm release.
 	// +optional
 	Revision int `json:"revision,omitempty"`
+
+	// ObservedGeneration is the latest generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +kubebuilder:object:root=true
