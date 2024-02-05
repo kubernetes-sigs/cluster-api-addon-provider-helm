@@ -19,6 +19,7 @@ package helmchartproxy
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/gomega"
@@ -52,7 +53,12 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
 		},
 	}
 
@@ -72,7 +78,12 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			ValuesTemplate:   "cidrBlockList: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join \",\" }}",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
 		},
 	}
 
@@ -92,7 +103,12 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			ValuesTemplate:   "apiServerPort: {{ .Cluster.invalid-path }}",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
 		},
 	}
 
@@ -112,7 +128,12 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
 		},
 	}
 
@@ -185,7 +206,12 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			Values:           "apiServerPort: 6443",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
 		},
 	}
 )
@@ -347,7 +373,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
 					Version:          "test-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 				},
 			},
 			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
@@ -365,7 +396,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Version:          "test-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 				},
 			},
 			parsedValues: "test-parsed-values",
@@ -398,75 +434,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ChartName:        "test-chart-name",
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
-					Options:          &addonsv1alpha1.HelmOptions{},
-				},
-			},
-			parsedValues: "test-parsed-values",
-			cluster: &clusterv1.Cluster{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: clusterv1.GroupVersion.String(),
-					Kind:       "Cluster",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "test-namespace",
-				},
-			},
-			expected: &addonsv1alpha1.HelmReleaseProxy{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-chart-name-test-cluster-",
-					Namespace:    "test-namespace",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion:         addonsv1alpha1.GroupVersion.String(),
-							Kind:               "HelmChartProxy",
-							Name:               "test-hcp",
-							Controller:         ptr.To(true),
-							BlockOwnerDeletion: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
 						},
-					},
-					Labels: map[string]string{
-						clusterv1.ClusterNameLabel:             "test-cluster",
-						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
-					},
-				},
-				Spec: addonsv1alpha1.HelmReleaseProxySpec{
-					ClusterRef: corev1.ObjectReference{
-						APIVersion: clusterv1.GroupVersion.String(),
-						Kind:       "Cluster",
-						Name:       "test-cluster",
-						Namespace:  "test-namespace",
-					},
-					ReleaseName:      "test-release-name",
-					ChartName:        "test-chart-name",
-					RepoURL:          "https://test-repo-url",
-					ReleaseNamespace: "test-release-namespace",
-					Values:           "test-parsed-values",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
-					},
-				},
-			},
-		},
-		{
-			name:     "construct helm release proxy without existing disable client cache",
-			existing: nil,
-			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: addonsv1alpha1.GroupVersion.String(),
-					Kind:       "HelmChartProxy",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-hcp",
-					Namespace: "test-namespace",
-				},
-				Spec: addonsv1alpha1.HelmChartProxySpec{
-					ReleaseName:      "test-release-name",
-					ChartName:        "test-chart-name",
-					RepoURL:          "https://test-repo-url",
-					ReleaseNamespace: "test-release-namespace",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(false),
 					},
 				},
 			},
@@ -511,77 +483,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(false),
-					},
-				},
-			},
-		},
-		{
-			name:     "construct helm release proxy without existing enable client cache",
-			existing: nil,
-			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: addonsv1alpha1.GroupVersion.String(),
-					Kind:       "HelmChartProxy",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-hcp",
-					Namespace: "test-namespace",
-				},
-				Spec: addonsv1alpha1.HelmChartProxySpec{
-					ReleaseName:      "test-release-name",
-					ChartName:        "test-chart-name",
-					RepoURL:          "https://test-repo-url",
-					ReleaseNamespace: "test-release-namespace",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
-					},
-				},
-			},
-			parsedValues: "test-parsed-values",
-			cluster: &clusterv1.Cluster{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: clusterv1.GroupVersion.String(),
-					Kind:       "Cluster",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: "test-namespace",
-				},
-			},
-			expected: &addonsv1alpha1.HelmReleaseProxy{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-chart-name-test-cluster-",
-					Namespace:    "test-namespace",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion:         addonsv1alpha1.GroupVersion.String(),
-							Kind:               "HelmChartProxy",
-							Name:               "test-hcp",
-							Controller:         ptr.To(true),
-							BlockOwnerDeletion: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
 						},
-					},
-					Labels: map[string]string{
-						clusterv1.ClusterNameLabel:             "test-cluster",
-						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
-					},
-				},
-				Spec: addonsv1alpha1.HelmReleaseProxySpec{
-					ClusterRef: corev1.ObjectReference{
-						APIVersion: clusterv1.GroupVersion.String(),
-						Kind:       "Cluster",
-						Name:       "test-cluster",
-						Namespace:  "test-namespace",
-					},
-					ReleaseName:      "test-release-name",
-					ChartName:        "test-chart-name",
-					RepoURL:          "https://test-repo-url",
-					ReleaseNamespace: "test-release-namespace",
-					Values:           "test-parsed-values",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
 					},
 				},
 			},
@@ -619,7 +525,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
 					Version:          "test-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 				},
 			},
 			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
@@ -637,7 +548,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Version:          "another-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 				},
 			},
 			parsedValues: "test-parsed-values",
@@ -682,8 +598,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
 					Version:          "another-version",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
 					},
 				},
 			},
@@ -721,7 +640,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
 					Version:          "test-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 				},
 			},
 			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
@@ -739,7 +663,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Version:          "test-version",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 				},
 			},
 			parsedValues: "updated-parsed-values",
@@ -784,8 +713,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "updated-parsed-values",
 					Version:          "test-version",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
 					},
 				},
 			},
@@ -807,7 +739,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ChartName:        "test-chart-name",
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{
 							Name: "test-secret",
@@ -854,8 +791,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
 					},
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{
@@ -884,7 +824,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ChartName:        "test-chart-name",
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{
 							Name:      "test-secret",
@@ -932,8 +877,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
 					},
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{
@@ -962,7 +910,12 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					ChartName:        "test-chart-name",
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
-					Options:          &addonsv1alpha1.HelmOptions{},
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{
 							Name: "test-secret",
@@ -1010,8 +963,11 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					RepoURL:          "https://test-repo-url",
 					ReleaseNamespace: "test-release-namespace",
 					Values:           "test-parsed-values",
-					Options: &addonsv1alpha1.HelmOptions{
-						EnableClientCache: ptr.To(true),
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
 					},
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{

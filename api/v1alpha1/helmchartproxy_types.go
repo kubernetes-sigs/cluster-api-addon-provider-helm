@@ -67,7 +67,7 @@ type HelmChartProxySpec struct {
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
 	// +optional
-	Options *HelmOptions `json:"options,omitempty"`
+	Options HelmOptions `json:"options,omitempty"`
 
 	// Credentials is a reference to an object containing the OCI credentials. If it is not specified, no credentials will be used.
 	// +optional
@@ -119,12 +119,12 @@ type HelmOptions struct {
 	// Install represents CLI flags passed to Helm install operation which can be used to control
 	// behaviour of helm Install operations via options like wait, skipCrds, timeout, waitForJobs, etc.
 	// +optional
-	Install *HelmInstallOptions `json:"install,omitempty"`
+	Install HelmInstallOptions `json:"install,omitempty"`
 
 	// Upgrade represents CLI flags passed to Helm upgrade operation which can be used to control
 	// behaviour of helm Upgrade operations via options like wait, skipCrds, timeout, waitForJobs, etc.
 	// +optional
-	Upgrade *HelmUpgradeOptions `json:"upgrade,omitempty"`
+	Upgrade HelmUpgradeOptions `json:"upgrade,omitempty"`
 
 	// Uninstall represents CLI flags passed to Helm uninstall operation which can be used to control
 	// behaviour of helm Uninstall operation via options like wait, timeout, etc.
@@ -132,8 +132,9 @@ type HelmOptions struct {
 	Uninstall *HelmUninstallOptions `json:"uninstall,omitempty"`
 
 	// EnableClientCache is a flag to enable Helm client cache. If it is not specified, it will be set to true.
+	// +kubebuilder:default=false
 	// +optional
-	EnableClientCache *bool `json:"enableClientCache,omitempty"`
+	EnableClientCache bool `json:"enableClientCache,omitempty"`
 }
 
 type HelmInstallOptions struct {
@@ -141,8 +142,9 @@ type HelmInstallOptions struct {
 	// HelmChartProxySpec.ReleaseNamespace if it does not exist yet.
 	// On uninstall, the namespace will not be garbage collected.
 	// If it is not specified by user, will be set to default 'true'.
+	// +kubebuilder:default=true
 	// +optional
-	CreateNamespace *bool `json:"createNamespace,omitempty"`
+	CreateNamespace bool `json:"createNamespace,omitempty"`
 
 	// IncludeCRDs determines whether CRDs stored as a part of helm templates directory should be installed.
 	// +optional
@@ -167,7 +169,8 @@ type HelmUpgradeOptions struct {
 	// +optional
 	Recreate bool `json:"recreate,omitempty"`
 
-	// MaxHistory limits the maximum number of revisions saved per release
+	// MaxHistory limits the maximum number of revisions saved per release (default is 10).
+	// +kubebuilder:default=10
 	// +optional
 	MaxHistory int `json:"maxHistory,omitempty"`
 

@@ -166,6 +166,7 @@ spec:
                       validation is enforced.
                     type: boolean
                   enableClientCache:
+                    default: false
                     description: EnableClientCache is a flag to enable Helm client
                       cache. If it is not specified, it will be set to true.
                     type: boolean
@@ -175,6 +176,7 @@ spec:
                       behaviour of helm Install operations via options like wait, skipCrds, timeout, waitForJobs, etc.
                     properties:
                       createNamespace:
+                        default: true
                         description: |-
                           CreateNamespace indicates the Helm install/upgrade action to create the
                           HelmChartProxySpec.ReleaseNamespace if it does not exist yet.
@@ -233,8 +235,9 @@ spec:
                           This should be used with caution.
                         type: boolean
                       maxHistory:
+                        default: 10
                         description: MaxHistory limits the maximum number of revisions
-                          saved per release
+                          saved per release (default is 10).
                         type: integer
                       recreate:
                         description: Recreate will (if true) recreate pods after a
