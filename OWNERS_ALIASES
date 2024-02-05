@@ -19,4 +19,6 @@ aliases:
     - Jont828
     - CecileRobertMichon
     - jackfrancis
-#  cluster-api-addon-helm-reviewers:
+  cluster-api-addon-helm-reviewers:
+    - mboersma
+
