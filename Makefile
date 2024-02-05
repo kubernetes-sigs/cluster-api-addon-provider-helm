@@ -433,7 +433,7 @@ test-e2e-run: ## Run the end-to-end tests and set controller image and pull poli
 	$(MAKE) test-e2e-run-skip-manifest
 
 .PHONY: get-e2e-kubeconfig
-get-e2e-kubeconfig:
+get-e2e-kubeconfig: ## Get the kubeconfig for the e2e cluster
 	@kind get kubeconfig --name caaph-e2e
 
 ## --------------------------------------

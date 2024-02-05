@@ -8,7 +8,6 @@ spec:
       cni: calico
   repoURL: https://docs.tigera.io/calico/charts
   chartName: tigera-operator
-  # version: ${CALICO_VERSION}
   releaseName: projectcalico
   namespace: tigera-operator
   valuesTemplate: |

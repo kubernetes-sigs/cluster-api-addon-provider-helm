@@ -69,7 +69,7 @@ var (
 	// kubetestConfigFilePath is the path to the kubetest configuration file
 	kubetestConfigFilePath string
 
-	// kubetestRepoListPath
+	// kubetestRepoListPath contains the path to the kubetest repo-list
 	kubetestRepoListPath string
 
 	// useCIArtifacts specifies whether or not to use the latest build from the main branch of the Kubernetes repository
