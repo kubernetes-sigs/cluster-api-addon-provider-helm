@@ -103,8 +103,11 @@ providers:
     - old: --metrics-addr=127.0.0.1:8080
       new: --metrics-addr=:8080
     files:
+    # Add cluster templates
     - sourcePath: "${PWD}/test/e2e/data/shared/v1beta1/metadata.yaml"
     - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1beta1/cluster-template.yaml"
+    - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1beta1/cluster-template-upgrades.yaml"
+    - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1beta1/clusterclass-quick-start.yaml"
 
 - name: helm
   type: AddonProvider
