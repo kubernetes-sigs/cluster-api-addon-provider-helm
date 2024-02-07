@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var defaultEnableClientCache = true
-
 // deleteOrphanedHelmReleaseProxies deletes any HelmReleaseProxy resources that belong to a Cluster that is not selected by its parent HelmChartProxy.
 func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
@@ -227,15 +225,6 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		if helmReleaseProxy.Spec.Credentials.Key == "" {
 			helmReleaseProxy.Spec.Credentials.Key = addonsv1alpha1.DefaultOCIKey
 		}
-	}
-
-	// Set the default value for EnableClientCache if it is not set
-	if helmReleaseProxy.Spec.Options == nil {
-		helmReleaseProxy.Spec.Options = &addonsv1alpha1.HelmOptions{}
-	}
-
-	if helmReleaseProxy.Spec.Options.EnableClientCache == nil {
-		helmReleaseProxy.Spec.Options.EnableClientCache = &defaultEnableClientCache
 	}
 
 	return helmReleaseProxy

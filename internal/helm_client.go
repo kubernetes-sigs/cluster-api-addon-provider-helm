@@ -155,14 +155,8 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 	installClient.SubNotes = helmOptions.SubNotes
 	installClient.DisableOpenAPIValidation = helmOptions.DisableOpenAPIValidation
 	installClient.Atomic = helmOptions.Atomic
-
-	if helmOptions.Install != nil {
-		installClient.IncludeCRDs = helmOptions.Install.IncludeCRDs
-		// Safety check to avoid panic in case webhook is disabled.
-		if helmOptions.Install.CreateNamespace != nil {
-			installClient.CreateNamespace = *helmOptions.Install.CreateNamespace
-		}
-	}
+	installClient.IncludeCRDs = helmOptions.Install.IncludeCRDs
+	installClient.CreateNamespace = helmOptions.Install.CreateNamespace
 
 	return installClient
 }
@@ -187,14 +181,11 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 	upgradeClient.SubNotes = helmOptions.SubNotes
 	upgradeClient.DisableOpenAPIValidation = helmOptions.DisableOpenAPIValidation
 	upgradeClient.Atomic = helmOptions.Atomic
-
-	if helmOptions.Upgrade != nil {
-		upgradeClient.Force = helmOptions.Upgrade.Force
-		upgradeClient.ResetValues = helmOptions.Upgrade.ResetValues
-		upgradeClient.ReuseValues = helmOptions.Upgrade.ReuseValues
-		upgradeClient.MaxHistory = helmOptions.Upgrade.MaxHistory
-		upgradeClient.CleanupOnFail = helmOptions.Upgrade.CleanupOnFail
-	}
+	upgradeClient.Force = helmOptions.Upgrade.Force
+	upgradeClient.ResetValues = helmOptions.Upgrade.ResetValues
+	upgradeClient.ReuseValues = helmOptions.Upgrade.ReuseValues
+	upgradeClient.MaxHistory = helmOptions.Upgrade.MaxHistory
+	upgradeClient.CleanupOnFail = helmOptions.Upgrade.CleanupOnFail
 
 	return upgradeClient
 }
@@ -209,10 +200,7 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, 
 	}
 	settings.RegistryConfig = credentialsPath
 
-	enableClientCache := true
-	if spec.Options != nil && spec.Options.EnableClientCache != nil {
-		enableClientCache = *spec.Options.EnableClientCache
-	}
+	enableClientCache := spec.Options.EnableClientCache
 	log.V(2).Info("Creating install registry client", "enableClientCache", enableClientCache, "credentialsPath", credentialsPath)
 	registryClient, err := newDefaultRegistryClient(credentialsPath, enableClientCache)
 	if err != nil {
@@ -226,7 +214,7 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, 
 		return nil, err
 	}
 
-	installClient := generateHelmInstallConfig(actionConfig, spec.Options)
+	installClient := generateHelmInstallConfig(actionConfig, &spec.Options)
 	installClient.RepoURL = repoURL
 	installClient.Version = spec.Version
 	installClient.Namespace = spec.ReleaseNamespace
@@ -342,10 +330,7 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig
 	}
 	settings.RegistryConfig = credentialsPath
 
-	enableClientCache := true
-	if spec.Options != nil && spec.Options.EnableClientCache != nil {
-		enableClientCache = *spec.Options.EnableClientCache
-	}
+	enableClientCache := spec.Options.EnableClientCache
 	log.V(2).Info("Creating upgrade registry client", "enableClientCache", enableClientCache, "credentialsPath", credentialsPath)
 	registryClient, err := newDefaultRegistryClient(credentialsPath, enableClientCache)
 	if err != nil {
@@ -359,7 +344,7 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig
 		return nil, err
 	}
 
-	upgradeClient := generateHelmUpgradeConfig(actionConfig, spec.Options)
+	upgradeClient := generateHelmUpgradeConfig(actionConfig, &spec.Options)
 	upgradeClient.RepoURL = repoURL
 	upgradeClient.Version = spec.Version
 	upgradeClient.Namespace = spec.ReleaseNamespace
@@ -535,7 +520,7 @@ func (c *HelmClient) UninstallHelmRelease(ctx context.Context, kubeconfig string
 		return nil, err
 	}
 
-	uninstallClient := generateHelmUninstallConfig(actionConfig, spec.Options)
+	uninstallClient := generateHelmUninstallConfig(actionConfig, &spec.Options)
 
 	response, err := uninstallClient.Run(spec.ReleaseName)
 	if err != nil {

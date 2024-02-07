@@ -23,7 +23,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -45,7 +44,7 @@ func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.Defaulter = &HelmChartProxy{}
 
-const helmTimeout = time.Second * 600
+const helmTimeout = 10 * time.Minute
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type.
 func (p *HelmChartProxy) Default() {
@@ -55,18 +54,13 @@ func (p *HelmChartProxy) Default() {
 		p.Spec.ReleaseNamespace = "default"
 	}
 
-	// If 'Wait' is set, we need to set default 'Timeout' to make install successful.
-	if p.Spec.Options != nil && p.Spec.Options.Wait && p.Spec.Options.Timeout == nil {
-		p.Spec.Options.Timeout = &metav1.Duration{Duration: helmTimeout}
+	if p.Spec.Options.Atomic {
+		p.Spec.Options.Wait = true
 	}
 
-	// If 'CreateNamespace' is not specified by user, set default value to 'true'
-	if p.Spec.Options != nil {
-		if p.Spec.Options.Install == nil {
-			p.Spec.Options.Install = &HelmInstallOptions{CreateNamespace: ptr.To(true)}
-		} else if p.Spec.Options.Install.CreateNamespace == nil {
-			p.Spec.Options.Install.CreateNamespace = ptr.To(true)
-		}
+	// Note: timeout is also needed to ensure that Spec.Options.Wait works.
+	if p.Spec.Options.Timeout == nil {
+		p.Spec.Options.Timeout = &metav1.Duration{Duration: helmTimeout}
 	}
 }
 

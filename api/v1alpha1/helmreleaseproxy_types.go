@@ -69,7 +69,7 @@ type HelmReleaseProxySpec struct {
 	// Options represents the helm setting options which can be used to control behaviour of helm operations(Install, Upgrade, Delete, etc)
 	// via options like wait, skipCrds, timeout, waitForJobs, etc.
 	// +optional
-	Options *HelmOptions `json:"options,omitempty"`
+	Options HelmOptions `json:"options,omitempty"`
 
 	// Credentials is a reference to an object containing the OCI credentials. If it is not specified, no credentials will be used.
 	// +optional

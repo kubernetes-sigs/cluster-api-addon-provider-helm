@@ -56,7 +56,7 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options:          addonsv1alpha1.HelmOptions{},
 		},
 	}
 
@@ -168,7 +168,7 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			Values:           "apiServerPort: 1234",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options:          addonsv1alpha1.HelmOptions{},
 		},
 		Status: addonsv1alpha1.HelmReleaseProxyStatus{
 			Conditions: []clusterv1.Condition{
@@ -211,7 +211,7 @@ var (
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
 			Values:           "apiServerPort: 5678",
-			Options:          &addonsv1alpha1.HelmOptions{},
+			Options:          addonsv1alpha1.HelmOptions{},
 		},
 		Status: addonsv1alpha1.HelmReleaseProxyStatus{
 			Conditions: []clusterv1.Condition{
