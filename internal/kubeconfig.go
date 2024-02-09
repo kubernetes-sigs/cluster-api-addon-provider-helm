@@ -25,21 +25,21 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	configclient "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 type Getter interface {
-	GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error)
+	GetClusterKubeconfig(ctx context.Context, clusterKey ctrlclient.ObjectKey) (string, error)
 }
 
 type KubeconfigGetter struct{}
 
 // GetClusterKubeconfig returns the kubeconfig for a selected Cluster as a string.
-func (k *KubeconfigGetter) GetClusterKubeconfig(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
+func (k *KubeconfigGetter) GetClusterKubeconfig(ctx context.Context, clusterKey ctrlclient.ObjectKey) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Initializing management cluster kubeconfig")
@@ -55,11 +55,11 @@ func (k *KubeconfigGetter) GetClusterKubeconfig(ctx context.Context, cluster *cl
 
 	options := client.GetKubeconfigOptions{
 		Kubeconfig:          client.Kubeconfig(*managementKubeconfig),
-		WorkloadClusterName: cluster.Name,
-		Namespace:           cluster.Namespace,
+		WorkloadClusterName: clusterKey.Name,
+		Namespace:           clusterKey.Namespace,
 	}
 
-	log.V(4).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
+	log.V(4).Info("Getting kubeconfig for cluster", "cluster", clusterKey.Name)
 	kubeconfig, err := c.GetKubeconfig(ctx, options)
 	if err != nil {
 		return "", err

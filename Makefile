@@ -39,7 +39,7 @@ export GO111MODULE=on
 #
 # Kubebuilder.
 #
-export KUBEBUILDER_ENVTEST_KUBERNETES_VERSION ?= 1.26.0
+export KUBEBUILDER_ENVTEST_KUBERNETES_VERSION ?= 1.27.1
 export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT ?= 60s
 export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT ?= 60s
 
@@ -93,7 +93,7 @@ _SKIP_ARGS := $(foreach arg,$(strip $(GINKGO_SKIP)),-skip="$(arg)")
 endif
 
 # Helper function to get dependency version from go.mod
-get_go_version = $(shell go list -m $1 | awk '{print $$2}')
+get_go_version = $(shell go list -f "{{.Version}}" -m $1)
 
 #
 # Binaries.
@@ -104,7 +104,10 @@ KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
 KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v4
 
-MOCKGEN_VER := v0.2.0
+CLUSTER_API_VERSION := $(call get_go_version,sigs.k8s.io/cluster-api)
+CLUSTER_API_CRD_LOCATION = test/controllers/data/crd
+
+MOCKGEN_VER := v0.4.0
 MOCKGEN_BIN := mockgen
 MOCKGEN := $(TOOLS_BIN_DIR)/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
 
@@ -263,6 +266,11 @@ generate-go: $(CONTROLLER_GEN) $(MOCKGEN) $(KUSTOMIZE) ## Generate manifests e.g
 generate-modules: ## Run go mod tidy to ensure modules are up to date
 	go mod tidy
 	cd $(TOOLS_DIR); go mod tidy
+
+.PHONY: download-cluster-api-crd
+download-cluster-api-crd: generate-modules ## Run to download Cluster API CRDs for tests
+	cp -r $(shell go env GOPATH)/pkg/mod/sigs.k8s.io/cluster-api@$(CLUSTER_API_VERSION)/config/crd/bases/cluster.x-k8s.io_clusters.yaml $(CLUSTER_API_CRD_LOCATION)
+	chmod 644 $(CLUSTER_API_CRD_LOCATION)/*
 
 DOCKER_TEMPLATES := test/e2e/data/addons-helm
 

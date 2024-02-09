@@ -31,6 +31,7 @@ import (
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	chartcontroller "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
 	releasecontroller "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
+	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/version"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
@@ -193,6 +194,8 @@ func main() {
 	if err = (&releasecontroller.HelmReleaseProxyReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           scheme,
+		KubeconfigGetter: &internal.KubeconfigGetter{},
+		HelmClient:       &internal.HelmClient{},
 		WatchFilterValue: watchFilterValue,
 	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmReleaseProxy")

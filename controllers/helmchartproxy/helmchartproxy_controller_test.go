@@ -22,11 +22,14 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -35,6 +38,9 @@ import (
 var _ reconcile.Reconciler = &HelmChartProxyReconciler{}
 
 var (
+	ctx        = ctrl.SetupSignalHandler()
+	fakeScheme = runtime.NewScheme()
+
 	defaultProxy = &addonsv1alpha1.HelmChartProxy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: addonsv1alpha1.GroupVersion.String(),
@@ -345,4 +351,10 @@ func TestReconcileNormal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func init() {
+	_ = scheme.AddToScheme(fakeScheme)
+	_ = clusterv1.AddToScheme(fakeScheme)
+	_ = addonsv1alpha1.AddToScheme(fakeScheme)
 }
