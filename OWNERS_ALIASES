@@ -7,17 +7,15 @@ aliases:
     - neolit123
     - timothysc
   cluster-api-admins:
-    - CecileRobertMichon
+    - fabriziopandini
     - vincepri
   cluster-api-maintainers:
-    - CecileRobertMichon
     - enxebre
     - fabriziopandini
     - sbueringer
     - vincepri
   cluster-api-addon-helm-maintainers:
     - Jont828
-    - CecileRobertMichon
     - jackfrancis
   cluster-api-addon-helm-reviewers:
     - mboersma
