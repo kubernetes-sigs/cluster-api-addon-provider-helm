@@ -21,12 +21,19 @@ package e2e
 
 import (
 	"context"
+	"log"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	kubeadmv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -115,4 +122,166 @@ func CheckTestBeforeCleanup() {
 		Logf("FAILED!")
 	}
 	Logf("Cleaning up after \"%s\" spec", CurrentSpecReport().FullText())
+}
+
+func setupSpecNamespace(ctx context.Context, namespaceName string, clusterProxy framework.ClusterProxy, artifactFolder string) (*corev1.Namespace, context.CancelFunc, error) {
+	Byf("Creating namespace %q for hosting the cluster", namespaceName)
+	Logf("starting to create namespace for hosting the %q test spec", namespaceName)
+	logPath := filepath.Join(artifactFolder, "clusters", clusterProxy.GetName())
+	namespace, err := GetNamespace(ctx, clusterProxy.GetClientSet(), namespaceName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, nil, err
+	}
+
+	// namespace exists wire it up
+	if err == nil {
+		Byf("Creating event watcher for existing namespace %q", namespace.Name)
+		watchesCtx, cancelWatches := context.WithCancel(ctx)
+		go func() {
+			defer GinkgoRecover()
+			framework.WatchNamespaceEvents(watchesCtx, framework.WatchNamespaceEventsInput{
+				ClientSet: clusterProxy.GetClientSet(),
+				Name:      namespace.Name,
+				LogFolder: logPath,
+			})
+		}()
+
+		return namespace, cancelWatches, nil
+	}
+
+	// create and wire up namespace
+	namespace, cancelWatches := framework.CreateNamespaceAndWatchEvents(ctx, framework.CreateNamespaceAndWatchEventsInput{
+		Creator:   clusterProxy.GetClient(),
+		ClientSet: clusterProxy.GetClientSet(),
+		Name:      namespaceName,
+		LogFolder: logPath,
+	})
+
+	return namespace, cancelWatches, nil
+}
+
+// GetNamespace returns a namespace for with a given name
+func GetNamespace(ctx context.Context, clientset *kubernetes.Clientset, name string) (*corev1.Namespace, error) {
+	opts := metav1.GetOptions{}
+	namespace, err := clientset.CoreV1().Namespaces().Get(ctx, name, opts)
+	if err != nil {
+		log.Printf("failed trying to get namespace (%s):%s\n", name, err.Error())
+		return nil, err
+	}
+
+	return namespace, nil
+}
+
+func createApplyClusterTemplateInput(specName string, changes ...func(*clusterctl.ApplyClusterTemplateAndWaitInput)) clusterctl.ApplyClusterTemplateAndWaitInput {
+	input := clusterctl.ApplyClusterTemplateAndWaitInput{
+		ClusterProxy: bootstrapClusterProxy,
+		ConfigCluster: clusterctl.ConfigClusterInput{
+			LogFolder:                filepath.Join(artifactFolder, "clusters", bootstrapClusterProxy.GetName()),
+			ClusterctlConfigPath:     clusterctlConfigPath,
+			KubeconfigPath:           bootstrapClusterProxy.GetKubeconfigPath(),
+			InfrastructureProvider:   clusterctl.DefaultInfrastructureProvider,
+			Flavor:                   clusterctl.DefaultFlavor,
+			Namespace:                "default",
+			ClusterName:              "cluster",
+			KubernetesVersion:        e2eConfig.GetVariable(capi_e2e.KubernetesVersion),
+			ControlPlaneMachineCount: ptr.To[int64](1),
+			WorkerMachineCount:       ptr.To[int64](1),
+		},
+		WaitForClusterIntervals:      e2eConfig.GetIntervals(specName, "wait-cluster"),
+		WaitForControlPlaneIntervals: e2eConfig.GetIntervals(specName, "wait-control-plane"),
+		WaitForMachineDeployments:    e2eConfig.GetIntervals(specName, "wait-worker-nodes"),
+		WaitForMachinePools:          e2eConfig.GetIntervals(specName, "wait-machine-pool-nodes"),
+		CNIManifestPath:              "",
+	}
+	for _, change := range changes {
+		change(&input)
+	}
+
+	return input
+}
+
+func withClusterProxy(proxy framework.ClusterProxy) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ClusterProxy = proxy
+	}
+}
+
+func withFlavor(flavor string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.Flavor = flavor
+	}
+}
+
+func withNamespace(namespace string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.Namespace = namespace
+	}
+}
+
+func withClusterName(clusterName string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.ClusterName = clusterName
+	}
+}
+
+func withKubernetesVersion(version string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.KubernetesVersion = version
+	}
+}
+
+func withControlPlaneMachineCount(count int64) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.ControlPlaneMachineCount = ptr.To[int64](count)
+	}
+}
+
+func withWorkerMachineCount(count int64) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.WorkerMachineCount = ptr.To[int64](count)
+	}
+}
+
+func withClusterInterval(specName string, intervalName string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		if intervalName != "" {
+			input.WaitForClusterIntervals = e2eConfig.GetIntervals(specName, intervalName)
+		}
+	}
+}
+
+func withControlPlaneInterval(specName string, intervalName string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		if intervalName != "" {
+			input.WaitForControlPlaneIntervals = e2eConfig.GetIntervals(specName, intervalName)
+		}
+	}
+}
+
+func withMachineDeploymentInterval(specName string, intervalName string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		if intervalName != "" {
+			input.WaitForMachineDeployments = e2eConfig.GetIntervals(specName, intervalName)
+		}
+	}
+}
+
+func withMachinePoolInterval(specName string, intervalName string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		if intervalName != "" {
+			input.WaitForMachinePools = e2eConfig.GetIntervals(specName, intervalName)
+		}
+	}
+}
+
+func withControlPlaneWaiters(waiters clusterctl.ControlPlaneWaiters) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ControlPlaneWaiters = waiters
+	}
+}
+
+func withPostMachinesProvisioned(postMachinesProvisioned func()) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.PostMachinesProvisioned = postMachinesProvisioned
+	}
 }

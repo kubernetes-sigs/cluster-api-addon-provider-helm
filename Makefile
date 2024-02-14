@@ -631,8 +631,8 @@ clean: ## Remove generated binaries, GitBook files, Helm charts, and Tilt build 
 	$(MAKE) clean-bin
 
 .PHONY: clean-kind
-clean-kind: ## Cleans up the kind cluster with the name $CAPI_KIND_CLUSTER_NAME
-	kind delete cluster --name="$(CAPI_KIND_CLUSTER_NAME)" || true
+clean-kind: ## Cleans up the kind cluster from e2e tests
+	kind delete cluster --name=caaph-e2e || true
 
 .PHONY: clean-bin
 clean-bin: ## Remove all generated binaries
