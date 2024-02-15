@@ -27,9 +27,11 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 	helmAction "helm.sh/helm/v3/pkg/action"
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	helmRelease "helm.sh/helm/v3/pkg/release"
@@ -52,6 +54,7 @@ const (
 	sshPort                               = "22"
 	deleteOperationTimeout                = 20 * time.Minute
 	retryableOperationTimeout             = 30 * time.Second
+	retryableOperationInterval            = 3 * time.Second
 	retryableDeleteOperationTimeout       = 3 * time.Minute
 	retryableOperationSleepBetweenRetries = 3 * time.Second
 	helmInstallTimeout                    = 3 * time.Minute
@@ -167,7 +170,7 @@ func prettyPrint(v interface{}) string {
 	return string(b)
 }
 
-func getHelmActionConfigForTests(ctx context.Context, workloadClusterProxy framework.ClusterProxy) *helmAction.Configuration {
+func getHelmActionConfigForTests(ctx context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace string) *helmAction.Configuration {
 
 	workloadKubeconfigPath := workloadClusterProxy.GetKubeconfigPath()
 
@@ -176,20 +179,20 @@ func getHelmActionConfigForTests(ctx context.Context, workloadClusterProxy frame
 
 	actionConfig := new(helmAction.Configuration)
 	klog.Info("Initializing action config")
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", Logf)
+	err := actionConfig.Init(settings.RESTClientGetter(), releaseNamespace, "secret", Logf)
 	Expect(err).NotTo(HaveOccurred())
 
 	return actionConfig
 }
 
 // GetWaitForHelmReleaseDeployedInput is a convenience func to compose a WaitForHelmReleaseDeployedInput.
-func GetWaitForHelmReleaseDeployedInput(ctx context.Context, workloadClusterProxy framework.ClusterProxy, releaseName, namespace string, specName string) WaitForHelmReleaseDeployedInput {
+func GetWaitForHelmReleaseDeployedInput(ctx context.Context, workloadClusterProxy framework.ClusterProxy, releaseName, releaseNamespace string, specName string) WaitForHelmReleaseDeployedInput {
 	Expect(workloadClusterProxy).NotTo(BeNil())
 
-	// Workaround atm so we don't need to deal with generated random Helm release names
+	// Workaround for now so we don't need to deal with generated random Helm release names
 	Expect(releaseName).NotTo(BeEmpty())
 
-	actionConfig := getHelmActionConfigForTests(ctx, workloadClusterProxy)
+	actionConfig := getHelmActionConfigForTests(ctx, workloadClusterProxy, releaseNamespace)
 
 	var release *helmRelease.Release
 	Eventually(func() error {
@@ -211,7 +214,7 @@ func GetWaitForHelmReleaseDeployedInput(ctx context.Context, workloadClusterProx
 
 	return WaitForHelmReleaseDeployedInput{
 		ActionConfig: actionConfig,
-		Namespace:    namespace,
+		Namespace:    releaseNamespace,
 		HelmRelease:  release,
 	}
 }
@@ -224,31 +227,34 @@ type WaitForHelmReleaseDeployedInput struct {
 }
 
 // WaitForHelmReleaseDeployed waits until the Helm release has status.Status = deployed, which signals that the Helm release was successfully deployed.
-func WaitForHelmReleaseDeployed(ctx context.Context, input WaitForHelmReleaseDeployedInput, intervals ...interface{}) {
+func WaitForHelmReleaseDeployed(ctx context.Context, input WaitForHelmReleaseDeployedInput, intervals ...interface{}) *helmRelease.Release {
 	start := time.Now()
 	Expect(input.HelmRelease).ToNot(BeNil())
 	getClient := helmAction.NewGet(input.ActionConfig)
 
 	Log("starting to wait for Helm release to be deployed")
 	Eventually(func() bool {
-		if release, err := getClient.Run(input.HelmRelease.Name); err == nil {
+		release, err := getClient.Run(input.HelmRelease.Name)
+		if err == nil {
 			if release != nil && release.Info.Status == helmRelease.StatusDeployed {
 				return true
 			}
-		} else {
-			input.HelmRelease = release
 		}
+
+		input.HelmRelease = release
 
 		return false
 	}, intervals...).Should(BeTrue(), fmt.Sprintf("HelmRelease %s/%s failed to deploy, status: %s", input.Namespace, input.HelmRelease.Name, input.HelmRelease.Info.Status))
 	Logf("Helm release %s is now deployed, took %v", input.HelmRelease, time.Since(start))
+
+	return input.HelmRelease
 }
 
 // WaitForHelmReleaseProxyReadyInput is the input for WaitForHelmReleaseProxyReady.
 type WaitForHelmReleaseProxyReadyInput struct {
 	Getter           framework.Getter
 	HelmReleaseProxy *addonsv1alpha1.HelmReleaseProxy
-	Client           ctrlclient.Client
+	ExpectedRevision int
 }
 
 // WaitForHelmReleaseProxyReady waits until the HelmReleaseProxy has ready condition = True, that signals that the Helm
@@ -259,36 +265,105 @@ func WaitForHelmReleaseProxyReady(ctx context.Context, input WaitForHelmReleaseP
 
 	Byf("waiting for HelmReleaseProxy for %s/%s to be ready", input.HelmReleaseProxy.GetNamespace(), input.HelmReleaseProxy.GetName())
 	Log("starting to wait for HelmReleaseProxy to become available")
+	helmReleaseProxy := input.HelmReleaseProxy
 	Eventually(func() bool {
 		key := client.ObjectKey{Namespace: namespace, Name: name}
-		if err := input.Getter.Get(ctx, key, input.HelmReleaseProxy); err == nil {
-			if conditions.IsTrue(input.HelmReleaseProxy, clusterv1.ReadyCondition) {
+		if err := input.Getter.Get(ctx, key, helmReleaseProxy); err == nil {
+			if conditions.IsTrue(helmReleaseProxy, clusterv1.ReadyCondition) && helmReleaseProxy.Status.Revision == input.ExpectedRevision {
 				return true
 			}
 		}
 		return false
-	}, intervals...).Should(BeTrue(), fmt.Sprintf("HelmReleaseProxy %s/%s failed to with ready condition: %+v`", namespace, name, conditions.Get(input.HelmReleaseProxy, clusterv1.ReadyCondition)))
+	}, intervals...).Should(BeTrue(), fmt.Sprintf("HelmReleaseProxy %s/%s failed to become ready and have up to date revision: ready condition = %+v, revision = %v, expectedRevision = %v, full object is:\n%+v\n`", namespace, name, conditions.Get(input.HelmReleaseProxy, clusterv1.ReadyCondition), helmReleaseProxy.Status.Revision, input.ExpectedRevision, helmReleaseProxy))
 	Logf("HelmReleaseProxy %s/%s is now ready, took %v", namespace, name, time.Since(start))
 }
 
 // GetWaitForHelmReleaseProxyReadyInput is a convenience func to compose a WaitForHelmReleaseProxyReadyInput.
-func GetWaitForHelmReleaseProxyReadyInput(ctx context.Context, clusterProxy framework.ClusterProxy, clusterName string, helmChartProxy addonsv1alpha1.HelmChartProxy, specName string) WaitForHelmReleaseProxyReadyInput {
+func GetWaitForHelmReleaseProxyReadyInput(ctx context.Context, clusterProxy framework.ClusterProxy, clusterName string, helmChartProxy addonsv1alpha1.HelmChartProxy, expectedRevision int, specName string) WaitForHelmReleaseProxyReadyInput {
 	Expect(clusterProxy).NotTo(BeNil())
 	cl := clusterProxy.GetClient()
 	var helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy
 	Eventually(func() error {
-		if hrp, err := getHelmReleaseProxy(ctx, cl, clusterName, helmChartProxy); err != nil {
+		hrp, err := getHelmReleaseProxy(ctx, cl, clusterName, helmChartProxy)
+		if err != nil {
 			return err
-		} else {
-			helmReleaseProxy = hrp
 		}
+
+		annotations := hrp.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		result, ok := annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
+
+		isReleaseNameGenerated := ok && result == "true"
+		// When an immutable field gets changed, the old HelmReleaseProxy gets deleted and a new one comes online.
+		// So we need to check to make sure the HelmReleaseProxy we got is the right one by making sure the immutable fields match.
+		switch {
+		case hrp.Spec.ChartName != helmChartProxy.Spec.ChartName:
+			return errors.Errorf("ChartName mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.ChartName, helmChartProxy.Spec.ChartName)
+		case hrp.Spec.RepoURL != helmChartProxy.Spec.RepoURL:
+			return errors.Errorf("RepoURL mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.RepoURL, helmChartProxy.Spec.RepoURL)
+		case isReleaseNameGenerated && helmChartProxy.Spec.ReleaseName != "":
+			return errors.Errorf("Generated ReleaseName mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.ReleaseName, helmChartProxy.Spec.ReleaseName)
+		case !isReleaseNameGenerated && hrp.Spec.ReleaseName != helmChartProxy.Spec.ReleaseName:
+			return errors.Errorf("Non-generated ReleaseName mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.ReleaseName, helmChartProxy.Spec.ReleaseName)
+		case hrp.Spec.ReleaseNamespace != helmChartProxy.Spec.ReleaseNamespace:
+			return errors.Errorf("ReleaseNamespace mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.ReleaseNamespace, helmChartProxy.Spec.ReleaseNamespace)
+		}
+
+		// If we made it past all the checks, then we have the correct HelmReleaseProxy.
+		helmReleaseProxy = hrp
 
 		return nil
 	}, e2eConfig.GetIntervals(specName, "wait-helmreleaseproxy")...).Should(Succeed())
 	return WaitForHelmReleaseProxyReadyInput{
 		HelmReleaseProxy: helmReleaseProxy,
+		ExpectedRevision: expectedRevision,
 		Getter:           cl,
 	}
+}
+
+// ValidateHelmRelease validates the fields of a Helm release.
+func ValidateHelmRelease(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, helmRelease *helmRelease.Release, expectedRevision int) {
+	Byf("Validating Helm release %s", helmReleaseProxy.Name)
+
+	Expect(helmReleaseProxy).NotTo(BeNil())
+	Expect(helmRelease).NotTo(BeNil())
+
+	// Validate that Helm release value overrides match the HelmReleaseProxy values.
+	helmReleaseProxyValues, releaseValues := normalizeHelmReleaseValues(ctx, helmReleaseProxy, helmRelease)
+	Logf("Helm release values:\n%+v\n", helmRelease.Config)
+	Logf("HelmReleaseProxy values:\n%s\n", helmReleaseProxy.Spec.Values)
+
+	valuesDiff := cmp.Diff(helmReleaseProxyValues, releaseValues)
+	Expect(valuesDiff).To(BeEmpty(), "Wanted HelmReleaseProxy values:\n%+v\n, instead got Helm release values:\n%+v\n", helmReleaseProxyValues, releaseValues)
+
+	// Validate that the revision matches the expected revision. This is useful to ensure that the Helm release was updated or reinstalled.
+	Expect(helmRelease.Version).To(Equal(expectedRevision), "Helm release revision does not match expected revision")
+}
+
+func normalizeHelmReleaseValues(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, helmRelease *helmRelease.Release) (helmReleaseProxyValues map[string]interface{}, helmReleaseValues map[string]interface{}) {
+	Byf("Normalizing Helm release %s", helmReleaseProxy.Name)
+
+	Expect(helmReleaseProxy).NotTo(BeNil())
+	Expect(helmRelease).NotTo(BeNil())
+
+	// Normalize the Helm release values.
+	releaseValues, err := yaml.Marshal(helmRelease.Config)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Normalize the HelmReleaseProxy values.
+	var normalizedValues map[string]interface{}
+	Expect(yaml.Unmarshal([]byte(helmReleaseProxy.Spec.Values), &normalizedValues)).To(Succeed())
+
+	// Normalize the Helm release values.
+	var normalizedReleaseValues map[string]interface{}
+	Expect(yaml.Unmarshal(releaseValues, &normalizedReleaseValues)).To(Succeed())
+
+	// Normalize the Helm release values.
+	Expect(normalizedReleaseValues).To(Equal(normalizedValues))
+
+	return normalizedValues, normalizedReleaseValues
 }
 
 // logCheckpoint prints a message indicating the start or end of the current test spec,
@@ -315,7 +390,7 @@ func logCheckpoint(specTimes map[string]time.Time) {
 }
 
 func getHelmReleaseProxy(ctx context.Context, c ctrlclient.Client, clusterName string, helmChartProxy addonsv1alpha1.HelmChartProxy) (*addonsv1alpha1.HelmReleaseProxy, error) {
-	// Get the HelmRelease
+	// Get the HelmReleaseProxy using label selectors since we don't know the name of the HelmReleaseProxy.
 	releaseList := &addonsv1alpha1.HelmReleaseProxyList{}
 	labels := map[string]string{
 		clusterv1.ClusterNameLabel:             clusterName,

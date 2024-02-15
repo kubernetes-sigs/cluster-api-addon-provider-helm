@@ -30,8 +30,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	kubeadmv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
@@ -113,6 +116,74 @@ func EnsureCalicoIsReady(ctx context.Context, input clusterctl.ApplyCustomCluste
 		waitInput := GetWaitForDeploymentsAvailableInput(ctx, clusterProxy, d, CalicoAPIServerNamespace, specName)
 		WaitForDeploymentsAvailable(ctx, waitInput, e2eConfig.GetIntervals(specName, "wait-deployment")...)
 	}
+}
+
+// EnsureHelmReleaseInstallOrUpgrade ensures that a Helm install or upgrade is successful. Only one of installInput or upgradeInput should be provided
+// depending on the Helm operation.
+func EnsureHelmReleaseInstallOrUpgrade(ctx context.Context, specName string, bootstrapClusterProxy framework.ClusterProxy, installInput *HelmInstallInput, upgradeInput *HelmUpgradeInput) {
+	var (
+		clusterName      string
+		clusterNamespace string
+		helmChartProxy   *addonsv1alpha1.HelmChartProxy
+		expectedRevision int
+	)
+
+	Expect(installInput != nil || upgradeInput != nil).To(BeTrue(), "either installInput or upgradeInput should be provided")
+	if installInput != nil {
+		Expect(upgradeInput).To(BeNil(), "only one of installInput or upgradeInput should be provided")
+		clusterName = installInput.ClusterName
+		clusterNamespace = installInput.Namespace.Name
+		helmChartProxy = installInput.HelmChartProxy
+		expectedRevision = 1
+	} else if upgradeInput != nil {
+		Expect(installInput).To(BeNil(), "only one of installInput or upgradeInput should be provided")
+		clusterName = upgradeInput.ClusterName
+		clusterNamespace = upgradeInput.Namespace.Name
+		helmChartProxy = upgradeInput.HelmChartProxy
+		expectedRevision = upgradeInput.ExpectedRevision
+	}
+
+	mgmtClient := bootstrapClusterProxy.GetClient()
+	Expect(mgmtClient).NotTo(BeNil())
+
+	// Get Cluster from management Cluster
+	workloadCluster := &clusterv1.Cluster{}
+	key := apitypes.NamespacedName{
+		Namespace: clusterNamespace,
+		Name:      clusterName,
+	}
+	err := mgmtClient.Get(ctx, key, workloadCluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Patch cluster labels, ignore match expressions for now
+	selector := helmChartProxy.Spec.ClusterSelector
+	labels := workloadCluster.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	for k, v := range selector.MatchLabels {
+		labels[k] = v
+	}
+
+	err = mgmtClient.Update(ctx, workloadCluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Wait for HelmReleaseProxy to be ready
+	hrpWaitInput := GetWaitForHelmReleaseProxyReadyInput(ctx, bootstrapClusterProxy, clusterName, *helmChartProxy, expectedRevision, specName)
+	WaitForHelmReleaseProxyReady(ctx, hrpWaitInput, e2eConfig.GetIntervals(specName, "wait-helmreleaseproxy-ready")...)
+
+	// Get workload Cluster proxy
+	By("creating a clusterctl proxy to the workload cluster")
+	workloadClusterProxy := bootstrapClusterProxy.GetWorkloadCluster(ctx, clusterNamespace, clusterName)
+	Expect(workloadClusterProxy).NotTo(BeNil())
+
+	// Wait for Helm release on workload cluster to have stauts = deployed
+	releaseWaitInput := GetWaitForHelmReleaseDeployedInput(ctx, workloadClusterProxy, hrpWaitInput.HelmReleaseProxy.Spec.ReleaseName, hrpWaitInput.HelmReleaseProxy.Spec.ReleaseNamespace, specName)
+	release := WaitForHelmReleaseDeployed(ctx, releaseWaitInput, e2eConfig.GetIntervals(specName, "wait-helm-release-deployed")...)
+
+	// Verify Helm release values and revision.
+	ValidateHelmRelease(ctx, hrpWaitInput.HelmReleaseProxy, release, expectedRevision)
 }
 
 // CheckTestBeforeCleanup checks to see if the current running Ginkgo test failed, and prints
