@@ -42,6 +42,11 @@ import (
 var nginxValues = `controller:
   name: "{{ .ControlPlane.metadata.name }}-nginx"
   nginxStatus:
+    allowCidrs: {{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}`
+
+var newNginxValues = `controller:
+  name: "{{ .Cluster.metadata.name }}-nginx"
+  nginxStatus:
     allowCidrs: 127.0.0.1,::1,{{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}`
 
 var _ = Describe("Workload cluster creation", func() {
@@ -113,7 +118,7 @@ var _ = Describe("Workload cluster creation", func() {
 	})
 
 	Context("Creating workload cluster [REQUIRED]", func() {
-		It("With default template and calico Helm chart", func() {
+		It("With default template to install and upgrade nginx Helm chart", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -126,36 +131,75 @@ var _ = Describe("Workload cluster creation", func() {
 				}),
 			), result)
 
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "nginx-ingress",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"nginxIngress": "enabled",
+						},
+					},
+					ReleaseName:      "nginx-ingress",
+					ReleaseNamespace: "nginx-namespace",
+					ChartName:        "nginx-ingress",
+					RepoURL:          "https://helm.nginx.com/stable",
+					ValuesTemplate:   nginxValues,
+				},
+			}
+
 			// Create new Helm chart
 			By("Creating new HelmChartProxy to install nginx", func() {
-				hcp := &addonsv1alpha1.HelmChartProxy{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: addonsv1alpha1.GroupVersion.String(),
-						Kind:       "HelmChartProxy",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "nginx-ingress",
-						Namespace: namespace.Name,
-					},
-					Spec: addonsv1alpha1.HelmChartProxySpec{
-						ClusterSelector: metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"nginxIngress": "enabled",
-							},
-						},
-						ReleaseName:    "nginx-ingress",
-						ChartName:      "nginx-ingress",
-						RepoURL:        "https://helm.nginx.com/stable",
-						ValuesTemplate: nginxValues,
-						Options:        addonsv1alpha1.HelmOptions{},
-					},
-				}
 				HelmInstallSpec(ctx, func() HelmInstallInput {
 					return HelmInstallInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
 						Namespace:             namespace,
 						ClusterName:           clusterName,
 						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			// Update existing Helm chart
+			By("Updating nginx HelmChartProxy valuesTemplate", func() {
+				hcp.Spec.ValuesTemplate = newNginxValues
+				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
+					return HelmUpgradeInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+						ExpectedRevision:      2,
+					}
+				})
+			})
+
+			// Force reinstall of existing Helm chart by changing the release namespace
+			By("Updating HelmChartProxy release namespace", func() {
+				hcp.Spec.ReleaseNamespace = "new-nginx-namespace"
+				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
+					return HelmUpgradeInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+						ExpectedRevision:      1,
+					}
+				})
+			})
+
+			// Force reinstall of existing Helm chart by changing the release name
+			By("Updating HelmChartProxy release name", func() {
+				hcp.Spec.ReleaseName = "new-nginx-name"
+				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
+					return HelmUpgradeInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+						ExpectedRevision:      1,
 					}
 				})
 			})
