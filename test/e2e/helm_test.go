@@ -217,6 +217,117 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 		})
 	})
+
+	Context("Creating multiple workload clusters [REQUIRED]", func() {
+		It("With default template to install and uninstall nginx Helm chart", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			result2 := new(clusterctl.ApplyClusterTemplateAndWaitResult)
+			defer func() {
+				// Delete Cluster 2 since it's not part of the AfterEach cleanup.
+				cleanInput := cleanupInput{
+					SpecName:          specName,
+					Cluster:           result2.Cluster,
+					ClusterProxy:      bootstrapClusterProxy,
+					Namespace:         namespace,
+					CancelWatches:     cancelWatches,
+					IntervalsGetter:   e2eConfig.GetIntervals,
+					SkipCleanup:       skipCleanup,
+					SkipLogCollection: skipLogCollection,
+					AdditionalCleanup: additionalCleanup,
+					ArtifactFolder:    artifactFolder,
+				}
+				dumpSpecResourcesAndCleanup(ctx, cleanInput)
+			}()
+
+			clusterName2 := fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName2),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result2)
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "nginx-ingress",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"nginxIngress": "enabled",
+						},
+					},
+					ReleaseName:      "nginx-ingress",
+					ReleaseNamespace: "nginx-namespace",
+					ChartName:        "nginx-ingress",
+					RepoURL:          "https://helm.nginx.com/stable",
+					ValuesTemplate:   nginxValues,
+				},
+			}
+
+			// Create a new HelmChartProxy and install on Cluster 1
+			By("Creating new HelmChartProxy to install nginx on Cluster 1", func() {
+				HelmInstallSpec(ctx, func() HelmInstallInput {
+					return HelmInstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			// Patch Cluster 2 labels to match HelmChartProxy's clusterSelector.
+			By("Patching Cluster 2 labels to install nginx", func() {
+				installInput := &HelmInstallInput{
+					BootstrapClusterProxy: bootstrapClusterProxy,
+					Namespace:             namespace,
+					ClusterName:           clusterName2,
+					HelmChartProxy:        hcp,
+				}
+				EnsureHelmReleaseInstallOrUpgrade(ctx, specName, bootstrapClusterProxy, installInput, nil, true)
+			})
+
+			// Uninstall Helm chart from Cluster 1 by removing the label selector.
+			By("Uninstalling Helm chart from Cluster 1", func() {
+				HelmUninstallSpec(ctx, func() HelmUninstallInput {
+					return HelmUninstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			// Ensure that Helm chart is still installed on Cluster 2.
+			By("Ensuring that nginx is still installed on Cluster 2", func() {
+				installInput := &HelmInstallInput{
+					BootstrapClusterProxy: bootstrapClusterProxy,
+					Namespace:             namespace,
+					ClusterName:           clusterName2,
+					HelmChartProxy:        hcp,
+				}
+				EnsureHelmReleaseInstallOrUpgrade(ctx, specName, bootstrapClusterProxy, installInput, nil, false)
+			})
+		})
+	})
 })
 
 type cleanupInput struct {
