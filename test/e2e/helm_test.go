@@ -118,7 +118,7 @@ var _ = Describe("Workload cluster creation", func() {
 	})
 
 	Context("Creating workload cluster [REQUIRED]", func() {
-		It("With default template to install and upgrade nginx Helm chart", func() {
+		It("With default template to install, upgrade, and uninstall nginx Helm chart", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -200,6 +200,18 @@ var _ = Describe("Workload cluster creation", func() {
 						ClusterName:           clusterName,
 						HelmChartProxy:        hcp,
 						ExpectedRevision:      1,
+					}
+				})
+			})
+
+			// Uninstall Helm chart by removing the label selector from the Cluster.
+			By("Uninstalling Helm chart from cluster", func() {
+				HelmUninstallSpec(ctx, func() HelmUninstallInput {
+					return HelmUninstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
 					}
 				})
 			})
