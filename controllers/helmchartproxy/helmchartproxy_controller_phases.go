@@ -104,6 +104,7 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 	helmReleaseProxyList := &addonsv1alpha1.HelmReleaseProxyList{}
 
 	listOpts := []client.ListOption{
+		client.InNamespace(helmChartProxy.Namespace),
 		client.MatchingLabels{
 			clusterv1.ClusterNameLabel:             cluster.Name,
 			addonsv1alpha1.HelmChartProxyLabelName: helmChartProxy.Name,
