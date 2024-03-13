@@ -175,6 +175,26 @@ var (
 		},
 	}
 
+	fakeClusterPaused = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "test-namespace",
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(1234)),
+				Pods: &clusterv1.NetworkRanges{
+					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
+				},
+			},
+			Paused: true,
+		},
+	}
+
 	fakeHelmReleaseProxy = &addonsv1alpha1.HelmReleaseProxy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-generated-name",
@@ -288,6 +308,17 @@ func TestReconcileForCluster(t *testing.T) {
 				g.Expect(specsReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseProxyReinstallingReason))
 				g.Expect(specsReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 				g.Expect(specsReady.Message).To(Equal(fmt.Sprintf("HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", fakeCluster1.Name)))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "do not reconcile for a paused cluster",
+			helmChartProxy:                fakeReinstallHelmChartProxy,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeClusterPaused,
+			expectHelmReleaseProxyToExist: false,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeFalse())
 			},
 			expectedError: "",
 		},

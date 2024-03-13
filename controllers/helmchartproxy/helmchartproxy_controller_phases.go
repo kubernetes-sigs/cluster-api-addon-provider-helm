@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,6 +57,12 @@ func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.
 // reconcileForCluster will create or update a HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	// Don't reconcile if the Cluster or the helmChartProxy is paused.
+	if annotations.IsPaused(&cluster, helmChartProxy) {
+		log.V(2).Info("Reconciliation is paused for this Cluster", "cluster", cluster.Name)
+		return nil
+	}
 
 	existingHelmReleaseProxy, err := r.getExistingHelmReleaseProxy(ctx, helmChartProxy, &cluster)
 	if err != nil {

@@ -143,6 +143,23 @@ var (
 		},
 	}
 
+	clusterPaused = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-paused",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"test-label": "test-value",
+			},
+		},
+		Spec: clusterv1.ClusterSpec{
+			Paused: true,
+		},
+	}
+
 	hrpReady1 = &addonsv1alpha1.HelmReleaseProxy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-hrp-1",
@@ -315,6 +332,46 @@ func TestReconcileNormal(t *testing.T) {
 			},
 			expectedError: "",
 		},
+		{
+			name:           "mark HelmChartProxy as ready once HelmReleaseProxies ready conditions are true ignoring paused clusters",
+			helmChartProxy: defaultProxy,
+			objects:        []client.Object{cluster1, cluster2, clusterPaused, hrpReady1, hrpReady2},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-1",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-2",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-paused",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+				hrpList := &addonsv1alpha1.HelmReleaseProxyList{}
+				g.Expect(c.List(ctx, hrpList, &client.ListOptions{Namespace: hcp.Namespace})).To(Succeed())
+
+				// There should be 2 HelmReleaseProxies as the paused cluster should not have a HelmReleaseProxy.
+				g.Expect(hrpList.Items).To(HaveLen(2))
+			},
+			expectedError: "",
+		},
 	}
 
 	for _, tc := range testcases {
@@ -351,6 +408,47 @@ func TestReconcileNormal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcileAfterMatchingClusterUnpaused(t *testing.T) {
+	g := NewWithT(t)
+
+	request := reconcile.Request{
+		NamespacedName: util.ObjectKey(defaultProxy),
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(fakeScheme).
+		WithObjects(cluster1, cluster2, clusterPaused, defaultProxy).
+		WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+		WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+		Build()
+
+	r := &HelmChartProxyReconciler{
+		Client: c,
+	}
+	result, err := r.Reconcile(ctx, request)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(reconcile.Result{}))
+
+	// There should be 2 HelmReleaseProxies as the paused cluster should not have a HelmReleaseProxy.
+	hrpList := &addonsv1alpha1.HelmReleaseProxyList{}
+	g.Expect(c.List(ctx, hrpList, &client.ListOptions{Namespace: request.Namespace})).To(Succeed())
+	g.Expect(hrpList.Items).To(HaveLen(2))
+
+	// Unpause the cluster and reconcile again.
+	unpausedCluster := clusterPaused.DeepCopy()
+	unpausedCluster.Spec.Paused = false
+	g.Expect(c.Update(ctx, unpausedCluster)).To(Succeed())
+
+	result, err = r.Reconcile(ctx, request)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(reconcile.Result{}))
+
+	// Now there should be 3 HelmReleaseProxies.
+	hrpList = &addonsv1alpha1.HelmReleaseProxyList{}
+	g.Expect(c.List(ctx, hrpList, &client.ListOptions{Namespace: request.Namespace})).To(Succeed())
+	g.Expect(hrpList.Items).To(HaveLen(3))
 }
 
 func init() {
