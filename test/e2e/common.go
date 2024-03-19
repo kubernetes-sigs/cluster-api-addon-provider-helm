@@ -120,7 +120,7 @@ func EnsureCalicoIsReady(ctx context.Context, input clusterctl.ApplyCustomCluste
 
 // EnsureHelmReleaseInstallOrUpgrade ensures that a Helm install or upgrade is successful. Only one of installInput or upgradeInput should be provided
 // depending on the Helm operation.
-func EnsureHelmReleaseInstallOrUpgrade(ctx context.Context, specName string, bootstrapClusterProxy framework.ClusterProxy, installInput *HelmInstallInput, upgradeInput *HelmUpgradeInput) {
+func EnsureHelmReleaseInstallOrUpgrade(ctx context.Context, specName string, bootstrapClusterProxy framework.ClusterProxy, installInput *HelmInstallInput, upgradeInput *HelmUpgradeInput, patchCluster bool) {
 	var (
 		clusterName      string
 		clusterNamespace string
@@ -143,31 +143,33 @@ func EnsureHelmReleaseInstallOrUpgrade(ctx context.Context, specName string, boo
 		expectedRevision = upgradeInput.ExpectedRevision
 	}
 
-	mgmtClient := bootstrapClusterProxy.GetClient()
-	Expect(mgmtClient).NotTo(BeNil())
+	if patchCluster {
+		mgmtClient := bootstrapClusterProxy.GetClient()
+		Expect(mgmtClient).NotTo(BeNil())
 
-	// Get Cluster from management Cluster
-	workloadCluster := &clusterv1.Cluster{}
-	key := apitypes.NamespacedName{
-		Namespace: clusterNamespace,
-		Name:      clusterName,
+		// Get Cluster from management Cluster
+		workloadCluster := &clusterv1.Cluster{}
+		key := apitypes.NamespacedName{
+			Namespace: clusterNamespace,
+			Name:      clusterName,
+		}
+		err := mgmtClient.Get(ctx, key, workloadCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Patch cluster labels, ignore match expressions for now
+		selector := helmChartProxy.Spec.ClusterSelector
+		labels := workloadCluster.Labels
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		for k, v := range selector.MatchLabels {
+			labels[k] = v
+		}
+
+		err = mgmtClient.Update(ctx, workloadCluster)
+		Expect(err).NotTo(HaveOccurred())
 	}
-	err := mgmtClient.Get(ctx, key, workloadCluster)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Patch cluster labels, ignore match expressions for now
-	selector := helmChartProxy.Spec.ClusterSelector
-	labels := workloadCluster.Labels
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	for k, v := range selector.MatchLabels {
-		labels[k] = v
-	}
-
-	err = mgmtClient.Update(ctx, workloadCluster)
-	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for HelmReleaseProxy to be ready
 	hrpWaitInput := GetWaitForHelmReleaseProxyReadyInput(ctx, bootstrapClusterProxy, clusterName, *helmChartProxy, expectedRevision, specName)

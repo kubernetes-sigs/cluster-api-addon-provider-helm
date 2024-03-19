@@ -84,5 +84,5 @@ func HelmUpgradeSpec(ctx context.Context, inputGetter func() HelmUpgradeInput) {
 		return patchHelper.Patch(ctx, existing)
 	}, retryableOperationTimeout, retryableOperationInterval).Should(Succeed(), "Failed to patch HelmChartProxy %s", klog.KObj(existing))
 
-	EnsureHelmReleaseInstallOrUpgrade(ctx, specName, input.BootstrapClusterProxy, nil, &input)
+	EnsureHelmReleaseInstallOrUpgrade(ctx, specName, input.BootstrapClusterProxy, nil, &input, true)
 }

@@ -61,5 +61,5 @@ func HelmInstallSpec(ctx context.Context, inputGetter func() HelmInstallInput) {
 	Byf("Creating HelmChartProxy %s/%s", input.Namespace, input.HelmChartProxy.Name)
 	Expect(mgmtClient.Create(ctx, input.HelmChartProxy)).To(Succeed())
 
-	EnsureHelmReleaseInstallOrUpgrade(ctx, specName, input.BootstrapClusterProxy, &input, nil)
+	EnsureHelmReleaseInstallOrUpgrade(ctx, specName, input.BootstrapClusterProxy, &input, nil, true)
 }
