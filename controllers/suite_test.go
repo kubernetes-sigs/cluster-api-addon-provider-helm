@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
@@ -89,7 +89,7 @@ var _ = BeforeSuite(func() {
 	klog.InitFlags(&fs)
 	err := fs.Set("v", "2")
 	Expect(err).NotTo(HaveOccurred())
-	ctrl.SetLogger(klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog)))
+	ctrl.SetLogger(textlogger.NewLogger(textlogger.NewConfig()))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
