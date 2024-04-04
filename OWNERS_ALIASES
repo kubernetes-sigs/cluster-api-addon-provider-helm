@@ -17,6 +17,4 @@ aliases:
   cluster-api-addon-helm-maintainers:
     - Jont828
     - jackfrancis
-  cluster-api-addon-helm-reviewers:
     - mboersma
-
