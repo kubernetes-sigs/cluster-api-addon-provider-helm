@@ -112,8 +112,8 @@ providers:
 - name: helm
   type: AddonProvider
   versions:
-  - name: v0.1.1-alpha.0 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
-    value: https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases/download/v0.1.1-alpha.0/addon-components.yaml
+  - name: v0.1.1-alpha.1 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases/download/v0.1.1-alpha.1/addon-components.yaml
     type: "url"
     contract: v1beta1
     files:
@@ -123,7 +123,7 @@ providers:
       new: "imagePullPolicy: IfNotPresent"
     - old: "--v=0"
       new: "--v=2"
-  - name: v0.2.99 # "vNext"; use manifests from local source files
+  - name: v0.3.99 # "vNext"; use manifests from local source files
     value: "${PWD}/config/default"
     contract: v1beta1
     files:
@@ -166,7 +166,7 @@ variables:
   CAPI_DIAGNOSTICS_ADDRESS: ":8080"
   CAPI_INSECURE_DIAGNOSTICS: "true"
   OLD_CAPI_UPGRADE_VERSION: "v1.5.7"
-  OLD_PROVIDER_UPGRADE_VERSION: "v0.1.1-alpha.0"
+  OLD_PROVIDER_UPGRADE_VERSION: "v0.1.1-alpha.1"
 
 intervals:
   default/wait-controllers: ["3m", "10s"]
