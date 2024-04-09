@@ -22,6 +22,10 @@ patchesStrategicMerge:
 # Adds clusterctl move hierarchy label to HelmChartProxies so they can be discovered by clusterctl move.
 - patches/clusterctl_move_label_in_helmchartproxies.yaml
 
+# Adds labels to the CRDs so they can be discovered by the Cluster API Visualizer.
+- patches/visualizer_label_in_helmchartproxies.yaml
+- patches/visualizer_label_in_helmreleaseproxies.yaml
+
 # the following config is for teaching kustomize how to do kustomization for CRDs.
 configurations:
 - kustomizeconfig.yaml
