@@ -24,8 +24,10 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
-      # securityContext:
-      #   runAsNonRoot: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - args:
           - --leader-elect
@@ -35,8 +37,14 @@ spec:
           image: controller:latest
           imagePullPolicy: Always
           name: manager
-          # securityContext:
-          #   allowPrivilegeEscalation: false
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            runAsUser: 65532
+            runAsGroup: 65532
           ports:
             - containerPort: 9440
               name: healthz
