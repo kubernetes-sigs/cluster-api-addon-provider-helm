@@ -313,7 +313,7 @@ func TestReconcileForCluster(t *testing.T) {
 		},
 		{
 			name:                          "do not reconcile for a paused cluster",
-			helmChartProxy:                fakeReinstallHelmChartProxy,
+			helmChartProxy:                fakeHelmChartProxy1,
 			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
 			cluster:                       fakeClusterPaused,
 			expectHelmReleaseProxyToExist: false,
