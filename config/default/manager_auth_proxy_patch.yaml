@@ -20,6 +20,14 @@ spec:
         - containerPort: 8443
           protocol: TCP
           name: https
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsUser: 65532
+          runAsGroup: 65532
         resources:
           limits:
             cpu: 500m
