@@ -72,6 +72,10 @@ type HelmChartProxySpec struct {
 	// Credentials is a reference to an object containing the OCI credentials. If it is not specified, no credentials will be used.
 	// +optional
 	Credentials *Credentials `json:"credentials,omitempty"`
+
+	// TLSConfig contains the TLS configuration for a HelmChartProxy.
+	// +optional
+	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 }
 
 type HelmOptions struct {
@@ -197,6 +201,17 @@ type Credentials struct {
 
 	// Key is the key in the Secret containing the OCI credentials.
 	Key string `json:"key"`
+}
+
+// TLSConfig defines a TLS configuration.
+type TLSConfig struct {
+	// Secret is a reference to a Secret containing the TLS CA certificate at the key ca.crt.
+	// +optional
+	CASecretRef *corev1.SecretReference `json:"caSecret,omitempty"`
+
+	// InsecureSkipTLSVerify controls whether the Helm client should verify the server's certificate.
+	// +optional
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
 // HelmChartProxyStatus defines the observed state of HelmChartProxy.

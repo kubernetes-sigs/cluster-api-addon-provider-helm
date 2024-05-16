@@ -131,7 +131,7 @@ var _ = BeforeSuite(func() {
 	kubeconfigGetter = mocks.NewMockGetter(gomock.NewController(&TestReporter{}))
 
 	kubeconfigGetter.EXPECT().GetClusterKubeconfig(gomock.Any(), client.ObjectKeyFromObject(cluster1)).Return(kubeconfig, nil).AnyTimes()
-	helmClient.EXPECT().InstallOrUpgradeHelmRelease(gomock.Any(), kubeconfig, gomock.Any(), gomock.Any()).Return(helmReleaseDeployed, nil).AnyTimes()
+	helmClient.EXPECT().InstallOrUpgradeHelmRelease(gomock.Any(), kubeconfig, gomock.Any(), gomock.Any(), gomock.Any()).Return(helmReleaseDeployed, nil).AnyTimes()
 	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), kubeconfig, gomock.Any()).Return(&helmRelease.UninstallReleaseResponse{}, nil).AnyTimes()
 	helmClient.EXPECT().GetHelmRelease(gomock.Any(), kubeconfig, gomock.Any()).Return(&helmRelease.Release{}, nil).AnyTimes()
 

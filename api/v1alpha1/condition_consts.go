@@ -81,4 +81,7 @@ const (
 
 	// GetCredentialsFailedReason indicates that the HelmReleaseProxy failed to get the credentials for the Helm registry.
 	GetCredentialsFailedReason = "GetCredentialsFailed"
+
+	// GetCACertificateFailedReason indicates that the HelmReleaseProxy failed to get the CA certiicate for the Helm registry.
+	GetCACertificateFailedReason = "GetCACertificateFailed"
 )

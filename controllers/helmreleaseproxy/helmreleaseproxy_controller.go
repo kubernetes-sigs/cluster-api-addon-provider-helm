@@ -224,21 +224,39 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, wrappedErr
 	}
 
-	defer func() {
-		if err := os.Remove(credentialsPath); err != nil {
-			log.Error(err, "failed to remove credentials file in path", "credentialsPath", credentialsPath)
-		}
-	}()
+	if credentialsPath != "" {
+		defer func() {
+			if err := os.Remove(credentialsPath); err != nil {
+				log.Error(err, "failed to remove credentials file in path", "credentialsPath", credentialsPath)
+			}
+		}()
+	}
+
+	caFilePath, err := r.getCAFile(ctx, helmReleaseProxy)
+	if err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to get CA certificate file for cluster")
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetCACertificateFailedReason, clusterv1.ConditionSeverityError, wrappedErr.Error())
+
+		return ctrl.Result{}, wrappedErr
+	}
+
+	if caFilePath != "" {
+		defer func() {
+			if err := os.Remove(caFilePath); err != nil {
+				log.Error(err, "failed to remove CA certificate file in path", "credentialsPath", caFilePath)
+			}
+		}()
+	}
 
 	log.V(2).Info("Reconciling HelmReleaseProxy", "releaseProxyName", helmReleaseProxy.Name)
-	err = r.reconcileNormal(ctx, helmReleaseProxy, r.HelmClient, credentialsPath, kubeconfig)
+	err = r.reconcileNormal(ctx, helmReleaseProxy, r.HelmClient, credentialsPath, caFilePath, kubeconfig)
 
 	return ctrl.Result{}, err
 }
 
 // reconcileNormal handles HelmReleaseProxy reconciliation when it is not being deleted. This will install or upgrade the HelmReleaseProxy on the Cluster.
 // It will set the ReleaseName on the HelmReleaseProxy if the name is generated and also set the release status and release revision.
-func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, client internal.Client, credentialsPath string, kubeconfig string) error {
+func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, client internal.Client, credentialsPath, caFilePath string, kubeconfig string) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
@@ -250,7 +268,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		})
 	}
 
-	release, err := client.InstallOrUpgradeHelmRelease(ctx, kubeconfig, credentialsPath, helmReleaseProxy.Spec)
+	release, err := client.InstallOrUpgradeHelmRelease(ctx, kubeconfig, credentialsPath, caFilePath, helmReleaseProxy.Spec)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("Failed to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, err.Error())
@@ -377,6 +395,31 @@ func (r *HelmReleaseProxyReconciler) getCredentials(ctx context.Context, helmRel
 	return credentialsPath, nil
 }
 
+// getCAFile fetches the CA certificate from a Secret and writes it to a temporary file, returning the path to the temporary file.
+func (r *HelmReleaseProxyReconciler) getCAFile(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) (string, error) {
+	caFilePath := ""
+	if helmReleaseProxy.Spec.TLSConfig != nil && helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name != "" {
+		// By default, the secret is in the same namespace as the HelmReleaseProxy
+		if helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace == "" {
+			helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace = helmReleaseProxy.Namespace
+		}
+		caSecretValues, err := r.getCACertificateFromSecret(ctx, helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name, helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace)
+		if err != nil {
+			return "", err
+		}
+
+		// Write to a file
+		filename, err := writeCACertificateToFile(ctx, caSecretValues)
+		if err != nil {
+			return "", err
+		}
+
+		caFilePath = filename
+	}
+
+	return caFilePath, nil
+}
+
 // getCredentialsFromSecret returns the OCI credentials from a Secret.
 func (r *HelmReleaseProxyReconciler) getCredentialsFromSecret(ctx context.Context, name, namespace, key string) ([]byte, error) {
 	secret := &corev1.Secret{}
@@ -406,4 +449,36 @@ func writeCredentialsToFile(ctx context.Context, credentials []byte) (string, er
 	}
 
 	return credentialsFile.Name(), nil
+}
+
+// getCredentialsFromSecret returns the OCI credentials from a Secret.
+func (r *HelmReleaseProxyReconciler) getCACertificateFromSecret(ctx context.Context, name, namespace string) ([]byte, error) {
+	secret := &corev1.Secret{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
+		return nil, err
+	}
+
+	const key = "ca.crt"
+	credentials, ok := secret.Data[key]
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("key %s not found in secret %s/%s", key, namespace, name))
+	}
+
+	return credentials, nil
+}
+
+// writeCACertificateToFile writes the CA certificate to a temporary file.
+func writeCACertificateToFile(ctx context.Context, caCertificate []byte) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("Writing CA certficate to file")
+	caCertFile, err := os.CreateTemp("", "ca-*.crt")
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := caCertFile.Write(caCertificate); err != nil {
+		return "", err
+	}
+
+	return caCertFile.Name(), nil
 }
