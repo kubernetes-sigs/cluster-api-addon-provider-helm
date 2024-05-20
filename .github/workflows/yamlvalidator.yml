@@ -1,0 +1,15 @@
+name: Lint YAML files
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Lint YAML files
+        run: yamllint -c .github/yamllint_config.yaml .
+
