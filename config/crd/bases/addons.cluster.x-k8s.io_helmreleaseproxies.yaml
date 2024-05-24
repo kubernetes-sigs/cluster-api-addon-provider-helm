@@ -270,6 +270,28 @@ spec:
                   RepoURL is the URL of the Helm chart repository.
                   e.g. chart-path oci://repo-url/chart-name as repoURL: oci://repo-url and https://repo-url/chart-name as repoURL: https://repo-url
                 type: string
+              tlsConfig:
+                description: TLSConfig contains the TLS configuration for the HelmReleaseProxy.
+                properties:
+                  caSecret:
+                    description: Secret is a reference to a Secret containing the
+                      TLS CA certificate at the key ca.crt.
+                    properties:
+                      name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
+                        type: string
+                      namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  insecureSkipTLSVerify:
+                    description: InsecureSkipTLSVerify controls whether the Helm client
+                      should verify the server's certificate.
+                    type: boolean
+                type: object
               values:
                 description: |-
                   Values is an inline YAML representing the values for the Helm chart. This YAML is the result of the rendered

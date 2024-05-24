@@ -235,6 +235,15 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		}
 	}
 
+	helmReleaseProxy.Spec.TLSConfig = helmChartProxy.Spec.TLSConfig
+
+	if helmReleaseProxy.Spec.TLSConfig != nil {
+		// If the namespace is not set, set it to the namespace of the HelmChartProxy
+		if helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace == "" {
+			helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace = helmChartProxy.Namespace
+		}
+	}
+
 	return helmReleaseProxy
 }
 

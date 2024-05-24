@@ -74,6 +74,9 @@ type HelmReleaseProxySpec struct {
 	// Credentials is a reference to an object containing the OCI credentials. If it is not specified, no credentials will be used.
 	// +optional
 	Credentials *Credentials `json:"credentials,omitempty"`
+
+	// TLSConfig contains the TLS configuration for the HelmReleaseProxy.
+	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
 }
 
 // HelmReleaseProxyStatus defines the observed state of HelmReleaseProxy.
