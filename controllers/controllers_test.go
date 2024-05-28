@@ -28,12 +28,12 @@ import (
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
+	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
 	testNamespace = "test-namespace"
-	kubeconfig    = "test-kubeconfig"
 	newVersion    = "new-version"
 
 	defaultProxy = &addonsv1alpha1.HelmChartProxy{
@@ -88,6 +88,30 @@ var (
 	}
 )
 
+func newKubeconfigSecretForCluster(cluster *clusterv1.Cluster) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name + "-kubeconfig",
+			Namespace: cluster.Namespace,
+		},
+		StringData: map[string]string{
+			secret.KubeconfigDataName: `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: http://127.0.0.1:8080
+  name: ` + cluster.Name + `
+contexts:
+- context:
+    cluster: ` + cluster.Name + `
+  name: ` + cluster.Name + `
+current-context: ` + cluster.Name + `
+`,
+		},
+	}
+}
+
 var _ = Describe("Testing HelmChartProxy and HelmReleaseProxy reconcile", func() {
 	var (
 		waitForHelmChartProxyCondition = func(objectKey client.ObjectKey, condition func(helmChartProxy *addonsv1alpha1.HelmChartProxy) bool) {
@@ -116,6 +140,8 @@ var _ = Describe("Testing HelmChartProxy and HelmReleaseProxy reconcile", func()
 	It("HelmChartProxy and HelmReleaseProxy lifecycle test", func() {
 		cluster := cluster1.DeepCopy()
 		err := k8sClient.Create(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		err = k8sClient.Create(ctx, newKubeconfigSecretForCluster(cluster))
 		Expect(err).ToNot(HaveOccurred())
 
 		patch := client.MergeFrom(cluster.DeepCopy())

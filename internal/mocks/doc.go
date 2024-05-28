@@ -17,7 +17,5 @@ limitations under the License.
 // Run go generate to regenerate this mock.
 //
 //go:generate ../../hack/tools/bin/mockgen -destination helm_client_mock.go -package mocks -source ../helm_client.go Client
-//go:generate ../../hack/tools/bin/mockgen -destination kubeconfig_mock.go -package mocks -source ../kubeconfig.go Getter
 //go:generate /usr/bin/env bash -c "cat ../../hack/boilerplate/boilerplate.generatego.txt helm_client_mock.go > _helm_client_mock.go && mv _helm_client_mock.go helm_client_mock.go"
-//go:generate /usr/bin/env bash -c "cat ../../hack/boilerplate/boilerplate.generatego.txt kubeconfig_mock.go > _kubeconfig_mock.go && mv _kubeconfig_mock.go kubeconfig_mock.go"
 package mocks

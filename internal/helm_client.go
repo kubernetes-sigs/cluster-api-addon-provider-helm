@@ -37,7 +37,6 @@ import (
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
@@ -45,9 +44,9 @@ import (
 )
 
 type Client interface {
-	InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
-	GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
-	UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
+	InstallOrUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
+	GetHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
+	UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
 }
 
 type HelmClient struct{}
@@ -57,17 +56,6 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	log := ctrl.LoggerFrom(ctx)
 	log.V(4).Info("Getting action config")
 	actionConfig := new(helmAction.Configuration)
-	// var cliConfig *genericclioptions.ConfigFlags
-	// cliConfig := &genericclioptions.ConfigFlags{
-	// 	Namespace:        &env.namespace,
-	// 	Context:          &env.KubeContext,
-	// 	BearerToken:      &env.KubeToken,
-	// 	APIServer:        &env.KubeAPIServer,
-	// 	CAFile:           &env.KubeCaFile,
-	// 	KubeConfig:       &env.KubeConfig,
-	// 	Impersonate:      &env.KubeAsUser,
-	// 	ImpersonateGroup: &env.KubeAsGroups,
-	// }
 	insecure := true
 	cliConfig := genericclioptions.NewConfigFlags(false)
 	cliConfig.APIServer = &config.Host
@@ -89,33 +77,22 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 }
 
 // HelmInit initializes Helm.
-func HelmInit(ctx context.Context, namespace string, kubeconfig string) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
+func HelmInit(ctx context.Context, namespace string, restConfig *rest.Config) (*helmCli.EnvSettings, *helmAction.Configuration, error) {
 	// log := ctrl.LoggerFrom(ctx)
 
 	settings := helmCli.New()
-
-	restConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
-	if err != nil {
-		return nil, nil, err
-	}
 
 	actionConfig, err := GetActionConfig(ctx, namespace, restConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// settings.KubeConfig = kubeconfig
-	// actionConfig := new(helmAction.Configuration)
-	// if err := actionConfig.Init(settings.RESTClientGetter(), "default", "secret", logf); err != nil {
-	// 	return nil, nil, err
-	// }
-
 	return settings, actionConfig, nil
 }
 
 // InstallOrUpgradeHelmRelease installs a Helm release if it does not exist, or upgrades it if it does and differs from the spec.
 // It returns a boolean indicating whether an install or upgrade was performed.
-func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig string, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Installing or upgrading Helm release")
@@ -123,16 +100,16 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, kubeconfig
 	// historyClient := helmAction.NewHistory(actionConfig)
 	// historyClient.Max = 1
 	// if _, err := historyClient.Run(spec.ReleaseName); err == helmDriver.ErrReleaseNotFound {
-	existingRelease, err := c.GetHelmRelease(ctx, kubeconfig, spec)
+	existingRelease, err := c.GetHelmRelease(ctx, restConfig, spec)
 	if err != nil {
 		if errors.Is(err, helmDriver.ErrReleaseNotFound) {
-			return c.InstallHelmRelease(ctx, kubeconfig, credentialsPath, caFilePath, spec)
+			return c.InstallHelmRelease(ctx, restConfig, credentialsPath, caFilePath, spec)
 		}
 
 		return nil, err
 	}
 
-	return c.UpgradeHelmReleaseIfChanged(ctx, kubeconfig, credentialsPath, caFilePath, spec, existingRelease)
+	return c.UpgradeHelmReleaseIfChanged(ctx, restConfig, credentialsPath, caFilePath, spec, existingRelease)
 }
 
 // generateHelmInstallConfig generates default helm install config using helmOptions specified in HCP CR spec.
@@ -192,10 +169,10 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 }
 
 // InstallHelmRelease installs a Helm release.
-func (c *HelmClient) InstallHelmRelease(ctx context.Context, kubeconfig string, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
+	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -312,10 +289,10 @@ func getHelmChartAndRepoName(chartName, repoURL string) (string, string, error) 
 }
 
 // UpgradeHelmReleaseIfChanged upgrades a Helm release. The boolean refers to if an upgrade was attempted.
-func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, kubeconfig string, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *helmRelease.Release) (*helmRelease.Release, error) {
+func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec, existing *helmRelease.Release) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
+	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -451,12 +428,12 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 }
 
 // GetHelmRelease returns a Helm release if it exists.
-func (c *HelmClient) GetHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+func (c *HelmClient) GetHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
 	if spec.ReleaseName == "" {
 		return nil, helmDriver.ErrReleaseNotFound
 	}
 
-	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -470,8 +447,8 @@ func (c *HelmClient) GetHelmRelease(ctx context.Context, kubeconfig string, spec
 }
 
 // ListHelmReleases lists all Helm releases in a namespace.
-func (c *HelmClient) ListHelmReleases(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) ([]*helmRelease.Release, error) {
-	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
+func (c *HelmClient) ListHelmReleases(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) ([]*helmRelease.Release, error) {
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -506,8 +483,8 @@ func generateHelmUninstallConfig(actionConfig *helmAction.Configuration, helmOpt
 }
 
 // UninstallHelmRelease uninstalls a Helm release.
-func (c *HelmClient) UninstallHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error) {
-	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
+func (c *HelmClient) UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error) {
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -523,8 +500,8 @@ func (c *HelmClient) UninstallHelmRelease(ctx context.Context, kubeconfig string
 }
 
 // RollbackHelmRelease rolls back a Helm release.
-func (c *HelmClient) RollbackHelmRelease(ctx context.Context, kubeconfig string, spec addonsv1alpha1.HelmReleaseProxySpec) error {
-	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, kubeconfig)
+func (c *HelmClient) RollbackHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) error {
+	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return err
 	}

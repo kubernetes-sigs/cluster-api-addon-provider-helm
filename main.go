@@ -194,7 +194,6 @@ func main() {
 	if err = (&releasecontroller.HelmReleaseProxyReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           scheme,
-		KubeconfigGetter: &internal.KubeconfigGetter{},
 		HelmClient:       &internal.HelmClient{},
 		WatchFilterValue: watchFilterValue,
 	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: helmReleaseProxyConcurrency}); err != nil {
