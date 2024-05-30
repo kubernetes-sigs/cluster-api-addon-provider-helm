@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal/mocks"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -40,7 +41,7 @@ var (
 	ctx        = ctrl.SetupSignalHandler()
 	fakeScheme = runtime.NewScheme()
 
-	kubeconfig = "test-kubeconfig"
+	restConfig = &rest.Config{}
 
 	defaultProxy = &addonsv1alpha1.HelmReleaseProxy{
 		TypeMeta: metav1.TypeMeta{
@@ -171,7 +172,7 @@ func TestReconcileNormal(t *testing.T) {
 			name:             "successfully install a Helm release",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "", "", defaultProxy.DeepCopy().Spec).Return(&helmRelease.Release{
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", defaultProxy.DeepCopy().Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
@@ -195,7 +196,7 @@ func TestReconcileNormal(t *testing.T) {
 			name:             "successfully install a Helm release with a generated name",
 			helmReleaseProxy: generateNameProxy,
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "", "", generateNameProxy.Spec).Return(&helmRelease.Release{
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", generateNameProxy.Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
@@ -219,7 +220,7 @@ func TestReconcileNormal(t *testing.T) {
 			name:             "Helm release pending",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "", "", defaultProxy.Spec).Return(&helmRelease.Release{
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", defaultProxy.Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
@@ -246,7 +247,7 @@ func TestReconcileNormal(t *testing.T) {
 			name:             "Helm client returns error",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "", "", defaultProxy.Spec).Return(nil, errInternal).Times(1)
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", defaultProxy.Spec).Return(nil, errInternal).Times(1)
 			},
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				_, ok := hrp.Annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
@@ -264,7 +265,7 @@ func TestReconcileNormal(t *testing.T) {
 			name:             "Helm release in a failed state, no client error",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "", "", defaultProxy.Spec).Return(&helmRelease.Release{
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", defaultProxy.Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
@@ -304,7 +305,7 @@ func TestReconcileNormal(t *testing.T) {
 					Build(),
 			}
 
-			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "", "", kubeconfig)
+			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "", "", restConfig)
 			if tc.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
@@ -330,7 +331,7 @@ func TestReconcileNormalWithCredentialRef(t *testing.T) {
 			name:             "successfully install a Helm release",
 			helmReleaseProxy: defaultProxyWithCredentialRef.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "/tmp/oci-credentials-xyz.json", "", defaultProxyWithCredentialRef.Spec).Return(&helmRelease.Release{
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "/tmp/oci-credentials-xyz.json", "", defaultProxyWithCredentialRef.Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
@@ -370,7 +371,7 @@ func TestReconcileNormalWithCredentialRef(t *testing.T) {
 					Build(),
 			}
 
-			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "/tmp/oci-credentials-xyz.json", "", kubeconfig)
+			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "/tmp/oci-credentials-xyz.json", "", restConfig)
 			if tc.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
@@ -396,7 +397,7 @@ func TestReconcileNormalWithACertificateRef(t *testing.T) {
 			name:             "successfully install a Helm release",
 			helmReleaseProxy: defaultProxyWithCACertRef.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.InstallOrUpgradeHelmRelease(ctx, kubeconfig, "", "/tmp/ca-xyz.crt", defaultProxyWithCACertRef.Spec).Return(&helmRelease.Release{
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "/tmp/ca-xyz.crt", defaultProxyWithCACertRef.Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
@@ -436,7 +437,7 @@ func TestReconcileNormalWithACertificateRef(t *testing.T) {
 					Build(),
 			}
 
-			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "", "/tmp/ca-xyz.crt", kubeconfig)
+			err := r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "", "/tmp/ca-xyz.crt", restConfig)
 			if tc.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
@@ -462,14 +463,14 @@ func TestReconcileDelete(t *testing.T) {
 			name:             "successfully uninstall a Helm release",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.GetHelmRelease(ctx, kubeconfig, defaultProxy.DeepCopy().Spec).Return(&helmRelease.Release{
+				c.GetHelmRelease(ctx, restConfig, defaultProxy.DeepCopy().Spec).Return(&helmRelease.Release{
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
 						Status: helmRelease.StatusDeployed,
 					},
 				}, nil).Times(1)
-				c.UninstallHelmRelease(ctx, kubeconfig, defaultProxy.DeepCopy().Spec).Return(&helmRelease.UninstallReleaseResponse{}, nil).Times(1)
+				c.UninstallHelmRelease(ctx, restConfig, defaultProxy.DeepCopy().Spec).Return(&helmRelease.UninstallReleaseResponse{}, nil).Times(1)
 			},
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -484,7 +485,7 @@ func TestReconcileDelete(t *testing.T) {
 			name:             "Helm release already uninstalled",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.GetHelmRelease(ctx, kubeconfig, defaultProxy.DeepCopy().Spec).Return(nil, helmDriver.ErrReleaseNotFound).Times(1)
+				c.GetHelmRelease(ctx, restConfig, defaultProxy.DeepCopy().Spec).Return(nil, helmDriver.ErrReleaseNotFound).Times(1)
 			},
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -499,7 +500,7 @@ func TestReconcileDelete(t *testing.T) {
 			name:             "error attempting to get Helm release",
 			helmReleaseProxy: defaultProxy.DeepCopy(),
 			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
-				c.GetHelmRelease(ctx, kubeconfig, defaultProxy.DeepCopy().Spec).Return(nil, errInternal).Times(1)
+				c.GetHelmRelease(ctx, restConfig, defaultProxy.DeepCopy().Spec).Return(nil, errInternal).Times(1)
 			},
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -530,7 +531,7 @@ func TestReconcileDelete(t *testing.T) {
 					Build(),
 			}
 
-			err := r.reconcileDelete(ctx, tc.helmReleaseProxy, clientMock, kubeconfig)
+			err := r.reconcileDelete(ctx, tc.helmReleaseProxy, clientMock, restConfig)
 			if tc.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())

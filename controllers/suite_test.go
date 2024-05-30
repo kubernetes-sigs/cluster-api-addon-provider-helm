@@ -50,13 +50,12 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	k8sClient        client.Client
-	testEnv          *envtest.Environment
-	k8sManager       manager.Manager
-	ctx              context.Context
-	cancel           context.CancelFunc
-	helmClient       *mocks.MockClient
-	kubeconfigGetter *mocks.MockGetter
+	k8sClient  client.Client
+	testEnv    *envtest.Environment
+	k8sManager manager.Manager
+	ctx        context.Context
+	cancel     context.CancelFunc
+	helmClient *mocks.MockClient
 )
 
 const (
@@ -64,7 +63,7 @@ const (
 	interval = time.Millisecond * 250
 )
 
-func TestAPIs(t *testing.T) {
+func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
@@ -128,12 +127,10 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	helmClient = mocks.NewMockClient(gomock.NewController(&TestReporter{}))
-	kubeconfigGetter = mocks.NewMockGetter(gomock.NewController(&TestReporter{}))
 
-	kubeconfigGetter.EXPECT().GetClusterKubeconfig(gomock.Any(), client.ObjectKeyFromObject(cluster1)).Return(kubeconfig, nil).AnyTimes()
-	helmClient.EXPECT().InstallOrUpgradeHelmRelease(gomock.Any(), kubeconfig, gomock.Any(), gomock.Any(), gomock.Any()).Return(helmReleaseDeployed, nil).AnyTimes()
-	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), kubeconfig, gomock.Any()).Return(&helmRelease.UninstallReleaseResponse{}, nil).AnyTimes()
-	helmClient.EXPECT().GetHelmRelease(gomock.Any(), kubeconfig, gomock.Any()).Return(&helmRelease.Release{}, nil).AnyTimes()
+	helmClient.EXPECT().InstallOrUpgradeHelmRelease(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(helmReleaseDeployed, nil).AnyTimes()
+	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).Return(&helmRelease.UninstallReleaseResponse{}, nil).AnyTimes()
+	helmClient.EXPECT().GetHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).Return(&helmRelease.Release{}, nil).AnyTimes()
 
 	err = (&helmchartproxy.HelmChartProxyReconciler{
 		Client: k8sManager.GetClient(),
@@ -142,10 +139,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&helmreleaseproxy.HelmReleaseProxyReconciler{
-		Client:           k8sManager.GetClient(),
-		Scheme:           k8sManager.GetScheme(),
-		KubeconfigGetter: kubeconfigGetter,
-		HelmClient:       helmClient,
+		Client:     k8sManager.GetClient(),
+		Scheme:     k8sManager.GetScheme(),
+		HelmClient: helmClient,
 	}).SetupWithManager(ctx, k8sManager, controller.Options{})
 	Expect(err).ToNot(HaveOccurred())
 
