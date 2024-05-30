@@ -27,6 +27,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/component-base/logs"
+	logsv1 "k8s.io/component-base/logs/api/v1"
+	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/klog/v2"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	chartcontroller "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
@@ -62,6 +65,7 @@ var (
 	webhookPort                 int
 	webhookCertDir              string
 	diagnosticsOptions          = flags.DiagnosticsOptions{}
+	logOptions                  = logs.NewOptions()
 )
 
 func init() {
@@ -73,6 +77,8 @@ func init() {
 
 // InitFlags initializes the flags.
 func InitFlags(fs *pflag.FlagSet) {
+	logsv1.AddFlags(logOptions, fs)
+
 	fs.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 
@@ -139,6 +145,11 @@ func main() {
 		watchNamespaces = map[string]cache.Config{
 			watchNamespace: {},
 		}
+	}
+
+	if err := logsv1.ValidateAndApply(logOptions, nil); err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
 	}
 
 	// klog.Background will automatically use the right logger.
