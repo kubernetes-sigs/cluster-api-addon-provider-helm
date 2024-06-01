@@ -254,7 +254,7 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 
 // newDefaultRegistryClient creates registry client object with default config which can be used to install/upgrade helm charts.
 func newDefaultRegistryClient(credentialsPath string, enableCache bool, caFilePath string, insecureSkipTLSVerify bool) (*registry.Client, error) {
-	if caFilePath == "" || !insecureSkipTLSVerify {
+	if caFilePath == "" && !insecureSkipTLSVerify {
 		opts := []registry.ClientOption{
 			registry.ClientOptDebug(true),
 			registry.ClientOptEnableCache(enableCache),
