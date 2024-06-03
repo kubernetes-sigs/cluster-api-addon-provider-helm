@@ -1010,6 +1010,85 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "construct helm release proxy with insecure TLS",
+			existing: nil,
+			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: addonsv1alpha1.GroupVersion.String(),
+					Kind:       "HelmChartProxy",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
+					TLSConfig: &addonsv1alpha1.TLSConfig{
+						InsecureSkipTLSVerify: true,
+					},
+				},
+			},
+			parsedValues: "test-parsed-values",
+			cluster: &clusterv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "Cluster",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+			expected: &addonsv1alpha1.HelmReleaseProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-chart-name-test-cluster-",
+					Namespace:    "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         addonsv1alpha1.GroupVersion.String(),
+							Kind:               "HelmChartProxy",
+							Name:               "test-hcp",
+							Controller:         ptr.To(true),
+							BlockOwnerDeletion: ptr.To(true),
+						},
+					},
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel:             "test-cluster",
+						addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+					},
+				},
+				Spec: addonsv1alpha1.HelmReleaseProxySpec{
+					ClusterRef: corev1.ObjectReference{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster",
+					},
+					ReleaseName:      "test-release-name",
+					ChartName:        "test-chart-name",
+					RepoURL:          "https://test-repo-url",
+					ReleaseNamespace: "test-release-namespace",
+					Values:           "test-parsed-values",
+					Options: addonsv1alpha1.HelmOptions{
+						EnableClientCache: true,
+						Timeout: &metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+					},
+					TLSConfig: &addonsv1alpha1.TLSConfig{
+						InsecureSkipTLSVerify: true,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

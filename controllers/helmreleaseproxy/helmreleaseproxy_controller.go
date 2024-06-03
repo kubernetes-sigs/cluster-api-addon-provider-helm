@@ -399,7 +399,9 @@ func (r *HelmReleaseProxyReconciler) getCredentials(ctx context.Context, helmRel
 // getCAFile fetches the CA certificate from a Secret and writes it to a temporary file, returning the path to the temporary file.
 func (r *HelmReleaseProxyReconciler) getCAFile(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) (string, error) {
 	caFilePath := ""
-	if helmReleaseProxy.Spec.TLSConfig != nil && helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name != "" {
+	if helmReleaseProxy.Spec.TLSConfig != nil &&
+		helmReleaseProxy.Spec.TLSConfig.CASecretRef != nil &&
+		helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name != "" {
 		// By default, the secret is in the same namespace as the HelmReleaseProxy
 		if helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace == "" {
 			helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace = helmReleaseProxy.Namespace
