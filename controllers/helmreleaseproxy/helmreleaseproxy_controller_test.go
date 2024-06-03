@@ -131,6 +131,34 @@ var (
 		},
 	}
 
+	defaultProxyWithSkipTLS = &addonsv1alpha1.HelmReleaseProxy{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "HelmReleaseProxy",
+			APIVersion: "addons.cluster.x-k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-proxy",
+			Namespace: "default",
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: "cluster.x-k8s.io/v1beta1",
+				Kind:       "Cluster",
+				Namespace:  "default",
+				Name:       "test-cluster",
+			},
+			RepoURL:          "https://test-repo",
+			ChartName:        "test-chart",
+			Version:          "test-version",
+			ReleaseName:      "test-release",
+			ReleaseNamespace: "default",
+			Values:           "test-values",
+			TLSConfig: &addonsv1alpha1.TLSConfig{
+				InsecureSkipTLSVerify: true,
+			},
+		},
+	}
+
 	generateNameProxy = &addonsv1alpha1.HelmReleaseProxy{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HelmReleaseProxy",
@@ -532,6 +560,72 @@ func TestReconcileDelete(t *testing.T) {
 			}
 
 			err := r.reconcileDelete(ctx, tc.helmReleaseProxy, clientMock, restConfig)
+			if tc.expectedError != "" {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+				tc.expect(g, tc.helmReleaseProxy)
+			}
+		})
+	}
+}
+
+func TestTLSSettings(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name             string
+		helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy
+		clientExpect     func(g *WithT, c *mocks.MockClientMockRecorder)
+		expect           func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy)
+		expectedError    string
+	}{
+		{
+			name:             "test",
+			helmReleaseProxy: defaultProxyWithSkipTLS.DeepCopy(),
+			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", defaultProxyWithSkipTLS.Spec).Return(&helmRelease.Release{
+					Name:    "test-release",
+					Version: 1,
+					Info: &helmRelease.Info{
+						Status: helmRelease.StatusDeployed,
+					},
+				}, nil).Times(1)
+			},
+			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				_, ok := hrp.Annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
+				g.Expect(ok).To(BeFalse())
+				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
+				g.Expect(hrp.Status.Revision).To(Equal(1))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+
+				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+			},
+			expectedError: "",
+		},
+	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			t.Parallel()
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			clientMock := mocks.NewMockClient(mockCtrl)
+			tc.clientExpect(g, clientMock.EXPECT())
+
+			r := &HelmReleaseProxyReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
+			}
+			caFilePath, err := r.getCAFile(ctx, tc.helmReleaseProxy)
+			g.Expect(err).ToNot(HaveOccurred(), "did not expect error to get CA file")
+			err = r.reconcileNormal(ctx, tc.helmReleaseProxy, clientMock, "", caFilePath, restConfig)
 			if tc.expectedError != "" {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
