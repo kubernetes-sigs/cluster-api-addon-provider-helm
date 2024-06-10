@@ -12,16 +12,16 @@ require (
 	go.uber.org/mock v0.4.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.15.1
-	k8s.io/api v0.30.0
-	k8s.io/apimachinery v0.30.0
+	k8s.io/api v0.30.1
+	k8s.io/apimachinery v0.30.1
 	k8s.io/cli-runtime v0.30.0
-	k8s.io/client-go v0.30.0
-	k8s.io/component-base v0.30.0
+	k8s.io/client-go v0.30.1
+	k8s.io/component-base v0.30.1
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/cluster-api v1.7.2
 	sigs.k8s.io/cluster-api/test v1.7.2
-	sigs.k8s.io/controller-runtime v0.17.3
+	sigs.k8s.io/controller-runtime v0.18.3
 )
 
 require (
@@ -186,8 +186,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.30.0 // indirect
-	k8s.io/apiserver v0.30.0 // indirect
+	k8s.io/apiextensions-apiserver v0.30.1 // indirect
+	k8s.io/apiserver v0.30.1 // indirect
 	k8s.io/cluster-bootstrap v0.29.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.30.0 // indirect
