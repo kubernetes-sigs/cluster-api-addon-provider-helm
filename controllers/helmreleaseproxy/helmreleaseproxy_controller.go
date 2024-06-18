@@ -79,7 +79,8 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 					),
 					predicates.ResourceHasFilterLabel(ctrl.LoggerFrom(ctx), r.WatchFilterValue),
 				),
-			)).
+			),
+		).
 		Complete(r)
 }
 

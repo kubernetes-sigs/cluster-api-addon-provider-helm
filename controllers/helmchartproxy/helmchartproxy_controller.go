@@ -31,11 +31,11 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // HelmChartProxyReconciler reconciles a HelmChartProxy object.
@@ -51,32 +51,36 @@ type HelmChartProxyReconciler struct {
 func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	c, err := ctrl.NewControllerManagedBy(mgr).
+	_, err := ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
+		Watches(
+			// Add a watch on clusterv1.Cluster object for changes.
+			&clusterv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
+			builder.WithPredicates(
+				predicates.All(ctrl.LoggerFrom(ctx),
+					predicates.Any(ctrl.LoggerFrom(ctx),
+						predicates.ClusterUnpaused(ctrl.LoggerFrom(ctx)),
+						predicates.ClusterControlPlaneInitialized(ctrl.LoggerFrom(ctx)),
+					),
+					predicates.ResourceHasFilterLabel(ctrl.LoggerFrom(ctx), r.WatchFilterValue),
+				),
+			),
+		).
+		Watches(
+			// Add a watch on HelmReleaseProxy object for changes.
+			&addonsv1alpha1.HelmReleaseProxy{},
+			handler.EnqueueRequestsFromMapFunc(HelmReleaseProxyToHelmChartProxyMapper),
+			builder.WithPredicates(
+				predicates.ResourceHasFilterLabel(ctrl.LoggerFrom(ctx), r.WatchFilterValue),
+			),
+		).
 		For(&addonsv1alpha1.HelmChartProxy{}).
 		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
-		// WithEventFilter(predicates.ResourceIsNotExternallyManaged(log)).
 		Build(r)
+
 	if err != nil {
 		return errors.Wrap(err, "error creating controller")
-	}
-
-	// Add a watch on clusterv1.Cluster object for changes.
-	if err = c.Watch(
-		source.Kind(mgr.GetCache(), &clusterv1.Cluster{}),
-		handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
-		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
-	); err != nil {
-		return errors.Wrap(err, "failed adding a watch for Clusters")
-	}
-
-	// Add a watch on HelmReleaseProxy object for changes.
-	if err = c.Watch(
-		source.Kind(mgr.GetCache(), &addonsv1alpha1.HelmReleaseProxy{}),
-		handler.EnqueueRequestsFromMapFunc(HelmReleaseProxyToHelmChartProxyMapper),
-		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
-	); err != nil {
-		return errors.Wrap(err, "failed adding a watch for HelmReleaseProxies")
 	}
 
 	return nil
