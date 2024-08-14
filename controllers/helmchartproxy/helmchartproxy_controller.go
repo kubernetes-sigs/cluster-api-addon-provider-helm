@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // HelmChartProxyReconciler reconciles a HelmChartProxy object.
@@ -51,35 +50,19 @@ type HelmChartProxyReconciler struct {
 func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	c, err := ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.HelmChartProxy{}).
 		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
-		// WithEventFilter(predicates.ResourceIsNotExternallyManaged(log)).
-		Build(r)
-	if err != nil {
-		return errors.Wrap(err, "error creating controller")
-	}
-
-	// Add a watch on clusterv1.Cluster object for changes.
-	if err = c.Watch(
-		source.Kind(mgr.GetCache(), &clusterv1.Cluster{}),
-		handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
-		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
-	); err != nil {
-		return errors.Wrap(err, "failed adding a watch for Clusters")
-	}
-
-	// Add a watch on HelmReleaseProxy object for changes.
-	if err = c.Watch(
-		source.Kind(mgr.GetCache(), &addonsv1alpha1.HelmReleaseProxy{}),
-		handler.EnqueueRequestsFromMapFunc(HelmReleaseProxyToHelmChartProxyMapper),
-		predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue),
-	); err != nil {
-		return errors.Wrap(err, "failed adding a watch for HelmReleaseProxies")
-	}
-
-	return nil
+		Watches(
+			&clusterv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
+		).
+		Watches(
+			&addonsv1alpha1.HelmReleaseProxy{},
+			handler.EnqueueRequestsFromMapFunc(HelmReleaseProxyToHelmChartProxyMapper),
+		).
+		Complete(r)
 }
 
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
