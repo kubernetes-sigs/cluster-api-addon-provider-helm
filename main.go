@@ -64,7 +64,7 @@ var (
 	healthAddr                  string
 	webhookPort                 int
 	webhookCertDir              string
-	diagnosticsOptions          = flags.DiagnosticsOptions{}
+	managerOptions              = flags.ManagerOptions{}
 	logOptions                  = logs.NewOptions()
 )
 
@@ -118,7 +118,7 @@ func InitFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&healthAddr, "health-addr", ":9440",
 		"Address the health endpoint binds to.")
 
-	flags.AddDiagnosticsOptions(fs, &diagnosticsOptions)
+	flags.AddManagerOptions(fs, &managerOptions)
 
 	feature.MutableGates.AddFlag(fs)
 }
@@ -138,7 +138,11 @@ func main() {
 	}
 	pflag.Parse()
 
-	diagnosticsOpts := flags.GetDiagnosticsOptions(diagnosticsOptions)
+	tlsOptions, metricsOptions, err := flags.GetManagerOptions(managerOptions)
+	if err != nil {
+		setupLog.Error(err, "Unable to start manager: invalid flags")
+		os.Exit(1)
+	}
 
 	var watchNamespaces map[string]cache.Config
 	if watchNamespace != "" {
@@ -163,7 +167,7 @@ func main() {
 		RenewDeadline:          &leaderElectionRenewDeadline,
 		HealthProbeBindAddress: healthAddr,
 		PprofBindAddress:       profilerAddress,
-		Metrics:                diagnosticsOpts,
+		Metrics:                *metricsOptions,
 		RetryPeriod:            &leaderElectionRetryPeriod,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNamespaces,
@@ -173,6 +177,7 @@ func main() {
 			webhook.Options{
 				Port:    webhookPort,
 				CertDir: webhookCertDir,
+				TLSOpts: tlsOptions,
 			},
 		),
 	})
