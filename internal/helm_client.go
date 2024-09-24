@@ -162,6 +162,7 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 	upgradeClient.Force = helmOptions.Upgrade.Force
 	upgradeClient.ResetValues = helmOptions.Upgrade.ResetValues
 	upgradeClient.ReuseValues = helmOptions.Upgrade.ReuseValues
+	upgradeClient.ResetThenReuseValues = helmOptions.Upgrade.ResetThenReuseValues
 	upgradeClient.MaxHistory = helmOptions.Upgrade.MaxHistory
 	upgradeClient.CleanupOnFail = helmOptions.Upgrade.CleanupOnFail
 

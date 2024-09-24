@@ -169,6 +169,10 @@ type HelmUpgradeOptions struct {
 	// +optional
 	ReuseValues bool `json:"reuseValues,omitempty"`
 
+	// ResetThenReuseValues will reset the values to the chart's built-ins then merge with user's last supplied values.
+	// +optional
+	ResetThenReuseValues bool `json:"resetThenReuseValues,omitempty"`
+
 	// Recreate will (if true) recreate pods after a rollback.
 	// +optional
 	Recreate bool `json:"recreate,omitempty"`
