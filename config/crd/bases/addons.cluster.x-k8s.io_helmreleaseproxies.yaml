@@ -243,6 +243,11 @@ spec:
                         description: Recreate will (if true) recreate pods after a
                           rollback.
                         type: boolean
+                      resetThenReuseValues:
+                        description: ResetThenReuseValues will reset the values to
+                          the chart's built-ins then merge with user's last supplied
+                          values.
+                        type: boolean
                       resetValues:
                         description: ResetValues will reset the values to the chart's
                           built-ins rather than merging with existing.
