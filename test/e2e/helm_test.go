@@ -49,6 +49,10 @@ var newNginxValues = `controller:
   nginxStatus:
     allowCidrs: 127.0.0.1,::1,{{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}`
 
+var nginxVersion = "v1"
+
+var newNginxVersion = `{{ if eq .Cluster.metadata.labels.version "1.26" }}v2{{ else }}v1{{ end }}`
+
 var _ = Describe("Workload cluster creation", func() {
 	var (
 		ctx               = context.Background()
@@ -135,6 +139,9 @@ var _ = Describe("Workload cluster creation", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "nginx-ingress",
 					Namespace: namespace.Name,
+					Labels: map[string]string{
+						"version": "1.26",
+					},
 				},
 				Spec: addonsv1alpha1.HelmChartProxySpec{
 					ClusterSelector: metav1.LabelSelector{
@@ -146,6 +153,7 @@ var _ = Describe("Workload cluster creation", func() {
 					ReleaseNamespace: "nginx-namespace",
 					ChartName:        "nginx-ingress",
 					RepoURL:          "https://helm.nginx.com/stable",
+					VersionTemplate:  nginxVersion,
 					ValuesTemplate:   nginxValues,
 				},
 			}
@@ -162,7 +170,7 @@ var _ = Describe("Workload cluster creation", func() {
 				})
 			})
 
-			// Update existing Helm chart
+			// Update existing Helm chart with new values
 			By("Updating nginx HelmChartProxy valuesTemplate", func() {
 				hcp.Spec.ValuesTemplate = newNginxValues
 				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
@@ -172,6 +180,20 @@ var _ = Describe("Workload cluster creation", func() {
 						ClusterName:           clusterName,
 						HelmChartProxy:        hcp,
 						ExpectedRevision:      2,
+					}
+				})
+			})
+
+			// Update existing Helm chart with new version
+			By("Updating nginx HelmChartProxy versionTemplate", func() {
+				hcp.Spec.VersionTemplate = newNginxVersion
+				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
+					return HelmUpgradeInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+						ExpectedRevision:      3,
 					}
 				})
 			})
@@ -266,17 +288,22 @@ var _ = Describe("Workload cluster creation", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "nginx-ingress",
 					Namespace: namespace.Name,
+					Labels: map[string]string{
+						"version": "1.26",
+					},
 				},
 				Spec: addonsv1alpha1.HelmChartProxySpec{
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"nginxIngress": "enabled",
+							"version":      "1.26",
 						},
 					},
 					ReleaseName:      "nginx-ingress",
 					ReleaseNamespace: "nginx-namespace",
 					ChartName:        "nginx-ingress",
 					RepoURL:          "https://helm.nginx.com/stable",
+					VersionTemplate:  nginxVersion,
 					ValuesTemplate:   nginxValues,
 				},
 			}
