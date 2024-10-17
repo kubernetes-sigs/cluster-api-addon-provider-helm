@@ -300,6 +300,12 @@ spec:
                   Version is the version of the Helm chart. If it is not specified, the chart will use
                   and be kept up to date with the latest version.
                 type: string
+              versionTemplate:
+                description: |-
+                  VersionTemplate is an inline Go template representing the version for the Helm chart. This template supports Go templating
+                  to reference fields from each selected workload Cluster and programatically create and set the version.
+                  If the Version is specified, VersionTemplate will take precedence.
+                type: string
             required:
             - chartName
             - clusterSelector

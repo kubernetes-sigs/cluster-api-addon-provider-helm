@@ -67,6 +67,7 @@ metadata:
   namespace: default
   labels:
     nginxIngressChart: enabled
+    version: 1.26
 spec:
   clusterNetwork:
     services:
@@ -105,6 +106,7 @@ spec:
     timeout: 5m
     install:
       createNamespace: true
+  versionTemplate: {{ if eq .Cluster.metadata.labels.version "1.26" }}v2{{ else }}v1{{ end }}
   valuesTemplate: |
     controller:
       name: "{{ .ControlPlane.metadata.name }}-nginx"
@@ -117,6 +119,7 @@ We use the `clusterSelector` to select the workload cluster to install the chart
 The `repoURL` and `chartName` are used to specify the chart to install.
 User shall specify chart-path `oci://repo-url/chart-name` as `repoURL: oci://repo-url` and `chartName: chart-name` in HCP CR. This format is consistent with other types of charts as well (e.g. `https://repo-url/chart-name` as `repoURL: https://repo-url` and `chartName: chart-name`).
 The `valuesTemplate` is used to specify the values to use when installing the chart. It supports Go templating, and here we set `controller.name` to the name of the selected cluster + `-nginx`. We also set `controller.nginxStatus.allowCidrs` to include the first entry in the workload cluster's pod CIDR blocks.
+The `versionTemplate` is used to specify the version of the chart to install. It supports Go templating, and here we set `metadata.labels.version` to the name of the Kubernetes version. Eventually, we can use different chart versions based on the Kubernetes versions.
 
 Helm options like `wait`, `skipCrds`, `timeout`, `waitForJobs`, etc. can be specified with `options` field as shown in above mentioned example, to control behaviour of helm operations(Install, Upgrade, Delete, etc). Please check CRD spec for all supported helm options and its behaviour.
 
@@ -211,6 +214,7 @@ spec:
   namespace: default
   releaseName: nginx-ingress-1665181073
   repoURL: https://helm.nginx.com/stable
+  version: v2
   values: |
     controller:
       name: "default-23995-nginx"
@@ -218,7 +222,7 @@ spec:
         allowCidrs: 127.0.0.1,::1,192.168.0.0/16
 ```
 
-Notice that a release name is generated for us, and the Go template we specified in `valuesTemplate` has been replaced with the actual values from the Cluster definition.
+Notice that a release name is generated for us, and the Go template we specified in `valuesTemplate` and `versionTemplate` has been replaced with the actual values from the Cluster definition.
 
 ### 6. Uninstall `nginx-ingress` from the workload cluster
 

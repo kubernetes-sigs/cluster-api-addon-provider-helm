@@ -93,3 +93,46 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 
 	return expandedTemplate, nil
 }
+
+func ParseVersion(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.HelmChartProxySpec, cluster *clusterv1.Cluster) (string, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Rendering templating in values:", "version", spec.VersionTemplate)
+	references := map[string]corev1.ObjectReference{
+		"Cluster": {
+			APIVersion: cluster.APIVersion,
+			Kind:       cluster.Kind,
+			Namespace:  cluster.Namespace,
+			Name:       cluster.Name,
+		},
+	}
+
+	if cluster.Spec.ControlPlaneRef != nil {
+		references["ControlPlane"] = *cluster.Spec.ControlPlaneRef
+	}
+	if cluster.Spec.InfrastructureRef != nil {
+		references["InfraCluster"] = *cluster.Spec.InfrastructureRef
+	}
+	// TODO: would we want to add ControlPlaneMachineTemplate?
+
+	valueLookUp, err := initializeBuiltins(ctx, c, references, cluster)
+	if err != nil {
+		return "", err
+	}
+
+	tmpl, err := template.New(spec.ChartName + "-" + cluster.GetName()).
+		Funcs(sprig.TxtFuncMap()).
+		Parse(spec.VersionTemplate)
+	if err != nil {
+		return "", err
+	}
+	var buffer bytes.Buffer
+
+	if err := tmpl.Execute(&buffer, valueLookUp); err != nil {
+		return "", errors.Wrapf(err, "error executing template string '%s' on cluster '%s'", spec.VersionTemplate, cluster.GetName())
+	}
+	expandedTemplate := buffer.String()
+	log.V(2).Info("Expanded version to", "result", expandedTemplate)
+
+	return expandedTemplate, nil
+}

@@ -77,6 +77,7 @@ var (
 			RepoURL:          "https://test-repo-url",
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
+			VersionTemplate:  "{{ if eq .Cluster.metadata.labels.version \"1.26\" }}v2{{ else }}v1{{ end }}",
 			ValuesTemplate:   "cidrBlockList: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join \",\" }}",
 			Options: addonsv1alpha1.HelmOptions{
 				EnableClientCache: true,
@@ -164,6 +165,9 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-cluster",
 			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"version": "1.26",
+			},
 		},
 		Spec: clusterv1.ClusterSpec{
 			ClusterNetwork: &clusterv1.ClusterNetwork{
@@ -281,6 +285,17 @@ func TestReconcileForCluster(t *testing.T) {
 			expectedError: "",
 		},
 		{
+			name:                          "updates a HelmReleaseProxy when versionTemplate value changes",
+			helmChartProxy:                fakeHelmChartProxy2,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Version).To(Equal("v2"))
+			},
+			expectedError: "",
+		},
+		{
 			name:                          "set condition when failing to parse values for a HelmChartProxy",
 			helmChartProxy:                fakeInvalidHelmChartProxy,
 			cluster:                       fakeCluster1,
@@ -368,6 +383,7 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 		existing       *addonsv1alpha1.HelmReleaseProxy
 		helmChartProxy *addonsv1alpha1.HelmChartProxy
 		parsedValues   string
+		parsedVersion  string
 		cluster        *clusterv1.Cluster
 		expected       *addonsv1alpha1.HelmReleaseProxy
 	}{
@@ -1097,7 +1113,7 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			result := constructHelmReleaseProxy(tc.existing, tc.helmChartProxy, tc.parsedValues, tc.cluster)
+			result := constructHelmReleaseProxy(tc.existing, tc.helmChartProxy, tc.parsedValues, tc.parsedVersion, tc.cluster)
 			diff := cmp.Diff(tc.expected, result)
 			g.Expect(diff).To(BeEmpty())
 		})

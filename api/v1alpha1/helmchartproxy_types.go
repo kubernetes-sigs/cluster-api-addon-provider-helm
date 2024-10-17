@@ -59,6 +59,12 @@ type HelmChartProxySpec struct {
 	// +optional
 	Version string `json:"version,omitempty"`
 
+	// VersionTemplate is an inline Go template representing the version for the Helm chart. This template supports Go templating
+	// to reference fields from each selected workload Cluster and programatically create and set the version.
+	// If the Version is specified, VersionTemplate will take precedence.
+	// +optional
+	VersionTemplate string `json:"versionTemplate,omitempty"`
+
 	// ValuesTemplate is an inline YAML representing the values for the Helm chart. This YAML supports Go templating to reference
 	// fields from each selected workload Cluster and programatically create and set values.
 	// +optional

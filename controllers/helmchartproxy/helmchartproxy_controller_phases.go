@@ -19,6 +19,7 @@ package helmchartproxy
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -95,7 +96,18 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 	}
 
 	log.V(2).Info("Values for cluster", "cluster", cluster.Name, "values", values)
-	if err := r.createOrUpdateHelmReleaseProxy(ctx, existingHelmReleaseProxy, helmChartProxy, &cluster, values); err != nil {
+
+	version := helmChartProxy.Spec.Version
+	if helmChartProxy.Spec.VersionTemplate != "" {
+		version, err = internal.ParseVersion(ctx, r.Client, helmChartProxy.Spec, &cluster)
+		if err != nil {
+			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ValueParsingFailedReason, clusterv1.ConditionSeverityError, err.Error())
+
+			return errors.Wrapf(err, "failed to parse version on cluster %s", cluster.Name)
+		}
+	}
+
+	if err := r.createOrUpdateHelmReleaseProxy(ctx, existingHelmReleaseProxy, helmChartProxy, &cluster, values, version); err != nil {
 		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyCreationFailedReason, clusterv1.ConditionSeverityError, err.Error())
 
 		return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
@@ -139,9 +151,9 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 }
 
 // createOrUpdateHelmReleaseProxy creates or updates the HelmReleaseProxy for the given cluster.
-func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues string) error {
+func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues, parsedVersion string) error {
 	log := ctrl.LoggerFrom(ctx)
-	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, cluster)
+	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, parsedVersion, cluster)
 	if helmReleaseProxy == nil {
 		log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)
 		return nil
@@ -178,8 +190,14 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 
 // constructHelmReleaseProxy constructs a new HelmReleaseProxy for the given Cluster or updates the existing HelmReleaseProxy if needed.
 // If no update is needed, this returns nil. Note that this does not check if we need to reinstall the HelmReleaseProxy, i.e. immutable fields changed.
-func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1alpha1.HelmReleaseProxy {
+func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, parsedValues, parsedVersion string, cluster *clusterv1.Cluster) *addonsv1alpha1.HelmReleaseProxy {
 	helmReleaseProxy := &addonsv1alpha1.HelmReleaseProxy{}
+
+	// If it's not set, then use the as-is version to make tests happy without breaking the logic.
+	if parsedVersion == "" {
+		parsedVersion = helmChartProxy.Spec.Version
+	}
+
 	if existing == nil {
 		helmReleaseProxy.GenerateName = fmt.Sprintf("%s-%s-", helmChartProxy.Spec.ChartName, cluster.Name)
 		helmReleaseProxy.Namespace = helmChartProxy.Namespace
@@ -212,13 +230,16 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		if !cmp.Equal(existing.Spec.Values, parsedValues) {
 			changed = true
 		}
+		if !cmp.Equal(existing.Spec.Version, parsedVersion) {
+			changed = true
+		}
 
 		if !changed {
 			return nil
 		}
 	}
 
-	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
+	helmReleaseProxy.Spec.Version = strings.TrimSpace(parsedVersion)
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
 	helmReleaseProxy.Spec.Credentials = helmChartProxy.Spec.Credentials
