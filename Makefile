@@ -199,7 +199,18 @@ HELM_BIN := helm
 HELM := $(TOOLS_BIN_DIR)/$(HELM_BIN)-$(HELM_VER)
 
 # Define Docker related variables. Releases should modify and double check these vars.
-REGISTRY ?= gcr.io/$(shell gcloud config get-value project)
+ifneq ($(shell command -v gcloud),)
+	GCLOUD_PROJECT := $(shell gcloud config get-value project 2>/dev/null)
+	ifneq ($(GCLOUD_PROJECT),)
+		REGISTRY ?= gcr.io/$(GCLOUD_PROJECT)
+	endif
+endif
+
+# If REGISTRY is not set, default to localhost:5000 to use the kind registry.
+ifndef REGISTRY
+	REGISTRY ?= localhost:5000
+endif
+
 PROD_REGISTRY ?= registry.k8s.io/cluster-api-helm
 
 STAGING_REGISTRY ?= gcr.io/k8s-staging-cluster-api-helm
