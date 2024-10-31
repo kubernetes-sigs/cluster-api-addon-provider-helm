@@ -18,7 +18,6 @@ package helmchartproxy
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -117,7 +116,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// to not have errors. An idea would be to check the deletion timestamp.
 	clusterList, err := r.listClustersWithLabels(ctx, helmChartProxy.Namespace, selector)
 	if err != nil {
-		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, err.Error())
+		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, "failed to list clusters")
 
 		return ctrl.Result{}, err
 	}
@@ -283,7 +282,7 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 	for i := range releaseList.Items {
 		helmReleaseProxy := &releaseList.Items[i]
 		if helmReleaseProxy.Generation != helmReleaseProxy.Status.ObservedGeneration {
-			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxySpecsUpdatingReason, clusterv1.ConditionSeverityInfo, fmt.Sprintf("Helm release proxy '%s' is not updated yet", helmReleaseProxy.Name))
+			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxySpecsUpdatingReason, clusterv1.ConditionSeverityInfo, "Helm release proxy '%s' is not updated yet", helmReleaseProxy.Name)
 			return nil
 		}
 		getters = append(getters, helmReleaseProxy)
