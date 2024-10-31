@@ -156,7 +156,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				restConfig, err := remote.RESTConfig(ctx, "caaph", r.Client, clusterKey)
 				if err != nil {
 					wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-					conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, "failed to get kubeconfig for cluster")
+					conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
 
 					return ctrl.Result{}, wrappedErr
 				}
@@ -173,7 +173,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				// TODO: should we set a condition here?
 			} else {
 				wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-				conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, "failed to get cluster '%s/%s'", clusterKey.Namespace, clusterKey.Name)
+				conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
 
 				return ctrl.Result{}, wrappedErr
 			}
@@ -193,7 +193,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
 		// TODO: add check to tell if Cluster is deleted so we can remove the HelmReleaseProxy.
 		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
 
 		return ctrl.Result{}, wrappedErr
 	}
@@ -211,7 +211,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	restConfig, err := remote.RESTConfig(ctx, "caaph", r.Client, clusterKey)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, "failed to get kubeconfig for cluster")
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetKubeconfigFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
 
 		return ctrl.Result{}, wrappedErr
 	}
@@ -220,7 +220,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	credentialsPath, err := r.getCredentials(ctx, helmReleaseProxy)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get credentials for cluster")
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetCredentialsFailedReason, clusterv1.ConditionSeverityError, "failed to get credentials for cluster")
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetCredentialsFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
 
 		return ctrl.Result{}, wrappedErr
 	}
@@ -236,7 +236,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	caFilePath, err := r.getCAFile(ctx, helmReleaseProxy)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get CA certificate file for cluster")
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetCACertificateFailedReason, clusterv1.ConditionSeverityError, "failed to get CA certificate file for cluster")
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetCACertificateFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
 
 		return ctrl.Result{}, wrappedErr
 	}
@@ -272,7 +272,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 	release, err := client.InstallOrUpgradeHelmRelease(ctx, restConfig, credentialsPath, caFilePath, helmReleaseProxy.Spec)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("Failed to install or upgrade release '%s' on cluster %s", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name))
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, "failed to install or upgrade release '%s' on cluster '%s'", helmReleaseProxy.Spec.ReleaseName, helmReleaseProxy.Spec.ClusterRef.Name)
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
 	}
 	if release != nil {
 		log.V(2).Info(fmt.Sprintf("Release '%s' exists on cluster %s, revision = %d", release.Name, helmReleaseProxy.Spec.ClusterRef.Name, release.Version))
@@ -286,10 +286,10 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		case status == helmRelease.StatusDeployed:
 			conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
 		case status.IsPending():
-			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleasePendingReason, clusterv1.ConditionSeverityInfo, "Helm release is in a pending state: '%s'", status)
+			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleasePendingReason, clusterv1.ConditionSeverityInfo, "Helm release is in a pending state: %s", status)
 		case status == helmRelease.StatusFailed && err == nil:
 			log.Info("Helm release failed without error, this might be unexpected", "release", release.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
-			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, "Helm release failed: '%s'", status)
+			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmInstallOrUpgradeFailedReason, clusterv1.ConditionSeverityError, "Helm release failed: %s", status)
 			// TODO: should we set the error state again here?
 		}
 	}
@@ -314,7 +314,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 			return nil
 		}
 
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseGetFailedReason, clusterv1.ConditionSeverityError, "'%s'", err.Error())
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseGetFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
 
 		return err
 	}
@@ -324,7 +324,7 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 	response, err := client.UninstallHelmRelease(ctx, restConfig, helmReleaseProxy.Spec)
 	if err != nil {
 		log.V(2).Info("Error uninstalling chart with Helm:", err)
-		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseDeletionFailedReason, clusterv1.ConditionSeverityError, "failed to uninstall chart with Helm on cluster '%s'", helmReleaseProxy.Spec.ClusterRef.Name)
+		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseDeletionFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
 
 		return errors.Wrapf(err, "error uninstalling chart with Helm on cluster %s", helmReleaseProxy.Spec.ClusterRef.Name)
 	}

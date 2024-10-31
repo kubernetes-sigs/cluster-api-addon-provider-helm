@@ -116,7 +116,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// to not have errors. An idea would be to check the deletion timestamp.
 	clusterList, err := r.listClustersWithLabels(ctx, helmChartProxy.Namespace, selector)
 	if err != nil {
-		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, "failed to list clusters")
+		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
 
 		return ctrl.Result{}, err
 	}
