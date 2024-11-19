@@ -59,13 +59,89 @@ var (
 				Namespace:  "default",
 				Name:       "test-cluster",
 			},
-			RepoURL:          "https://test-repo",
-			ChartName:        "test-chart",
-			Version:          "test-version",
-			ReleaseName:      "test-release",
-			ReleaseNamespace: "default",
-			Values:           "test-values",
-			Credentials:      nil,
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseName:       "test-release",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Credentials:       nil,
+		},
+	}
+
+	installOnceProxyAlreadyInstalled = &addonsv1alpha1.HelmReleaseProxy{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "HelmReleaseProxy",
+			APIVersion: "addons.cluster.x-k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-proxy",
+			Namespace: "default",
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: "cluster.x-k8s.io/v1beta1",
+				Kind:       "Cluster",
+				Namespace:  "default",
+				Name:       "test-cluster",
+			},
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseName:       "test-release",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyInstallOnce),
+			Credentials:       nil,
+		},
+		Status: addonsv1alpha1.HelmReleaseProxyStatus{
+			Status:   string(helmRelease.StatusDeployed),
+			Revision: 1,
+			Conditions: clusterv1.Conditions{
+				{
+					Type:   addonsv1alpha1.HelmReleaseReadyCondition,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   addonsv1alpha1.ClusterAvailableCondition,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   clusterv1.ReadyCondition,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	installOnceProxyNotInstalled = &addonsv1alpha1.HelmReleaseProxy{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "HelmReleaseProxy",
+			APIVersion: "addons.cluster.x-k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-proxy",
+			Namespace: "default",
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: "cluster.x-k8s.io/v1beta1",
+				Kind:       "Cluster",
+				Namespace:  "default",
+				Name:       "test-cluster",
+			},
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseName:       "test-release",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyInstallOnce),
+			Credentials:       nil,
 		},
 	}
 
@@ -85,12 +161,13 @@ var (
 				Namespace:  "default",
 				Name:       "test-cluster",
 			},
-			RepoURL:          "https://test-repo",
-			ChartName:        "test-chart",
-			Version:          "test-version",
-			ReleaseName:      "test-release",
-			ReleaseNamespace: "default",
-			Values:           "test-values",
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseName:       "test-release",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 			Credentials: &addonsv1alpha1.Credentials{
 				Secret: corev1.SecretReference{
 					Name:      "test-secret",
@@ -116,12 +193,13 @@ var (
 				Namespace:  "default",
 				Name:       "test-cluster",
 			},
-			RepoURL:          "https://test-repo",
-			ChartName:        "test-chart",
-			Version:          "test-version",
-			ReleaseName:      "test-release",
-			ReleaseNamespace: "default",
-			Values:           "test-values",
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseName:       "test-release",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 			TLSConfig: &addonsv1alpha1.TLSConfig{
 				CASecretRef: &corev1.SecretReference{
 					Name:      "test-secret",
@@ -147,12 +225,13 @@ var (
 				Namespace:  "default",
 				Name:       "test-cluster",
 			},
-			RepoURL:          "https://test-repo",
-			ChartName:        "test-chart",
-			Version:          "test-version",
-			ReleaseName:      "test-release",
-			ReleaseNamespace: "default",
-			Values:           "test-values",
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseName:       "test-release",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 			TLSConfig: &addonsv1alpha1.TLSConfig{
 				InsecureSkipTLSVerify: true,
 			},
@@ -175,11 +254,12 @@ var (
 				Namespace:  "default",
 				Name:       "test-cluster",
 			},
-			RepoURL:          "https://test-repo",
-			ChartName:        "test-chart",
-			Version:          "test-version",
-			ReleaseNamespace: "default",
-			Values:           "test-values",
+			RepoURL:           "https://test-repo",
+			ChartName:         "test-chart",
+			Version:           "test-version",
+			ReleaseNamespace:  "default",
+			Values:            "test-values",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 		},
 	}
 
@@ -310,6 +390,52 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmInstallOrUpgradeFailedReason))
 				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
 				g.Expect(releaseReady.Message).To(Equal(fmt.Sprintf("Helm release failed: %s", helmRelease.StatusFailed)))
+			},
+			expectedError: "",
+		},
+		{
+			name:             "do nothing if already successfully and installed strategy is InstallOnce",
+			helmReleaseProxy: installOnceProxyAlreadyInstalled.DeepCopy(),
+			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
+				// no client calls expected
+			},
+			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				_, ok := hrp.Annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
+				g.Expect(ok).To(BeFalse())
+				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
+				g.Expect(hrp.Status.Revision).To(Equal(1))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+
+				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+			},
+			expectedError: "",
+		},
+		{
+			name:             "successfully install a Helm release when strategy is InstallOnce",
+			helmReleaseProxy: installOnceProxyNotInstalled.DeepCopy(),
+			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
+				c.InstallOrUpgradeHelmRelease(ctx, restConfig, "", "", installOnceProxyNotInstalled.DeepCopy().Spec).Return(&helmRelease.Release{
+					Name:    "test-release",
+					Version: 1,
+					Info: &helmRelease.Info{
+						Status: helmRelease.StatusDeployed,
+					},
+				}, nil).Times(1)
+			},
+			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				_, ok := hrp.Annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
+				g.Expect(ok).To(BeFalse())
+
+				_, ok = hrp.Annotations[addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation]
+				g.Expect(ok).To(BeTrue())
+
+				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
+				g.Expect(hrp.Status.Revision).To(Equal(1))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+
+				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 			},
 			expectedError: "",
 		},
@@ -538,6 +664,19 @@ func TestReconcileDelete(t *testing.T) {
 				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
 			},
 			expectedError: errInternal.Error(),
+		},
+		{
+			name:             "do nothing when strategy is InstallOnce",
+			helmReleaseProxy: installOnceProxyAlreadyInstalled.DeepCopy(),
+			clientExpect: func(g *WithT, c *mocks.MockClientMockRecorder) {
+				// no client calls expected
+			},
+			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				// Since the condition was set to true before, it should remain true.
+				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
+			},
+			expectedError: "",
 		},
 	}
 

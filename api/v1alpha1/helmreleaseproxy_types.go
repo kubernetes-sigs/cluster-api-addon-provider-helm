@@ -32,6 +32,10 @@ const (
 
 	// IsReleaseNameGeneratedAnnotation is the annotation signifying the Helm release name is auto-generated.
 	IsReleaseNameGeneratedAnnotation = "helmreleaseproxy.addons.cluster.x-k8s.io/is-release-name-generated"
+
+	// ReleaseSuccessfullyInstalledAnnotation is the annotation signifying the Helm release has been successfully installed at least once.
+	// This is used to determine if the HelmReleaseProxy is in a ready state for the InstallOnce strategy.
+	ReleaseSuccessfullyInstalledAnnotation = "helmreleaseproxy.addons.cluster.x-k8s.io/release-successfully-installed"
 )
 
 // HelmReleaseProxySpec defines the desired state of HelmReleaseProxy.
@@ -65,6 +69,14 @@ type HelmReleaseProxySpec struct {
 	// Go templating with the values from the referenced workload Cluster.
 	// +optional
 	Values string `json:"values,omitempty"`
+
+	// ReconcileStrategy indicates whether a Helm chart should be continuously installed, updated, and uninstalled on the Cluster,
+	// or if it should be reconciled until it is successfully installed on the Cluster and not otherwise updated or uninstalled.
+	// If not specified, the default behavior will be to reconcile continuously. This field is immutable.
+	// Possible values are `Continuous`, `InstallOnce`, or unset.
+	// +kubebuilder:validation:Enum="";InstallOnce;Continuous;
+	// +optional
+	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
 
 	// Options represents the helm setting options which can be used to control behaviour of helm operations(Install, Upgrade, Delete, etc)
 	// via options like wait, skipCrds, timeout, waitForJobs, etc.

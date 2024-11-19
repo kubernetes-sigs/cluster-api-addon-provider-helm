@@ -266,6 +266,17 @@ spec:
                       after a Helm install/upgrade has been performed.
                     type: boolean
                 type: object
+              reconcileStrategy:
+                description: |-
+                  ReconcileStrategy indicates whether a Helm chart should be continuously installed, updated, and uninstalled on the Cluster,
+                  or if it should be reconciled until it is successfully installed on the Cluster and not otherwise updated or uninstalled.
+                  If not specified, the default behavior will be to reconcile continuously. This field is immutable.
+                  Possible values are `Continuous`, `InstallOnce`, or unset.
+                enum:
+                - ""
+                - InstallOnce
+                - Continuous
+                type: string
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
                   chart. If it is not specified, a name will be generated.

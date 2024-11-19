@@ -99,6 +99,10 @@ get_go_version = $(shell go list -f "{{.Version}}" -m $1)
 # Binaries.
 #
 # Note: Need to use abspath so we can invoke these from subdirectories
+
+# curl retries
+CURL_RETRIES=3
+
 KUSTOMIZE_VER := v5.3.0
 KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
@@ -189,6 +193,10 @@ TILT_PREPARE := $(abspath $(TOOLS_BIN_DIR)/$(TILT_PREPARE_BIN))
 
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN))
+
+HELM_VER := v3.14.4
+HELM_BIN := helm
+HELM := $(TOOLS_BIN_DIR)/$(HELM_BIN)-$(HELM_VER)
 
 # Define Docker related variables. Releases should modify and double check these vars.
 REGISTRY ?= gcr.io/$(shell gcloud config get-value project)
@@ -394,6 +402,9 @@ ARTIFACTS ?= ${ROOT_DIR}/_artifacts
 
 KUBEBUILDER_ASSETS ?= $(shell $(SETUP_ENVTEST) use --use-env -p path $(KUBEBUILDER_ENVTEST_KUBERNETES_VERSION))
 
+.PHONY: install-tools # populate hack/tools/bin
+install-tools: $(ENVSUBST) $(KUSTOMIZE) $(HELM) $(GINKGO) # Should kubectl be added here?
+
 .PHONY: test
 test: $(SETUP_ENVTEST) ## Run unit and integration tests
 	KUBEBUILDER_ASSETS="$(KUBEBUILDER_ASSETS)" go test ./... $(TEST_ARGS)
@@ -428,7 +439,7 @@ test-e2e-local: ## Run `docker-build` rule then run e2e tests.
 	test-e2e-run
 
 .PHONY: test-e2e-run-skip-manifest
-test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates ## Run the end-to-end tests without updating the manifest.
+test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates install-tools ## Run the end-to-end tests without updating the manifest.
 	$(ENVSUBST) < $(E2E_CONF_FILE) > $(E2E_CONF_FILE_ENVSUBST) && \
 	$(GINKGO) -v --trace -poll-progress-after=$(GINKGO_POLL_PROGRESS_AFTER) \
 		-poll-progress-interval=$(GINKGO_POLL_PROGRESS_INTERVAL) --tags=e2e --focus="$(GINKGO_FOCUS)" \
@@ -729,6 +740,9 @@ $(GOLANGCI_LINT_BIN): $(GOLANGCI_LINT) ## Build a local copy of golangci-lint
 .PHONY: $(GINKGO_BIN)
 $(GINKGO_BIN): $(GINKGO) ## Build a local copy of ginkgo
 
+.PHONY: $(HELM_BIN)
+$(HELM_BIN): $(HELM) ## Build a local copy of Helm
+
 $(CONTROLLER_GEN): # Build controller-gen from tools folder.
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(CONTROLLER_GEN_PKG) $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
 
@@ -787,3 +801,12 @@ $(GOLANGCI_LINT): .github/workflows/golangci-lint.yml # Download golangci-lint u
 
 $(GINKGO): # Build ginkgo from tools folder.
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(GINKGO_PKG) $(GINKGO_BIN) $(GINGKO_VER)
+
+$(HELM): ## Put helm into tools folder.
+	mkdir -p $(TOOLS_BIN_DIR)
+	rm -f "$(TOOLS_BIN_DIR)/$(HELM_BIN)*"
+	curl --retry $(CURL_RETRIES) -fsSL -o $(TOOLS_BIN_DIR)/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+	chmod 700 $(TOOLS_BIN_DIR)/get_helm.sh
+	USE_SUDO=false HELM_INSTALL_DIR=$(TOOLS_BIN_DIR) DESIRED_VERSION=$(HELM_VER) BINARY_NAME=$(HELM_BIN)-$(HELM_VER) $(TOOLS_BIN_DIR)/get_helm.sh
+	ln -sf $(HELM) $(TOOLS_BIN_DIR)/$(HELM_BIN)
+	rm -f $(TOOLS_BIN_DIR)/get_helm.sh

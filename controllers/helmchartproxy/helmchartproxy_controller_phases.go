@@ -70,22 +70,29 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 		// TODO: Should we set a condition here?
 		return errors.Wrapf(err, "failed to get HelmReleaseProxy for cluster %s", cluster.Name)
 	}
-	// log.V(2).Info("Found existing HelmReleaseProxy", "cluster", cluster.Name, "release", existingHelmReleaseProxy.Name)
 
-	if existingHelmReleaseProxy != nil && shouldReinstallHelmRelease(ctx, existingHelmReleaseProxy, helmChartProxy) {
-		log.V(2).Info("Reinstalling Helm release by deleting and creating HelmReleaseProxy", "helmReleaseProxy", existingHelmReleaseProxy.Name)
-		if err := r.deleteHelmReleaseProxy(ctx, existingHelmReleaseProxy); err != nil {
-			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
+	if helmChartProxy.Spec.ReconcileStrategy == string(addonsv1alpha1.ReconcileStrategyInstallOnce) {
+		if internal.HasHelmReleaseBeenSuccessfullyInstalled(existingHelmReleaseProxy) {
+			log.V(2).Info("HelmReleaseProxy has been installed on InstallOnce mode, nothing to do", "helmReleaseProxy", existingHelmReleaseProxy.Name, "cluster", cluster.Name)
 
-			return err
+			return nil
 		}
+	} else { // ReconcileStrategy == `Continuous` or unset
+		if existingHelmReleaseProxy != nil && shouldReinstallHelmRelease(ctx, existingHelmReleaseProxy, helmChartProxy) {
+			log.V(2).Info("Reinstalling Helm release by deleting and creating HelmReleaseProxy", "helmReleaseProxy", existingHelmReleaseProxy.Name)
+			if err := r.deleteHelmReleaseProxy(ctx, existingHelmReleaseProxy); err != nil {
+				conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyDeletionFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
 
-		// TODO: Add a check on requeue to make sure that the HelmReleaseProxy isn't still deleting
-		log.V(2).Info("Successfully deleted HelmReleaseProxy on cluster, returning to requeue for reconcile", "cluster", cluster.Name)
-		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyReinstallingReason, clusterv1.ConditionSeverityInfo, "HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", cluster.Name)
+				return err
+			}
 
-		return nil // Try returning early so it will requeue
-		// TODO: should we continue in the loop or just requeue?
+			// TODO: Add a check on requeue to make sure that the HelmReleaseProxy isn't still deleting
+			log.V(2).Info("Successfully deleted HelmReleaseProxy on cluster, returning to requeue for reconcile", "cluster", cluster.Name)
+			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyReinstallingReason, clusterv1.ConditionSeverityInfo, "HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", cluster.Name)
+
+			return nil // Try returning early so it will requeue
+			// TODO: should we continue in the loop or just requeue?
+		}
 	}
 
 	values, err := internal.ParseValues(ctx, r.Client, helmChartProxy.Spec, &cluster)
@@ -219,6 +226,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		}
 	}
 
+	helmReleaseProxy.Spec.ReconcileStrategy = helmChartProxy.Spec.ReconcileStrategy
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options

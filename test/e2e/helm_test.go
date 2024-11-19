@@ -51,15 +51,17 @@ var newNginxValues = `controller:
 
 var _ = Describe("Workload cluster creation", func() {
 	var (
-		ctx               = context.Background()
-		specName          = "create-workload-cluster"
-		namespace         *corev1.Namespace
-		cancelWatches     context.CancelFunc
-		result            *clusterctl.ApplyClusterTemplateAndWaitResult
-		clusterName       string
-		clusterNamePrefix string
-		additionalCleanup func()
-		specTimes         = map[string]time.Time{}
+		ctx                   = context.Background()
+		specName              = "create-workload-cluster"
+		namespace             *corev1.Namespace
+		cancelWatches         context.CancelFunc
+		result                *clusterctl.ApplyClusterTemplateAndWaitResult
+		clusterName           string
+		clusterNamePrefix     string
+		additionalCleanup     func()
+		specTimes             = map[string]time.Time{}
+		installOnceWaitPeriod = 3 * time.Minute // The wait period for the InstallOnce strategy to ensure the Helm release is unchanged.
+		numOutOfBandUpgrades  = 5
 	)
 
 	BeforeEach(func() {
@@ -142,11 +144,12 @@ var _ = Describe("Workload cluster creation", func() {
 							"nginxIngress": "enabled",
 						},
 					},
-					ReleaseName:      "nginx-ingress",
-					ReleaseNamespace: "nginx-namespace",
-					ChartName:        "nginx-ingress",
-					RepoURL:          "https://helm.nginx.com/stable",
-					ValuesTemplate:   nginxValues,
+					ReleaseName:       "nginx-ingress",
+					ReleaseNamespace:  "nginx-namespace",
+					ChartName:         "nginx-ingress",
+					RepoURL:           "https://helm.nginx.com/stable",
+					ValuesTemplate:    nginxValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 				},
 			}
 
@@ -208,6 +211,100 @@ var _ = Describe("Workload cluster creation", func() {
 			By("Uninstalling Helm chart from cluster", func() {
 				HelmUninstallSpec(ctx, func() HelmUninstallInput {
 					return HelmUninstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to install and orphan an nginx Helm chart with InstallOnce strategy", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "nginx-ingress",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"nginxIngress": "enabled",
+						},
+					},
+					ReleaseName:       "nginx-ingress",
+					ReleaseNamespace:  "nginx-namespace",
+					ChartName:         "nginx-ingress",
+					RepoURL:           "https://helm.nginx.com/stable",
+					ValuesTemplate:    nginxValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyInstallOnce),
+				},
+			}
+
+			// Create new Helm chart
+			By("Creating new HelmChartProxy to install nginx", func() {
+				HelmInstallSpec(ctx, func() HelmInstallInput {
+					return HelmInstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			// Update existing Helm chart and expect Helm release to remain unchanged
+			By("Updating nginx HelmChartProxy valuesTemplate", func() {
+				hcp.Spec.ValuesTemplate = newNginxValues
+				HelmReleaseUnchangedSpec(ctx, func() HelmReleaseUnchangedInput {
+					return HelmReleaseUnchangedInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			for i := 0; i < numOutOfBandUpgrades; i++ {
+				// Modify Helm release and expect it to remain unchanged
+				By(fmt.Sprintf("Upgrading Helm release out-of-band, iteration #%d", i+1), func() {
+					HelmReleaseOutOfBandSpec(ctx, func() HelmReleaseOutOfBandInput {
+						return HelmReleaseOutOfBandInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        hcp,
+							Values:                []string{fmt.Sprintf("--controller.name=new-nginx-controller-%d", i)},
+							WaitPeriod:            installOnceWaitPeriod,
+						}
+					})
+				})
+			}
+
+			// Unselect Cluster or delete HelmChartProxy and expect Helm release to remain unchanged.
+			By("Unselecting Cluster from HelmChartProxy", func() {
+				hcp.Spec.ClusterSelector = metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"unmatchCluster": "true",
+					},
+				}
+				HelmReleaseUnchangedSpec(ctx, func() HelmReleaseUnchangedInput {
+					return HelmReleaseUnchangedInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
 						Namespace:             namespace,
 						ClusterName:           clusterName,

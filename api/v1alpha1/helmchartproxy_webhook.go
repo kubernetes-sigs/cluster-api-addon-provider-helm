@@ -21,8 +21,10 @@ import (
 	"net/url"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -70,10 +72,10 @@ func (p *HelmChartProxy) Default() {
 var _ webhook.Validator = &HelmChartProxy{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (r *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
-	helmchartproxylog.Info("validate create", "name", r.Name)
+func (p *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
+	helmchartproxylog.Info("validate create", "name", p.Name)
 
-	if err := isUrlValid(r.Spec.RepoURL); err != nil {
+	if err := isUrlValid(p.Spec.RepoURL); err != nil {
 		return nil, err
 	}
 
@@ -81,19 +83,39 @@ func (r *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (r *HelmChartProxy) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	helmchartproxylog.Info("validate update", "name", r.Name)
+func (p *HelmChartProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
+	helmchartproxylog.Info("validate update", "name", p.Name)
 
-	if err := isUrlValid(r.Spec.RepoURL); err != nil {
-		return nil, err
+	var allErrs field.ErrorList
+	old, ok := oldRaw.(*HelmChartProxy)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", old))
+	}
+
+	if err := isUrlValid(p.Spec.RepoURL); err != nil {
+		allErrs = append(allErrs,
+			field.Invalid(field.NewPath("spec", "RepoURL"),
+				p.Spec.ReleaseNamespace, err.Error()),
+		)
+	}
+
+	if p.Spec.ReconcileStrategy != old.Spec.ReconcileStrategy {
+		allErrs = append(allErrs,
+			field.Invalid(field.NewPath("spec", "ReconcileStrategy"),
+				p.Spec.ReconcileStrategy, "field is immutable"),
+		)
+	}
+
+	if len(allErrs) > 0 {
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmChartProxy").GroupKind(), p.Name, allErrs)
 	}
 
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (r *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
-	helmchartproxylog.Info("validate delete", "name", r.Name)
+func (p *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
+	helmchartproxylog.Info("validate delete", "name", p.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil

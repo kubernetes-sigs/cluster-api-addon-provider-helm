@@ -33,6 +33,7 @@ spec:
           - --leader-elect
           - "--diagnostics-address=${CAAPH_DIAGNOSTICS_ADDRESS:=:8443}"
           - "--insecure-diagnostics=${CAAPH_INSECURE_DIAGNOSTICS:=false}"
+          - "--sync-period=${CAAPH_SYNC_PERIOD:=10m}"
           - "--v=2"
           image: controller:latest
           imagePullPolicy: Always

@@ -187,11 +187,14 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, clusters []clusterv1.Cluster, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	log.V(2).Info("Starting reconcileNormal for chart proxy", "name", helmChartProxy.Name)
+	log.V(2).Info("Starting reconcileNormal for chart proxy", "name", helmChartProxy.Name, "strategy", helmChartProxy.Spec.ReconcileStrategy)
 
-	err := r.deleteOrphanedHelmReleaseProxies(ctx, helmChartProxy, clusters, helmReleaseProxies)
-	if err != nil {
-		return err
+	// If Reconcile strategy is not InstallOnce, delete orphaned HelmReleaseProxies
+	if !(helmChartProxy.Spec.ReconcileStrategy == string(addonsv1alpha1.ReconcileStrategyInstallOnce)) {
+		err := r.deleteOrphanedHelmReleaseProxies(ctx, helmChartProxy, clusters, helmReleaseProxies)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, cluster := range clusters {

@@ -47,12 +47,13 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: addonsv1alpha1.HelmChartProxySpec{
-			ReleaseName:      "test-release-name",
-			ChartName:        "test-chart-name",
-			RepoURL:          "https://test-repo-url",
-			ReleaseNamespace: "test-release-namespace",
-			Version:          "test-version",
-			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 			Options: addonsv1alpha1.HelmOptions{
 				EnableClientCache: true,
 				Timeout: &metav1.Duration{
@@ -72,12 +73,64 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "cidrBlockList: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join \",\" }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeNoStrategyHelmChartProxy1 = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
 			ReleaseName:      "test-release-name",
 			ChartName:        "test-chart-name",
 			RepoURL:          "https://test-repo-url",
 			ReleaseNamespace: "test-release-namespace",
 			Version:          "test-version",
-			ValuesTemplate:   "cidrBlockList: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join \",\" }}",
+			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeNoStrategyHelmChartProxy2 = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "cidrBlockList: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join \",\" }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 			Options: addonsv1alpha1.HelmOptions{
 				EnableClientCache: true,
 				Timeout: &metav1.Duration{
@@ -97,12 +150,13 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: addonsv1alpha1.HelmChartProxySpec{
-			ReleaseName:      "test-release-name",
-			ChartName:        "test-chart-name",
-			RepoURL:          "https://test-repo-url",
-			ReleaseNamespace: "test-release-namespace",
-			Version:          "test-version",
-			ValuesTemplate:   "apiServerPort: {{ .Cluster.invalid-path }}",
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.invalid-path }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 			Options: addonsv1alpha1.HelmOptions{
 				EnableClientCache: true,
 				Timeout: &metav1.Duration{
@@ -122,12 +176,91 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: addonsv1alpha1.HelmChartProxySpec{
-			ReleaseName:      "other-release-name",
-			ChartName:        "other-chart-name",
-			RepoURL:          "https://other-repo-url",
-			ReleaseNamespace: "test-release-namespace",
-			Version:          "test-version",
-			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReleaseName:       "other-release-name",
+			ChartName:         "other-chart-name",
+			RepoURL:           "https://other-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeNoStrategyReinstallHelmChartProxy = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:       "other-release-name",
+			ChartName:         "other-chart-name",
+			RepoURL:           "https://other-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeInstallOnceHelmChartProxy1 = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyInstallOnce),
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeInstallOnceHelmChartProxy2 = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "cidrBlockList: {{ .Cluster.spec.clusterNetwork.pods.cidrBlocks | join \",\" }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyInstallOnce),
 			Options: addonsv1alpha1.HelmOptions{
 				EnableClientCache: true,
 				Timeout: &metav1.Duration{
@@ -234,6 +367,49 @@ var (
 			},
 		},
 	}
+
+	fakeReadyHelmReleaseProxy = &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-generated-name",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         addonsv1alpha1.GroupVersion.String(),
+					Kind:               "HelmChartProxy",
+					Name:               "test-hcp",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:             "test-cluster",
+				addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+			},
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+				Name:       "test-cluster",
+				Namespace:  "test-namespace",
+			},
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			Version:          "test-version",
+			Values:           "apiServerPort: 6443",
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
 )
 
 func TestReconcileForCluster(t *testing.T) {
@@ -308,6 +484,98 @@ func TestReconcileForCluster(t *testing.T) {
 				g.Expect(specsReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseProxyReinstallingReason))
 				g.Expect(specsReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 				g.Expect(specsReady.Message).To(Equal(fmt.Sprintf("HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", fakeCluster1.Name)))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "creates a HelmReleaseProxy for a HelmChartProxy when strategy is unset",
+			helmChartProxy:                fakeNoStrategyHelmChartProxy1,
+			cluster:                       fakeCluster1,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 6443"))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "updates a HelmReleaseProxy when Cluster value changes when strategy is unset",
+			helmChartProxy:                fakeNoStrategyHelmChartProxy1,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 1234"))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "updates a HelmReleaseProxy when valuesTemplate value changes when strategy is unset",
+			helmChartProxy:                fakeNoStrategyHelmChartProxy2,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("cidrBlockList: 10.0.0.0/16,20.0.0.0/16"))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "set condition for reinstalling when requeueing after a deletion when strategy is unset",
+			helmChartProxy:                fakeNoStrategyReinstallHelmChartProxy,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeCluster1,
+			expectHelmReleaseProxyToExist: false,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
+				specsReady := conditions.Get(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)
+				g.Expect(specsReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(specsReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseProxyReinstallingReason))
+				g.Expect(specsReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
+				g.Expect(specsReady.Message).To(Equal(fmt.Sprintf("HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", fakeCluster1.Name)))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "when strategy is InstallOnce, do not update if HelmReleaseProxy is ready when Cluster value changes",
+			helmChartProxy:                fakeInstallOnceHelmChartProxy1,
+			existingHelmReleaseProxy:      fakeReadyHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 6443"))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "when strategy is InstallOnce, do not update if HelmReleaseProxy is ready when valuesTemplate value changes",
+			helmChartProxy:                fakeInstallOnceHelmChartProxy2,
+			existingHelmReleaseProxy:      fakeReadyHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 6443"))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "when strategy is InstallOnce, update if HelmReleaseProxy is not ready when Cluster value changes",
+			helmChartProxy:                fakeInstallOnceHelmChartProxy1,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("apiServerPort: 1234"))
+			},
+			expectedError: "",
+		},
+		{
+			name:                          "when strategy is InstallOnce, update if HelmReleaseProxy is not ready when valuesTemplate value changes",
+			helmChartProxy:                fakeInstallOnceHelmChartProxy2,
+			existingHelmReleaseProxy:      fakeHelmReleaseProxy,
+			cluster:                       fakeCluster2,
+			expectHelmReleaseProxyToExist: true,
+			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
+				g.Expect(hrp.Spec.Values).To(Equal("cidrBlockList: 10.0.0.0/16,20.0.0.0/16"))
 			},
 			expectedError: "",
 		},
