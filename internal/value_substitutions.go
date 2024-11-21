@@ -39,8 +39,11 @@ func initializeBuiltins(ctx context.Context, c ctrlClient.Client, referenceMap m
 	valueLookUp := make(map[string]interface{})
 
 	for name, ref := range referenceMap {
+		if ref.Namespace == "" {
+			ref.Namespace = cluster.Namespace
+		}
 		log.V(2).Info("Getting object for reference", "ref", ref)
-		obj, err := external.Get(ctx, c, &ref, cluster.Namespace)
+		obj, err := external.Get(ctx, c, &ref)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get object %s", ref.Name)
 		}
