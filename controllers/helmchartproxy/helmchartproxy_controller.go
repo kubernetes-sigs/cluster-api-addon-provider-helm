@@ -52,7 +52,7 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.HelmChartProxy{}).
-		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
+		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(mgr.GetScheme(), log, r.WatchFilterValue)).
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.ClusterToHelmChartProxiesMapper),
