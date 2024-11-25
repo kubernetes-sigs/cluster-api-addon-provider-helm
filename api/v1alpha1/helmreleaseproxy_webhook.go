@@ -59,16 +59,16 @@ func (p *HelmReleaseProxy) Default() {
 var _ webhook.Validator = &HelmReleaseProxy{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (r *HelmReleaseProxy) ValidateCreate() (admission.Warnings, error) {
-	helmreleaseproxylog.Info("validate create", "name", r.Name)
+func (p *HelmReleaseProxy) ValidateCreate() (admission.Warnings, error) {
+	helmreleaseproxylog.Info("validate create", "name", p.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (r *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
-	helmreleaseproxylog.Info("validate update", "name", r.Name)
+func (p *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
+	helmreleaseproxylog.Info("validate update", "name", p.Name)
 
 	var allErrs field.ErrorList
 	old, ok := oldRaw.(*HelmReleaseProxy)
@@ -76,31 +76,38 @@ func (r *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warn
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", old))
 	}
 
-	if !reflect.DeepEqual(r.Spec.RepoURL, old.Spec.RepoURL) {
+	if !reflect.DeepEqual(p.Spec.RepoURL, old.Spec.RepoURL) {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "RepoURL"),
-				r.Spec.RepoURL, "field is immutable"),
+				p.Spec.RepoURL, "field is immutable"),
 		)
 	}
 
-	if !reflect.DeepEqual(r.Spec.ChartName, old.Spec.ChartName) {
+	if !reflect.DeepEqual(p.Spec.ChartName, old.Spec.ChartName) {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "ChartName"),
-				r.Spec.ChartName, "field is immutable"),
+				p.Spec.ChartName, "field is immutable"),
 		)
 	}
 
-	if !reflect.DeepEqual(r.Spec.ReleaseNamespace, old.Spec.ReleaseNamespace) {
+	if !reflect.DeepEqual(p.Spec.ReleaseNamespace, old.Spec.ReleaseNamespace) {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "ReleaseNamespace"),
-				r.Spec.ReleaseNamespace, "field is immutable"),
+				p.Spec.ReleaseNamespace, "field is immutable"),
+		)
+	}
+
+	if p.Spec.ReconcileStrategy != old.Spec.ReconcileStrategy {
+		allErrs = append(allErrs,
+			field.Invalid(field.NewPath("spec", "ReconcileStrategy"),
+				p.Spec.ReconcileStrategy, "field is immutable"),
 		)
 	}
 
 	// TODO: add webhook for ReleaseName. Currently it's being set if the release name is generated.
 
 	if len(allErrs) > 0 {
-		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmReleaseProxy").GroupKind(), r.Name, allErrs)
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmReleaseProxy").GroupKind(), p.Name, allErrs)
 	}
 
 	return nil, nil

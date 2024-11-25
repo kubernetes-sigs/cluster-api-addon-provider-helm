@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -170,7 +171,7 @@ func prettyPrint(v interface{}) string {
 	return string(b)
 }
 
-func getHelmActionConfigForTests(ctx context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace string) *helmAction.Configuration {
+func getHelmActionConfigForTests(_ context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace string) *helmAction.Configuration {
 
 	workloadKubeconfigPath := workloadClusterProxy.GetKubeconfigPath()
 
@@ -342,7 +343,7 @@ func ValidateHelmRelease(ctx context.Context, helmReleaseProxy *addonsv1alpha1.H
 	Expect(helmRelease.Version).To(Equal(expectedRevision), "Helm release revision does not match expected revision")
 }
 
-func normalizeHelmReleaseValues(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, helmRelease *helmRelease.Release) (helmReleaseProxyValues map[string]interface{}, helmReleaseValues map[string]interface{}) {
+func normalizeHelmReleaseValues(_ context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, helmRelease *helmRelease.Release) (helmReleaseProxyValues map[string]interface{}, helmReleaseValues map[string]interface{}) {
 	Byf("Normalizing Helm release %s", helmReleaseProxy.Name)
 
 	Expect(helmReleaseProxy).NotTo(BeNil())
@@ -405,4 +406,54 @@ func getHelmReleaseProxy(ctx context.Context, c ctrlclient.Client, clusterName s
 	}
 
 	return &releaseList.Items[0], nil
+}
+
+// HelmOptions handles arguments to a `helm upgrade --install` command.
+type HelmOptions struct {
+	StringValues []string // --set-string
+	ValueFiles   []string // --values
+	Values       []string // --set
+}
+
+// UpgradeHelmChart takes a Helm repo URL, a chart name, and release name, and upgrades an existing Helm release on the E2E workload cluster.
+func UpgradeHelmChart(_ context.Context, clusterProxy framework.ClusterProxy, namespace, repoURL, chartName, releaseName string, options *HelmOptions, version string) {
+	// Check that Helm v3 is installed
+	helm, err := exec.LookPath("helm")
+	Expect(err).NotTo(HaveOccurred(), "No helm binary found in PATH")
+	cmd := exec.Command(helm, "version", "--short") //nolint:gosec // Suppress G204: Subprocess launched with variable warning since this is a test file
+	stdout, err := cmd.Output()
+	Expect(err).NotTo(HaveOccurred())
+	Logf("Helm version: %s", stdout)
+	Expect(stdout).To(HavePrefix("v3."), "Helm v3 is required")
+
+	// Set up the Helm command arguments.
+	args := []string{
+		"upgrade", releaseName, chartName, "--install",
+		"--kubeconfig", clusterProxy.GetKubeconfigPath(),
+		"--create-namespace", "--namespace", namespace,
+	}
+	if repoURL != "" {
+		args = append(args, "--repo", repoURL)
+	}
+	for _, stringValue := range options.StringValues {
+		args = append(args, "--set-string", stringValue)
+	}
+	for _, valueFile := range options.ValueFiles {
+		args = append(args, "--values", valueFile)
+	}
+	for _, value := range options.Values {
+		args = append(args, "--set", value)
+	}
+	if version != "" {
+		args = append(args, "--version", version)
+	}
+
+	// Install the chart and retry if needed
+	Eventually(func() error {
+		cmd := exec.Command(helm, args...) //nolint:gosec // Suppress G204: Subprocess launched with variable warning since this is a test file
+		Logf("Helm command: %s", cmd.String())
+		output, err := cmd.CombinedOutput()
+		Logf("Helm upgrade output: %s", string(output))
+		return err
+	}, helmInstallTimeout, retryableOperationSleepBetweenRetries).Should(Succeed())
 }

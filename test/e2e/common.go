@@ -24,9 +24,11 @@ import (
 	"log"
 	"path/filepath"
 
+	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	. "github.com/onsi/gomega"
+	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -186,6 +188,25 @@ func EnsureHelmReleaseInstallOrUpgrade(ctx context.Context, specName string, boo
 
 	// Verify Helm release values and revision.
 	ValidateHelmRelease(ctx, hrpWaitInput.HelmReleaseProxy, release, expectedRevision)
+}
+
+// EnsureHelmReleaseUnchanged ensures that a Helm release was not changed after the HelmChartProxy was updated.
+func EnsureHelmReleaseUnchanged(ctx context.Context, specName string, bootstrapClusterProxy framework.ClusterProxy, clusterName string, clusterNamespace string, existingRelease *release.Release) {
+
+	// Get workload Cluster proxy
+	By("creating a clusterctl proxy to the workload cluster")
+	workloadClusterProxy := bootstrapClusterProxy.GetWorkloadCluster(ctx, clusterNamespace, clusterName)
+	Expect(workloadClusterProxy).NotTo(BeNil())
+
+	// Wait for Helm release on workload cluster to have status = deployed
+	releaseWaitInput := GetWaitForHelmReleaseDeployedInput(ctx, workloadClusterProxy, existingRelease.Name, existingRelease.Namespace, specName)
+	release := WaitForHelmReleaseDeployed(ctx, releaseWaitInput, e2eConfig.GetIntervals(specName, "wait-helm-release-deployed")...)
+
+	valuesDiff := cmp.Diff(release.Config, existingRelease.Config)
+	Expect(valuesDiff).To(BeEmpty(), "Wanted Helm release values:\n%+v\n, instead got Helm release values:\n%+v\n", existingRelease.Config, release.Config)
+
+	// Validate that the revision matches the expected revision. This is useful to ensure that the Helm release not changed.
+	Expect(release.Version).To(Equal(existingRelease.Version), "Helm release revision has changed")
 }
 
 // CheckTestBeforeCleanup checks to see if the current running Ginkgo test failed, and prints

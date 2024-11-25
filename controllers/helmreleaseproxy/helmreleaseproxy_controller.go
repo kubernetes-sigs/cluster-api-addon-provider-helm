@@ -262,11 +262,23 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 
 	log.V(2).Info("Reconciling HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 
+	if helmReleaseProxy.Spec.ReconcileStrategy == string(addonsv1alpha1.ReconcileStrategyInstallOnce) {
+		if internal.HasHelmReleaseBeenSuccessfullyInstalled(helmReleaseProxy) {
+			log.Info("HelmReleaseProxy has been installed on InstallOnce mode, nothing to do", "helmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
+
+			return nil
+		}
+	}
+
+	annotations := helmReleaseProxy.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
 	// TODO: add this here or in HelmChartProxy controller?
 	if helmReleaseProxy.Spec.ReleaseName == "" {
-		helmReleaseProxy.ObjectMeta.SetAnnotations(map[string]string{
-			addonsv1alpha1.IsReleaseNameGeneratedAnnotation: "true",
-		})
+		annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation] = "true"
+		helmReleaseProxy.SetAnnotations(annotations)
 	}
 
 	release, err := client.InstallOrUpgradeHelmRelease(ctx, restConfig, credentialsPath, caFilePath, helmReleaseProxy.Spec)
@@ -285,6 +297,8 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 		switch {
 		case status == helmRelease.StatusDeployed:
 			conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
+			annotations[addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation] = "true"
+			helmReleaseProxy.SetAnnotations(annotations)
 		case status.IsPending():
 			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleasePendingReason, clusterv1.ConditionSeverityInfo, "Helm release is in a pending state: %s", status)
 		case status == helmRelease.StatusFailed && err == nil:
@@ -300,6 +314,12 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 // reconcileDelete handles HelmReleaseProxy deletion. This will uninstall the HelmReleaseProxy on the Cluster or return nil if the HelmReleaseProxy is not found.
 func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy, client internal.Client, restConfig *rest.Config) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	if helmReleaseProxy.Spec.ReconcileStrategy == string(addonsv1alpha1.ReconcileStrategyInstallOnce) {
+		log.V(2).Info("HelmReleaseProxy is in InstallOnce mode, nothing to do for uninstall", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
+
+		return nil
+	}
 
 	log.V(2).Info("Deleting HelmReleaseProxy on cluster", "HelmReleaseProxy", helmReleaseProxy.Name, "cluster", helmReleaseProxy.Spec.ClusterRef.Name)
 

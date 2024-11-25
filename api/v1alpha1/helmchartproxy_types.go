@@ -22,6 +22,9 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+// ReconcileStrategy is a string representation of the reconciliation strategy of a HelmChartProxy.
+type ReconcileStrategy string
+
 const (
 	// HelmChartProxyFinalizer is the finalizer used by the HelmChartProxy controller to cleanup add-on resources when
 	// a HelmChartProxy is being deleted.
@@ -29,6 +32,15 @@ const (
 
 	// DefaultOCIKey is the default file name of the OCI secret key.
 	DefaultOCIKey = "config.json"
+
+	// ReconcileStrategyContinuous is the default reconciliation strategy for HelmChartProxy. It will attempt to install the Helm
+	// chart on a selected Cluster, update the Helm release to match the current HelmChartProxy spec, and delete the Helm release
+	// if the Cluster no longer selected.
+	ReconcileStrategyContinuous ReconcileStrategy = "Continuous"
+
+	// ReconcileStrategyInstallOnce attempts to install the Helm chart for a HelmChartProxy on a selected Cluster, and once
+	// it is installed, it will not attempt to update or delete the Helm release on the Cluster again.
+	ReconcileStrategyInstallOnce ReconcileStrategy = "InstallOnce"
 )
 
 // HelmChartProxySpec defines the desired state of HelmChartProxy.
@@ -63,6 +75,14 @@ type HelmChartProxySpec struct {
 	// fields from each selected workload Cluster and programatically create and set values.
 	// +optional
 	ValuesTemplate string `json:"valuesTemplate,omitempty"`
+
+	// ReconcileStrategy indicates whether a Helm chart should be continuously installed, updated, and uninstalled on selected Clusters,
+	// or if it should be reconciled until it is successfully installed on selected Clusters and not otherwise updated or uninstalled.
+	// If not specified, the default behavior will be to reconcile continuously. This field is immutable.
+	// Possible values are `Continuous`, `InstallOnce`, or unset.
+	// +kubebuilder:validation:Enum="";InstallOnce;Continuous;
+	// +optional
+	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
 
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
