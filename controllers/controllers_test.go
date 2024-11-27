@@ -17,8 +17,6 @@ limitations under the License.
 package controllers_test
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	helmrelease "helm.sh/helm/v3/pkg/release"
@@ -32,51 +30,62 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	testNamespace = "test-namespace"
-	newVersion    = "new-version"
+const (
+	testNamespace1       = "test-namespace1"
+	testNamespace2       = "test-namespace2"
+	newVersion           = "new-version"
+	releaseFailedMessage = "unable to remove helm release"
+)
 
-	defaultProxy = &addonsv1alpha1.HelmChartProxy{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: addonsv1alpha1.GroupVersion.String(),
-			Kind:       "HelmChartProxy",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-hcp",
-			Namespace: testNamespace,
-		},
-		Spec: addonsv1alpha1.HelmChartProxySpec{
-			ClusterSelector: metav1.LabelSelector{
-				MatchLabels: map[string]string{
+var (
+	namespaces          = []string{testNamespace1, testNamespace2}
+	failedHelmUninstall bool
+
+	newProxy = func(namespace string) *addonsv1alpha1.HelmChartProxy {
+		return &addonsv1alpha1.HelmChartProxy{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: addonsv1alpha1.GroupVersion.String(),
+				Kind:       "HelmChartProxy",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-hcp",
+				Namespace: namespace,
+			},
+			Spec: addonsv1alpha1.HelmChartProxySpec{
+				ClusterSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"test-label": "test-value",
+					},
+				},
+				ReleaseName:      "test-release-name",
+				ChartName:        "test-chart-name",
+				RepoURL:          "https://test-repo-url",
+				ReleaseNamespace: "test-release-namespace",
+				Version:          "test-version",
+				ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			},
+		}
+	}
+
+	newCluster = func(namespace string) *clusterv1.Cluster {
+		return &clusterv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-1",
+				Namespace: namespace,
+				Labels: map[string]string{
 					"test-label": "test-value",
 				},
 			},
-			ReleaseName:      "test-release-name",
-			ChartName:        "test-chart-name",
-			RepoURL:          "https://test-repo-url",
-			ReleaseNamespace: "test-release-namespace",
-			Version:          "test-version",
-			ValuesTemplate:   "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
-		},
-	}
-
-	cluster1 = &clusterv1.Cluster{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: clusterv1.GroupVersion.String(),
-			Kind:       "Cluster",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster-1",
-			Namespace: testNamespace,
-			Labels: map[string]string{
-				"test-label": "test-value",
+			Spec: clusterv1.ClusterSpec{
+				ClusterNetwork: &clusterv1.ClusterNetwork{
+					APIServerPort: ptr.To(int32(1234)),
+				},
 			},
-		},
-		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(1234)),
-			},
-		},
+		}
 	}
 
 	helmReleaseDeployed = &helmrelease.Release{
@@ -135,62 +144,91 @@ var _ = Describe("Testing HelmChartProxy and HelmReleaseProxy reconcile", func()
 				return condition != nil && condition(hrpList.Items)
 			}, timeout, interval).Should(BeTrue())
 		}
+
+		install = func(cluster *clusterv1.Cluster, proxy *addonsv1alpha1.HelmChartProxy) {
+			err := k8sClient.Create(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			err = k8sClient.Create(ctx, newKubeconfigSecretForCluster(cluster))
+			Expect(err).ToNot(HaveOccurred())
+
+			patch := client.MergeFrom(cluster.DeepCopy())
+			conditions.MarkTrue(cluster, clusterv1.ControlPlaneInitializedCondition)
+			err = k8sClient.Status().Patch(ctx, cluster, patch)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = k8sClient.Create(ctx, proxy)
+			Expect(err).ToNot(HaveOccurred())
+
+			waitForHelmChartProxyCondition(client.ObjectKeyFromObject(proxy), func(helmChartProxy *addonsv1alpha1.HelmChartProxy) bool {
+				return conditions.IsTrue(helmChartProxy, clusterv1.ReadyCondition)
+			})
+
+			waitForHelmReleaseProxyCondition(client.ObjectKeyFromObject(proxy), func(helmReleaseProxyList []addonsv1alpha1.HelmReleaseProxy) bool {
+				return len(helmReleaseProxyList) == 1 && conditions.IsTrue(&helmReleaseProxyList[0], clusterv1.ReadyCondition)
+			})
+		}
+
+		deleteAndWaitHelmChartProxy = func(proxy *addonsv1alpha1.HelmChartProxy) {
+			err := k8sClient.Delete(ctx, proxy)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(proxy), &addonsv1alpha1.HelmChartProxy{}); client.IgnoreNotFound(err) != nil {
+					return false
+				}
+
+				return true
+			}, timeout, interval).Should(BeTrue())
+
+			waitForHelmReleaseProxyCondition(client.ObjectKeyFromObject(proxy), func(helmReleaseProxyList []addonsv1alpha1.HelmReleaseProxy) bool {
+				return len(helmReleaseProxyList) == 0
+			})
+		}
 	)
 
-	It("HelmChartProxy and HelmReleaseProxy lifecycle test", func() {
-		cluster := cluster1.DeepCopy()
-		err := k8sClient.Create(ctx, cluster)
-		Expect(err).ToNot(HaveOccurred())
-		err = k8sClient.Create(ctx, newKubeconfigSecretForCluster(cluster))
-		Expect(err).ToNot(HaveOccurred())
+	It("HelmChartProxy and HelmReleaseProxy lifecycle happy path test", func() {
+		cluster := newCluster(testNamespace1)
+		helmChartProxy := newProxy(testNamespace1)
+		install(cluster, helmChartProxy)
 
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Conditions = clusterv1.Conditions{
-			{
-				Type:               clusterv1.ControlPlaneInitializedCondition,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now()),
-			},
-		}
-		err = k8sClient.Status().Patch(ctx, cluster, patch)
+		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(helmChartProxy), helmChartProxy)
+		Expect(err).ToNot(HaveOccurred())
+		patch := client.MergeFrom(helmChartProxy.DeepCopy())
+		helmChartProxy.Spec.Version = newVersion
+		err = k8sClient.Patch(ctx, helmChartProxy, patch)
 		Expect(err).ToNot(HaveOccurred())
 
-		err = k8sClient.Create(ctx, defaultProxy)
-		Expect(err).ToNot(HaveOccurred())
-
-		waitForHelmChartProxyCondition(client.ObjectKeyFromObject(defaultProxy), func(helmChartProxy *addonsv1alpha1.HelmChartProxy) bool {
-			return conditions.IsTrue(helmChartProxy, clusterv1.ReadyCondition)
-		})
-
-		waitForHelmReleaseProxyCondition(client.ObjectKeyFromObject(defaultProxy), func(helmReleaseProxyList []addonsv1alpha1.HelmReleaseProxy) bool {
-			return len(helmReleaseProxyList) == 1 && conditions.IsTrue(&helmReleaseProxyList[0], clusterv1.ReadyCondition)
-		})
-
-		hcp := &addonsv1alpha1.HelmChartProxy{}
-		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(defaultProxy), hcp)
-		Expect(err).ToNot(HaveOccurred())
-		patch = client.MergeFrom(hcp.DeepCopy())
-		hcp.Spec.Version = newVersion
-		err = k8sClient.Patch(ctx, hcp, patch)
-		Expect(err).ToNot(HaveOccurred())
-
-		waitForHelmReleaseProxyCondition(client.ObjectKeyFromObject(defaultProxy), func(helmReleaseProxyList []addonsv1alpha1.HelmReleaseProxy) bool {
+		waitForHelmReleaseProxyCondition(client.ObjectKeyFromObject(helmChartProxy), func(helmReleaseProxyList []addonsv1alpha1.HelmReleaseProxy) bool {
 			return len(helmReleaseProxyList) == 1 && conditions.IsTrue(&helmReleaseProxyList[0], clusterv1.ReadyCondition) && helmReleaseProxyList[0].Spec.Version == "new-version"
 		})
 
-		err = k8sClient.Delete(ctx, hcp)
+		deleteAndWaitHelmChartProxy(helmChartProxy)
+	})
+
+	It("HelmChartProxy and HelmReleaseProxy test with failed Release uninstall", func() {
+		cluster := newCluster(testNamespace2)
+		helmChartProxy := newProxy(testNamespace2)
+		failedHelmUninstall = true
+		install(cluster, helmChartProxy)
+
+		err := k8sClient.Delete(ctx, helmChartProxy)
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(func() bool {
-			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(hcp), hcp); client.IgnoreNotFound(err) != nil {
+		Consistently(func() bool {
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(helmChartProxy), helmChartProxy); err != nil {
 				return false
 			}
 
 			return true
 		}, timeout, interval).Should(BeTrue())
 
-		waitForHelmReleaseProxyCondition(client.ObjectKeyFromObject(defaultProxy), func(helmReleaseProxyList []addonsv1alpha1.HelmReleaseProxy) bool {
-			return len(helmReleaseProxyList) == 0
-		})
+		readyCondition := conditions.Get(helmChartProxy, clusterv1.ReadyCondition)
+		Expect(readyCondition).NotTo(BeNil())
+		Expect(readyCondition.Status).To(Equal(corev1.ConditionFalse))
+		Expect(readyCondition.Message).To(Equal(releaseFailedMessage))
+
+		By("Making HelmChartProxy uninstallable")
+		failedHelmUninstall = false
+		deleteAndWaitHelmChartProxy(helmChartProxy)
 	})
 })
