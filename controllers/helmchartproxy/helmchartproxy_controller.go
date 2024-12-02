@@ -148,7 +148,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmChartProxy, addonsv1alpha1.HelmChartProxyFinalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.reconcileDelete(ctx, helmChartProxy, releaseList.Items); err != nil {
+			if result, err := r.reconcileDelete(ctx, helmChartProxy, releaseList.Items); err != nil || !result.IsZero() {
 				// if fail to delete the external dependency here, return with error
 				// so that it can be retried
 				return ctrl.Result{}, err
@@ -213,22 +213,40 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 }
 
 // reconcileDelete handles the deletion of a HelmChartProxy. It takes a list of HelmReleaseProxies to uninstall the Helm chart from all selected Clusters.
-func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, releases []addonsv1alpha1.HelmReleaseProxy) error {
+func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, releases []addonsv1alpha1.HelmReleaseProxy) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
+	getters := make([]conditions.Getter, 0)
 
 	log.V(2).Info("Deleting all HelmReleaseProxies as part of HelmChartProxy deletion", "helmChartProxy", helmChartProxy.Name)
-
 	for i := range releases {
 		release := releases[i]
 
 		log.V(2).Info("Deleting release", "releaseName", release.Name, "cluster", release.Spec.ClusterRef.Name)
 		if err := r.deleteHelmReleaseProxy(ctx, &release); err != nil {
 			// TODO: will this fail if clusterRef is nil
-			return errors.Wrapf(err, "failed to delete release %s from cluster %s", release.Name, release.Spec.ClusterRef.Name)
+			return ctrl.Result{}, errors.Wrapf(err, "failed to delete release %s from cluster %s", release.Name, release.Spec.ClusterRef.Name)
 		}
+
+		log.V(2).Info("Validating release deletion", "releaseName", release.Name)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(&release), &release); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+
+			return ctrl.Result{}, errors.Wrapf(err, "failed to get HelmReleaseProxy %s", release.Name)
+		}
+
+		log.V(2).Info("The release has not been deleted yet, waiting for it to be removed", "releaseName", release.Name)
+		getters = append(getters, &release)
 	}
 
-	return nil
+	if len(getters) > 0 {
+		conditions.SetAggregate(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition, getters, conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
+
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // listClustersWithLabels returns a list of Clusters that match the given label selector.

@@ -18,6 +18,7 @@ package controllers_test
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"path/filepath"
@@ -114,7 +115,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})).NotTo(HaveOccurred())
+	for _, namespace := range namespaces {
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).NotTo(HaveOccurred())
+	}
 
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
@@ -129,8 +132,15 @@ var _ = BeforeSuite(func() {
 	helmClient = mocks.NewMockClient(gomock.NewController(&TestReporter{}))
 
 	helmClient.EXPECT().InstallOrUpgradeHelmRelease(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(helmReleaseDeployed, nil).AnyTimes()
-	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).Return(&helmRelease.UninstallReleaseResponse{}, nil).AnyTimes()
 	helmClient.EXPECT().GetHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).Return(&helmRelease.Release{}, nil).AnyTimes()
+	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_, _, _ any) (*helmRelease.UninstallReleaseResponse, error) {
+		if failedHelmUninstall {
+			return nil, errors.New(releaseFailedMessage)
+		}
+
+		return &helmRelease.UninstallReleaseResponse{}, nil
+	},
+	).AnyTimes()
 
 	err = (&helmchartproxy.HelmChartProxyReconciler{
 		Client: k8sManager.GetClient(),
