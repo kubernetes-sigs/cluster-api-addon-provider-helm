@@ -227,6 +227,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	}
 
 	helmReleaseProxy.Spec.ReconcileStrategy = helmChartProxy.Spec.ReconcileStrategy
+	helmReleaseProxy.Spec.ReleaseDrift = helmChartProxy.Spec.ReleaseDrift
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
