@@ -270,6 +270,8 @@ spec:
                 - InstallOnce
                 - Continuous
                 type: string
+              releaseDrift:
+                type: boolean
               releaseName:
                 description: ReleaseName is the release name of the installed Helm
                   chart. If it is not specified, a name will be generated.

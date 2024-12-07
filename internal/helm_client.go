@@ -53,6 +53,8 @@ type Client interface {
 	UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
 }
 
+var _ Client = (*HelmClient)(nil)
+
 type HelmClient struct{}
 
 // GetActionConfig returns a new Helm action configuration.
