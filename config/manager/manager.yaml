@@ -30,16 +30,28 @@ spec:
           type: RuntimeDefault
       containers:
         - args:
-          - --leader-elect
-          - "--diagnostics-address=${CAAPH_DIAGNOSTICS_ADDRESS:=:8443}"
-          - "--insecure-diagnostics=${CAAPH_INSECURE_DIAGNOSTICS:=false}"
-          - "--sync-period=${CAAPH_SYNC_PERIOD:=10m}"
-          - "--v=2"
+            - --leader-elect
+            - "--diagnostics-address=${CAAPH_DIAGNOSTICS_ADDRESS:=:8443}"
+            - "--insecure-diagnostics=${CAAPH_INSECURE_DIAGNOSTICS:=false}"
+            - "--sync-period=${CAAPH_SYNC_PERIOD:=10m}"
+            - "--v=2"
+          env:
+            - name: XDG_DATA_HOME
+              value: /tmp/xdg/.data
+            - name: XDG_CONFIG_HOME
+              value: /tmp/xdg/.config
+            - name: XDG_STATE_HOME
+              value: /tmp/xdg/.state
+            - name: XDG_CACHE_HOME
+              value: /tmp/xdg/.cache
+            - name: XDG_CONFIG_DIRS
+              value: /tmp/xdg
           image: controller:latest
           imagePullPolicy: Always
           name: manager
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -65,6 +77,12 @@ spec:
               port: healthz
             initialDelaySeconds: 10
             periodSeconds: 10
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - emptyDir: {}
+          name: tmp
           # TODO(user): Configure the resources accordingly based on the project requirements.
           # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
           # resources:
