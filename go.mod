@@ -1,8 +1,8 @@
 module sigs.k8s.io/cluster-api-addon-provider-helm
 
-go 1.22.0
+go 1.22.3
 
-toolchain go1.22.5
+toolchain go1.22.9
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -26,6 +26,7 @@ require (
 	sigs.k8s.io/cluster-api v1.8.5
 	sigs.k8s.io/cluster-api/test v1.8.5
 	sigs.k8s.io/controller-runtime v0.18.5
+	sigs.k8s.io/kustomize/api v0.17.3
 )
 
 require (
@@ -78,7 +79,7 @@ require (
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
-	github.com/go-openapi/swag v0.22.3 // indirect
+	github.com/go-openapi/swag v0.22.4 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobuffalo/flect v1.0.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
@@ -173,7 +174,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.30.0 // indirect
-	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.32.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
@@ -201,7 +201,6 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kind v0.24.0 // indirect
-	sigs.k8s.io/kustomize/api v0.17.3 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
