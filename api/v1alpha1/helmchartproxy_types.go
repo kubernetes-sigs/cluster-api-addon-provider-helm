@@ -84,6 +84,8 @@ type HelmChartProxySpec struct {
 	// +optional
 	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
 
+	ReleaseDrift bool `json:"releaseDrift,omitempty"`
+
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
 	// +optional
