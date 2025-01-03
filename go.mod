@@ -21,9 +21,9 @@ require (
 	k8s.io/component-base v0.30.3
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
-	sigs.k8s.io/cluster-api v1.8.5
-	sigs.k8s.io/cluster-api/test v1.8.5
-	sigs.k8s.io/controller-runtime v0.18.5
+	sigs.k8s.io/cluster-api v1.8.8
+	sigs.k8s.io/cluster-api/test v1.8.8
+	sigs.k8s.io/controller-runtime v0.18.6
 )
 
 require (
@@ -112,7 +112,7 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
-	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/magiconair/properties v1.8.8 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -204,4 +204,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.8.5
+replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.8.8
