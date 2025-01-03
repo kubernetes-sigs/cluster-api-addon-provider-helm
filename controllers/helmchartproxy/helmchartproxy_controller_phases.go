@@ -102,11 +102,17 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 		return errors.Wrapf(err, "failed to parse values on cluster %s", cluster.Name)
 	}
 
-	log.V(2).Info("Values for cluster", "cluster", cluster.Name, "values", values)
-	if err := r.createOrUpdateHelmReleaseProxy(ctx, existingHelmReleaseProxy, helmChartProxy, &cluster, values); err != nil {
-		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyCreationFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
+	// If the cluster is not being deleted, create or update the HelmReleaseProxy
+	if cluster.DeletionTimestamp.IsZero() {
+		log.V(2).Info("Values for cluster", "cluster", cluster.Name, "values", values)
+		if err := r.createOrUpdateHelmReleaseProxy(ctx, existingHelmReleaseProxy, helmChartProxy, &cluster, values); err != nil {
+			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxyCreationFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
 
-		return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
+			return errors.Wrapf(err, "failed to create or update HelmReleaseProxy on cluster %s", cluster.Name)
+		}
+	} else {
+		log.V(2).Info("Cluster is being deleted, skipping reconciliation", "cluster", cluster.Name)
+		return nil
 	}
 
 	return nil
