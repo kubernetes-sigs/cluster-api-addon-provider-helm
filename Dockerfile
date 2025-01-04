@@ -17,6 +17,9 @@
 # Build the manager binary
 # Run this with docker build --build-arg builder_image=<golang:x.y.z>
 ARG builder_image
+ARG deployment_base_image
+ARG deployment_base_image_tag
+ARG goprivate
 
 # Build architecture
 ARG ARCH
@@ -32,6 +35,7 @@ WORKDIR /workspace
 ARG goproxy=https://proxy.golang.org
 # Run this with docker build --build-arg package=./controlplane/kubeadm or --build-arg package=./bootstrap/kubeadm
 ENV GOPROXY=$goproxy
+ENV GOPRIVATE=$goprivate
 
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -39,14 +43,16 @@ COPY go.sum go.sum
 
 # Cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
+    --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 # Copy the sources
 COPY ./ ./
 
 # Cache the go build into the Go’s compiler cache folder so we take benefits of compiler caching across docker build calls
-RUN --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
+    --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go build .
 
@@ -63,7 +69,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -o manager ${package}
 
 # Production image
-FROM gcr.io/distroless/static:nonroot-${ARCH}
+FROM ${deployment_base_image}:${deployment_base_image_tag}
 WORKDIR /
 COPY --from=builder /workspace/manager .
 # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
