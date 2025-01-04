@@ -1,3 +1,4 @@
+---
 name: helm
 config:
   image: gcr.io/k8s-staging-cluster-api-helm/cluster-api-helm-controller
