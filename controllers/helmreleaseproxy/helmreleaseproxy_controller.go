@@ -67,17 +67,17 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.HelmReleaseProxy{}).
-		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(log, r.WatchFilterValue)).
+		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(mgr.GetScheme(), log, r.WatchFilterValue)).
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(clusterToHelmReleaseProxies),
 			builder.WithPredicates(
-				predicates.All(ctrl.LoggerFrom(ctx),
-					predicates.Any(ctrl.LoggerFrom(ctx),
-						predicates.ClusterUnpaused(ctrl.LoggerFrom(ctx)),
-						predicates.ClusterControlPlaneInitialized(ctrl.LoggerFrom(ctx)),
+				predicates.All(mgr.GetScheme(), ctrl.LoggerFrom(ctx),
+					predicates.Any(mgr.GetScheme(), ctrl.LoggerFrom(ctx),
+						predicates.ClusterUnpaused(mgr.GetScheme(), ctrl.LoggerFrom(ctx)),
+						predicates.ClusterControlPlaneInitialized(mgr.GetScheme(), ctrl.LoggerFrom(ctx)),
 					),
-					predicates.ResourceHasFilterLabel(ctrl.LoggerFrom(ctx), r.WatchFilterValue),
+					predicates.ResourceHasFilterLabel(mgr.GetScheme(), ctrl.LoggerFrom(ctx), r.WatchFilterValue),
 				),
 			)).
 		Complete(r)
