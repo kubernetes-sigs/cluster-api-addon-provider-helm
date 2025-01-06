@@ -24,7 +24,8 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 GO_VERSION ?= 1.22.9
-GO_CONTAINER_IMAGE ?= docker.io/library/golang:$(GO_VERSION)
+GO_BASE_CONTAINER ?= docker.io/library/golang
+GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 
 # Use GOPROXY environment variable if set
 GOPROXY := $(shell go env GOPROXY)
@@ -33,8 +34,19 @@ GOPROXY := https://proxy.golang.org
 endif
 export GOPROXY
 
+# Use GOPRIVATE environment variable if set
+GOPRIVATE := $(shell go env GOPRIVATE)
+export GOPRIVATE
+
 # Active module mode, as we use go modules to manage dependencies
 export GO111MODULE=on
+
+# Base docker images
+
+DOCKERFILE_CONTAINER_IMAGE ?= docker.io/docker/dockerfile:1.4
+DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/static
+DEPLOYMENT_BASE_IMAGE_TAG ?= nonroot-${ARCH}
+BUILD_CONTAINER_ADDITIONAL_ARGS ?=
 
 #
 # Kubebuilder.
@@ -383,9 +395,9 @@ manager: ## Build the manager binary into the ./bin folder
 
 .PHONY: docker-pull-prerequisites
 docker-pull-prerequisites:
-	docker pull docker.io/docker/dockerfile:1.4
+	docker pull $(DOCKERFILE_CONTAINER_IMAGE)
 	docker pull $(GO_CONTAINER_IMAGE)
-	docker pull gcr.io/distroless/static:latest
+	docker pull $(DEPLOYMENT_BASE_IMAGE):$(DEPLOYMENT_BASE_IMAGE_TAG)
 
 .PHONY: docker-build-all
 docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images for all architectures
@@ -395,7 +407,7 @@ docker-build-%:
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Build the docker image for core controller manager
-	DOCKER_BUILDKIT=1 docker build --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg goproxy=$(GOPROXY) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	DOCKER_BUILDKIT=1 docker build $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
 
