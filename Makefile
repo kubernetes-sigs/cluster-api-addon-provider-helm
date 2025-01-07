@@ -23,7 +23,7 @@ SHELL:=/usr/bin/env bash
 #
 # Go.
 #
-GO_VERSION ?= 1.22.9
+GO_VERSION ?= $(shell go mod edit --print | grep -oP '(?<=toolchain go).*' || go mod edit --print | grep "go " | head -1 | awk '{print $$2}')
 GO_BASE_CONTAINER ?= docker.io/library/golang
 GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 
@@ -121,7 +121,7 @@ KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
 KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 
 CLUSTER_API_VERSION := $(call get_go_version,sigs.k8s.io/cluster-api)
-CLUSTER_API_CRD_LOCATION = test/controllers/data/crd
+CLUSTER_API_CRD_LOCATION = tmp/cluster-api/crd
 
 MOCKGEN_VER := v0.4.0
 MOCKGEN_BIN := mockgen
@@ -300,6 +300,8 @@ generate-modules: ## Run go mod tidy to ensure modules are up to date
 
 .PHONY: download-cluster-api-crd
 download-cluster-api-crd: generate-modules ## Run to download Cluster API CRDs for tests
+	mkdir -p $(CLUSTER_API_CRD_LOCATION)
+	rm -f $(CLUSTER_API_CRD_LOCATION)/*
 	cp -r $(shell go env GOPATH)/pkg/mod/sigs.k8s.io/cluster-api@$(CLUSTER_API_VERSION)/config/crd/bases/cluster.x-k8s.io_clusters.yaml $(CLUSTER_API_CRD_LOCATION)
 	chmod 644 $(CLUSTER_API_CRD_LOCATION)/*
 
@@ -425,7 +427,7 @@ KUBEBUILDER_ASSETS ?= $(shell $(SETUP_ENVTEST) use --use-env -p path $(KUBEBUILD
 install-tools: $(ENVSUBST) $(KUSTOMIZE) $(HELM) $(GINKGO) # Should kubectl be added here?
 
 .PHONY: test
-test: $(SETUP_ENVTEST) ## Run unit and integration tests
+test: $(SETUP_ENVTEST) download-cluster-api-crd ## Run unit and integration tests
 	KUBEBUILDER_ASSETS="$(KUBEBUILDER_ASSETS)" go test ./... $(TEST_ARGS)
 
 .PHONY: test-verbose
