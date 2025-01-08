@@ -45,6 +45,11 @@ var excludeCreateEventsPredicate = predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool {
 		return false
 	},
+	/*
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return false
+		},
+	*/
 }
 
 // setupWithManager sets up the controller with the Manager.

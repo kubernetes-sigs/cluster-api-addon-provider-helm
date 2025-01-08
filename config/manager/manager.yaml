@@ -46,6 +46,8 @@ spec:
               value: /tmp/xdg/.cache
             - name: XDG_CONFIG_DIRS
               value: /tmp/xdg
+            - name: KUBECACHEDIR
+              value: /tmp/.kube/cache
           image: controller:latest
           imagePullPolicy: Always
           name: manager
