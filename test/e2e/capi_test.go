@@ -25,7 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	"k8s.io/utils/ptr"
-	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
+	capie2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 )
 
@@ -36,8 +36,8 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 	})
 
 	Context("Running the quick-start spec [PR-Blocking]", func() {
-		capi_e2e.QuickStartSpec(context.TODO(), func() capi_e2e.QuickStartSpecInput {
-			return capi_e2e.QuickStartSpecInput{
+		capie2e.QuickStartSpec(context.TODO(), func() capie2e.QuickStartSpecInput {
+			return capie2e.QuickStartSpecInput{
 				E2EConfig:             e2eConfig,
 				ClusterctlConfigPath:  clusterctlConfigPath,
 				BootstrapClusterProxy: bootstrapClusterProxy,
@@ -52,8 +52,8 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 	})
 
 	Context("Running the workload cluster K8s version upgrade spec [K8s-Upgrade]", func() {
-		capi_e2e.ClusterUpgradeConformanceSpec(context.TODO(), func() capi_e2e.ClusterUpgradeConformanceSpecInput {
-			return capi_e2e.ClusterUpgradeConformanceSpecInput{
+		capie2e.ClusterUpgradeConformanceSpec(context.TODO(), func() capie2e.ClusterUpgradeConformanceSpecInput {
+			return capie2e.ClusterUpgradeConformanceSpecInput{
 				E2EConfig:             e2eConfig,
 				ClusterctlConfigPath:  clusterctlConfigPath,
 				BootstrapClusterProxy: bootstrapClusterProxy,
@@ -71,8 +71,8 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 
 		Context("upgrade from an old version of v1beta1 to current, and scale workload clusters created in the old version", func() {
 
-			capi_e2e.ClusterctlUpgradeSpec(context.TODO(), func() capi_e2e.ClusterctlUpgradeSpecInput {
-				return capi_e2e.ClusterctlUpgradeSpecInput{
+			capie2e.ClusterctlUpgradeSpec(context.TODO(), func() capie2e.ClusterctlUpgradeSpecInput {
+				return capie2e.ClusterctlUpgradeSpecInput{
 					E2EConfig:                 e2eConfig,
 					ClusterctlConfigPath:      clusterctlConfigPath,
 					BootstrapClusterProxy:     bootstrapClusterProxy,

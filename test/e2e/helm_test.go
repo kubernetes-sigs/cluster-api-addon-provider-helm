@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
+	capie2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
@@ -72,7 +72,7 @@ var _ = Describe("Workload cluster creation", func() {
 		Expect(clusterctlConfigPath).To(BeAnExistingFile(), "Invalid argument. clusterctlConfigPath must be an existing file when calling %s spec", specName)
 		Expect(bootstrapClusterProxy).NotTo(BeNil(), "Invalid argument. bootstrapClusterProxy can't be nil when calling %s spec", specName)
 		Expect(os.MkdirAll(artifactFolder, 0o755)).To(Succeed(), "Invalid argument. artifactFolder can't be created for %s spec", specName)
-		Expect(e2eConfig.Variables).To(HaveKey(capi_e2e.KubernetesVersion))
+		Expect(e2eConfig.Variables).To(HaveKey(capie2e.KubernetesVersion))
 
 		// CLUSTER_NAME and CLUSTER_NAMESPACE allows for testing existing clusters.
 		// If CLUSTER_NAMESPACE is set, don't generate a new prefix. Otherwise,
@@ -215,6 +215,68 @@ var _ = Describe("Workload cluster creation", func() {
 						Namespace:             namespace,
 						ClusterName:           clusterName,
 						HelmChartProxy:        hcp,
+					}
+				})
+			})
+		})
+
+		FIt("Install and manage Helm chart with ReleaseDrift option enabled", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "nginx-ingress",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"nginxIngress": "enabled",
+						},
+					},
+					ReleaseName:       "nginx-ingress",
+					ReleaseNamespace:  "nginx-namespace",
+					ChartName:         "nginx-ingress",
+					RepoURL:           "https://helm.nginx.com/stable",
+					ValuesTemplate:    nginxValues,
+					ReleaseDrift:      true,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+				},
+			}
+
+			// Create new Helm chart
+			By("Creating new HelmChartProxy to install nginx", func() {
+				HelmInstallSpec(ctx, func() HelmInstallInput {
+					return HelmInstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			// Updating Nginx deployment and waiting for the release drift
+			By("Updating Nginx deployment and waiting for the release drift", func() {
+				HelmReleaseDriftWithDeployment(ctx, func() HelmReleaseDriftInput {
+					return HelmReleaseDriftInput{
+						BootstrapClusterProxy:      bootstrapClusterProxy,
+						Namespace:                  namespace,
+						ClusterName:                clusterName,
+						HelmChartProxy:             hcp,
+						UpdatedDeploymentReplicas:  2,
+						ExpectedDeploymentReplicas: 1,
+						ExpectedRevision:           2,
 					}
 				})
 			})

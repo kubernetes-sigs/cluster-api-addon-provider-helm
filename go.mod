@@ -6,6 +6,7 @@ toolchain go1.22.10
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
+	github.com/databus23/helm-diff/v3 v3.0.0-00010101000000-000000000000
 	github.com/google/go-cmp v0.7.0
 	github.com/ironcore-dev/controller-utils v0.9.4
 	github.com/onsi/ginkgo/v2 v2.22.2
@@ -210,4 +211,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.6
+replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.3
