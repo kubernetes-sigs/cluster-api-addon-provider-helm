@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
+	"sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleasedrift"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/remote"
@@ -42,7 +43,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object.
@@ -54,6 +57,8 @@ type HelmReleaseProxyReconciler struct {
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
 }
+
+var helmReleaseProxyEventChannel = make(chan event.GenericEvent)
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
@@ -80,6 +85,7 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 					predicates.ResourceHasFilterLabel(mgr.GetScheme(), ctrl.LoggerFrom(ctx), r.WatchFilterValue),
 				),
 			)).
+		WatchesRawSource(source.Channel(helmReleaseProxyEventChannel, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
 
@@ -299,6 +305,11 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 			conditions.MarkTrue(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition)
 			annotations[addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation] = "true"
 			helmReleaseProxy.SetAnnotations(annotations)
+			if helmReleaseProxy.Spec.ReleaseDrift {
+				if err = helmreleasedrift.Add(ctx, restConfig, helmReleaseProxy, release.Manifest, helmReleaseProxyEventChannel); err != nil {
+					return err
+				}
+			}
 		case status.IsPending():
 			conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleasePendingReason, clusterv1.ConditionSeverityInfo, "Helm release is in a pending state: %s", status)
 		case status == helmRelease.StatusFailed && err == nil:
@@ -351,6 +362,9 @@ func (r *HelmReleaseProxyReconciler) reconcileDelete(ctx context.Context, helmRe
 
 	log.V(2).Info(fmt.Sprintf("Chart '%s' successfully uninstalled on cluster %s", helmReleaseProxy.Spec.ChartName, helmReleaseProxy.Spec.ClusterRef.Name))
 	conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.HelmReleaseReadyCondition, addonsv1alpha1.HelmReleaseDeletedReason, clusterv1.ConditionSeverityInfo, "")
+	if helmReleaseProxy.Spec.ReleaseDrift {
+		helmreleasedrift.Remove(helmReleaseProxy)
+	}
 	if response != nil && response.Info != "" {
 		log.V(2).Info(fmt.Sprintf("Response is %s", response.Info))
 	}

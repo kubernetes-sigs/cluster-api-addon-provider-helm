@@ -74,10 +74,13 @@ type deploymentsClientAdapter struct {
 // Get fetches the deployment named by the key and updates the provided object.
 func (c deploymentsClientAdapter) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	deployment, err := c.client.Get(ctx, key.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 	if deployObj, ok := obj.(*appsv1.Deployment); ok {
 		deployment.DeepCopyInto(deployObj)
 	}
-	return err
+	return nil
 }
 
 // WaitForDeploymentsAvailableInput is the input for WaitForDeploymentsAvailable.
@@ -172,7 +175,6 @@ func prettyPrint(v interface{}) string {
 }
 
 func getHelmActionConfigForTests(_ context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace string) *helmAction.Configuration {
-
 	workloadKubeconfigPath := workloadClusterProxy.GetKubeconfigPath()
 
 	settings := helmCli.New()
@@ -228,7 +230,7 @@ type WaitForHelmReleaseDeployedInput struct {
 }
 
 // WaitForHelmReleaseDeployed waits until the Helm release has status.Status = deployed, which signals that the Helm release was successfully deployed.
-func WaitForHelmReleaseDeployed(ctx context.Context, input WaitForHelmReleaseDeployedInput, intervals ...interface{}) *helmRelease.Release {
+func WaitForHelmReleaseDeployed(_ context.Context, input WaitForHelmReleaseDeployedInput, intervals ...interface{}) *helmRelease.Release {
 	start := time.Now()
 	Expect(input.HelmRelease).ToNot(BeNil())
 	getClient := helmAction.NewGet(input.ActionConfig)
@@ -246,7 +248,7 @@ func WaitForHelmReleaseDeployed(ctx context.Context, input WaitForHelmReleaseDep
 
 		return false
 	}, intervals...).Should(BeTrue(), fmt.Sprintf("HelmRelease %s/%s failed to deploy, status: %s", input.Namespace, input.HelmRelease.Name, input.HelmRelease.Info.Status))
-	Logf("Helm release %s is now deployed, took %v", input.HelmRelease, time.Since(start))
+	Logf("Helm release %s/%s is now deployed, took %v", input.Namespace, input.HelmRelease.Name, time.Since(start))
 
 	return input.HelmRelease
 }
