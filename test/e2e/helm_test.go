@@ -220,7 +220,7 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 		})
 
-		FIt("Install and manage Helm chart with ReleaseDrift option enabled", func() {
+		It("Install and manage Helm chart with ReleaseDrift option enabled", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,

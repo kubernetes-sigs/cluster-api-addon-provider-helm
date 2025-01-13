@@ -17,7 +17,9 @@ limitations under the License.
 package internal
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -26,6 +28,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/databus23/helm-diff/v3/diff"
@@ -39,6 +42,7 @@ import (
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/registry"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
@@ -48,6 +52,8 @@ import (
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 type Client interface {
@@ -56,7 +62,13 @@ type Client interface {
 	UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
 }
 
-var _ Client = (*HelmClient)(nil)
+var (
+	_ Client                  = (*HelmClient)(nil)
+	_ postrender.PostRenderer = (*releaseDriftPostRenderer)(nil)
+)
+
+//go:embed data/kustomization.yaml
+var releaseDriftKustomization string
 
 type HelmClient struct{}
 
@@ -65,6 +77,10 @@ type HelmInstallOverride struct {
 	DisableHooks bool
 	SkipCRDs     bool
 	IsUpgrade    bool
+}
+
+type releaseDriftPostRenderer struct {
+	releaseName string
 }
 
 // GetActionConfig returns a new Helm action configuration.
@@ -220,6 +236,9 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 	installClient.RepoURL = repoURL
 	installClient.Version = spec.Version
 	installClient.Namespace = spec.ReleaseNamespace
+	if spec.ReleaseDrift {
+		installClient.PostRenderer = releaseDriftPostRenderer{releaseName: spec.ReleaseName}
+	}
 
 	if spec.ReleaseName == "" {
 		installClient.GenerateName = true
@@ -399,6 +418,9 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, restConfig
 	upgradeClient.RepoURL = repoURL
 	upgradeClient.Version = spec.Version
 	upgradeClient.Namespace = spec.ReleaseNamespace
+	if spec.ReleaseDrift {
+		upgradeClient.PostRenderer = releaseDriftPostRenderer{releaseName: spec.ReleaseName}
+	}
 
 	log.V(2).Info("Locating chart...")
 	cp, err := upgradeClient.ChartPathOptions.LocateChart(chartName, settings)
@@ -615,4 +637,25 @@ func (c *HelmClient) RollbackHelmRelease(ctx context.Context, restConfig *rest.C
 	rollbackClient := helmAction.NewRollback(actionConfig)
 
 	return rollbackClient.Run(spec.ReleaseName)
+}
+
+func (r releaseDriftPostRenderer) Run(renderedManifests *bytes.Buffer) (modifiedManifests *bytes.Buffer, err error) {
+	fSys := filesys.MakeFsInMemory()
+	if err := fSys.WriteFile("kustomization.yaml", []byte(strings.Replace(releaseDriftKustomization, "$RELEASE_NAME", r.releaseName, 1))); err != nil {
+		return nil, err
+	}
+	if err := fSys.WriteFile("rendered-manifests.yaml", renderedManifests.Bytes()); err != nil {
+		return nil, err
+	}
+
+	kustomizer := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
+	m, err := kustomizer.Run(fSys, ".")
+	if err != nil {
+		return nil, err
+	}
+	yml, err := m.AsYaml()
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewBuffer(yml), nil
 }

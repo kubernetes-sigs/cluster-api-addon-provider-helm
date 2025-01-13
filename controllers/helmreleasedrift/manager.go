@@ -39,7 +39,8 @@ import (
 )
 
 const (
-	InstanceLabelKey = "app.kubernetes.io/instance"
+	InstanceLabelKey    = "app.kubernetes.io/instance"
+	ManagedByLabelValue = "Helm"
 )
 
 var (
@@ -77,7 +78,7 @@ func Add(ctx context.Context, restConfig *rest.Config, helmReleaseProxy *addonsv
 		HealthProbeBindAddress: "0",
 		Cache: cache.Options{
 			DefaultLabelSelector: labels.SelectorFromSet(map[string]string{
-				konfig.ManagedbyLabelKey: "Helm",
+				konfig.ManagedbyLabelKey: ManagedByLabelValue,
 				InstanceLabelKey:         helmReleaseProxy.Spec.ReleaseName,
 			}),
 		},
