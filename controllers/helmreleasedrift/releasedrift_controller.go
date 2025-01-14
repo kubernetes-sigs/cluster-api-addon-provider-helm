@@ -47,18 +47,22 @@ var excludeCreateEventsPredicate = predicate.Funcs{
 		return false
 	},
 	UpdateFunc: func(e event.UpdateEvent) bool {
-		mf := e.ObjectNew.GetManagedFields()
-		mfl := len(mf)
-		if mfl > 0 {
-			manager := mf[mfl-1].Manager
-			return !(manager == os.Args[0])
-		}
+		return shouldFilteredByManager(e.ObjectNew.GetManagedFields())
 
-		return false
 	},
 	DeleteFunc: func(e event.DeleteEvent) bool {
-		return false
+		return shouldFilteredByManager(e.Object.GetManagedFields())
 	},
+}
+
+func shouldFilteredByManager(mfs []metav1.ManagedFieldsEntry) bool {
+	mfl := len(mfs)
+	if mfl > 0 {
+		manager := mfs[mfl-1].Manager
+		return !(manager == os.Args[0])
+	}
+
+	return false
 }
 
 // setupWithManager sets up the controller with the Manager.
