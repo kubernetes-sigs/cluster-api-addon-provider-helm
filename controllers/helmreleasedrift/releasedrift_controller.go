@@ -19,6 +19,7 @@ package helmreleasedrift
 import (
 	"context"
 	"fmt"
+	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,11 +46,19 @@ var excludeCreateEventsPredicate = predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool {
 		return false
 	},
-	/*
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return false
-		},
-	*/
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		mf := e.ObjectNew.GetManagedFields()
+		mfl := len(mf)
+		if mfl > 0 {
+			manager := mf[mfl-1].Manager
+			return !(manager == os.Args[0])
+		}
+
+		return false
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return false
+	},
 }
 
 // setupWithManager sets up the controller with the Manager.
