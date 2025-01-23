@@ -17,6 +17,8 @@ limitations under the License.
 package internal
 
 import (
+	"github.com/Masterminds/semver/v3"
+	"github.com/pkg/errors"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
@@ -33,4 +35,23 @@ func HasHelmReleaseBeenSuccessfullyInstalled(hrp *addonsv1alpha1.HelmReleaseProx
 	}
 
 	return false
+}
+
+func ResolveHelmChartVersion(kubernetesVersion string, versionMap map[string]string) (string, error) {
+	version, err := semver.NewVersion(kubernetesVersion)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to parse control plane version %s", kubernetesVersion)
+	}
+
+	for kuberenetesVersionConstraint, helmChartVersion := range versionMap {
+		constraint, err := semver.NewConstraint(kuberenetesVersionConstraint)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to parse constraint %s", kuberenetesVersionConstraint)
+		}
+		if match := constraint.Check(version); match {
+			return helmChartVersion, nil
+		}
+	}
+
+	return "", nil
 }

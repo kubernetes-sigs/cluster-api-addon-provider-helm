@@ -27,4 +27,3 @@ spec:
           encapsulation: None
           natOutgoing: Enabled
           nodeSelector: all(){{end}}
-  # TODO: pay attention to newlines at the end that get inserted by templates

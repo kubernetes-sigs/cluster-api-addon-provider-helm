@@ -25,9 +25,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/controllers/external"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -118,6 +120,33 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 	return nil
 }
 
+func (r *HelmChartProxyReconciler) getHelmChartVersionForCluster(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster) (string, error) {
+	_ = ctrl.LoggerFrom(ctx)
+
+	if helmChartProxy.Spec.VersionMap == nil {
+		return helmChartProxy.Spec.Version, nil
+	}
+
+	if cluster.Spec.ControlPlaneRef != nil {
+		return "", errors.New("control plane reference is not set")
+	}
+
+	controlPlane, err := external.Get(ctx, r.Client, cluster.Spec.ControlPlaneRef)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get control plane object %s", cluster.Spec.ControlPlaneRef.Name)
+	}
+
+	v, found, err := unstructured.NestedString(controlPlane.Object, "spec", "version")
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get control plane version from object %s", cluster.Spec.ControlPlaneRef.Name)
+	}
+	if !found {
+		return "", errors.New("control plane version not found")
+	}
+
+	return internal.ResolveHelmChartVersion(v, helmChartProxy.Spec.VersionMap)
+}
+
 // getExistingHelmReleaseProxy returns the HelmReleaseProxy for the given cluster if it exists.
 func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster) (*addonsv1alpha1.HelmReleaseProxy, error) {
 	log := ctrl.LoggerFrom(ctx)
@@ -155,7 +184,15 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 // createOrUpdateHelmReleaseProxy creates or updates the HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Context, existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster, parsedValues string) error {
 	log := ctrl.LoggerFrom(ctx)
-	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, cluster)
+
+	version, err := r.getHelmChartVersionForCluster(ctx, helmChartProxy, cluster)
+	if err != nil {
+		// TODO: Should we set a condition here?
+		return errors.Wrapf(err, "failed to resolve Kubernetes version for cluster %s", cluster.Name)
+	}
+	// TODO: do something with the computed version
+
+	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, cluster, version)
 	if helmReleaseProxy == nil {
 		log.V(2).Info("HelmReleaseProxy is up to date, nothing to do", "helmReleaseProxy", existing.Name, "cluster", cluster.Name)
 		return nil
@@ -192,7 +229,7 @@ func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, h
 
 // constructHelmReleaseProxy constructs a new HelmReleaseProxy for the given Cluster or updates the existing HelmReleaseProxy if needed.
 // If no update is needed, this returns nil. Note that this does not check if we need to reinstall the HelmReleaseProxy, i.e. immutable fields changed.
-func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster) *addonsv1alpha1.HelmReleaseProxy {
+func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmChartProxy *addonsv1alpha1.HelmChartProxy, parsedValues string, cluster *clusterv1.Cluster, version string) *addonsv1alpha1.HelmReleaseProxy {
 	helmReleaseProxy := &addonsv1alpha1.HelmReleaseProxy{}
 	if existing == nil {
 		helmReleaseProxy.GenerateName = fmt.Sprintf("%s-%s-", helmChartProxy.Spec.ChartName, cluster.Name)
@@ -220,7 +257,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	} else {
 		helmReleaseProxy = existing
 		changed := false
-		if existing.Spec.Version != helmChartProxy.Spec.Version {
+		if existing.Spec.Version != version {
 			changed = true
 		}
 		if !cmp.Equal(existing.Spec.Values, parsedValues) {
@@ -233,7 +270,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	}
 
 	helmReleaseProxy.Spec.ReconcileStrategy = helmChartProxy.Spec.ReconcileStrategy
-	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
+	helmReleaseProxy.Spec.Version = version
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
 	helmReleaseProxy.Spec.Credentials = helmChartProxy.Spec.Credentials

@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	kubeadmv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -270,6 +271,65 @@ var (
 		},
 	}
 
+	fakeVersionMapHelmChartProxy = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			VersionMap: map[string]string{
+				"> v1.32":      "v0.32",
+				"v1.31":        "v0.31",
+				"v1.30":        "v0.30",
+				"v1.29":        "v0.29",
+				"v1.28":        "v0.28",
+				"v1.27":        "v0.27",
+				"v1.26":        "v0.26",
+				"v1.25":        "v0.25",
+				"v1.24":        "v0.24",
+				"v1.23":        "v0.23",
+				"v1.22":        "v0.22",
+				"v1.21":        "v0.21",
+				"v1.20":        "v0.20",
+				"v1.19":        "v0.19",
+				"v1.18":        "v0.18",
+				"v1.17":        "v0.10",
+				"v1.9 - v1.16": "v0.4 - v0.9",
+				"v1.7 - v1.8":  "v0.3.0",
+			},
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeKubeadmControlPlane = &kubeadmv1.KubeadmControlPlane{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: kubeadmv1.GroupVersion.String(),
+			Kind:       "KubeadmControlPlane",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-kcp",
+			Namespace: "test-namespace",
+		},
+		Spec: kubeadmv1.KubeadmControlPlaneSpec{
+			Version: "v1.21.0",
+		},
+	}
+
 	fakeCluster1 = &clusterv1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: clusterv1.GroupVersion.String(),
@@ -285,6 +345,12 @@ var (
 				Pods: &clusterv1.NetworkRanges{
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
+			},
+			ControlPlaneRef: &corev1.ObjectReference{
+				APIVersion: fakeKubeadmControlPlane.APIVersion,
+				Kind:       fakeKubeadmControlPlane.Kind,
+				Name:       fakeKubeadmControlPlane.Name,
+				Namespace:  fakeKubeadmControlPlane.Namespace,
 			},
 		},
 	}
@@ -629,6 +695,55 @@ func TestReconcileForCluster(t *testing.T) {
 		})
 	}
 }
+
+// func TestResolveKubernetesVersion(t *testing.T) {
+// 	t.Parallel()
+
+// 	testcases := []struct {
+// 		name            string
+// 		helmChartProxy  *addonsv1alpha1.HelmChartProxy
+// 		cluster         *clusterv1.Cluster
+// 		controlPlane    client.Object
+// 		expectedVersion string
+// 		expectedError   string
+// 	}{
+// 		{
+// 			name:            "creates a HelmReleaseProxy for a HelmChartProxy",
+// 			helmChartProxy:  fakeVersionMapHelmChartProxy,
+// 			cluster:         fakeCluster1,
+// 			controlPlane:    fakeKubeadmControlPlane,
+// 			expectedVersion: "v0.21",
+// 			expectedError:   "",
+// 		},
+// 	}
+
+// 	for _, tc := range testcases {
+// 		tc := tc
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			g := NewWithT(t)
+// 			t.Parallel()
+
+// 			objects := []client.Object{tc.helmChartProxy, tc.cluster, tc.controlPlane}
+// 			r := &HelmChartProxyReconciler{
+// 				Client: fake.NewClientBuilder().
+// 					WithScheme(fakeScheme).
+// 					WithObjects(objects...).
+// 					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+// 					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+// 					Build(),
+// 			}
+// 			version, err := r.resolveKubernetesVersion(ctx, tc.helmChartProxy, *tc.cluster)
+
+// 			if tc.expectedError != "" {
+// 				g.Expect(err).To(HaveOccurred())
+// 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
+// 			} else {
+// 				g.Expect(err).NotTo(HaveOccurred())
+// 				g.Expect(version).To(Equal(tc.expectedVersion))
+// 			}
+// 		})
+// 	}
+// }
 
 func TestConstructHelmReleaseProxy(t *testing.T) {
 	testCases := []struct {
@@ -1365,7 +1480,10 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			result := constructHelmReleaseProxy(tc.existing, tc.helmChartProxy, tc.parsedValues, tc.cluster)
+			// TODO: figure out if we need to update this.
+			version := tc.helmChartProxy.Spec.Version
+
+			result := constructHelmReleaseProxy(tc.existing, tc.helmChartProxy, tc.parsedValues, tc.cluster, version)
 			diff := cmp.Diff(tc.expected, result)
 			g.Expect(diff).To(BeEmpty())
 		})
