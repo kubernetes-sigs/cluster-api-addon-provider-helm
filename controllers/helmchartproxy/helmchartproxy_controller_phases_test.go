@@ -346,12 +346,6 @@ var (
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
 			},
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: fakeKubeadmControlPlane.APIVersion,
-				Kind:       fakeKubeadmControlPlane.Kind,
-				Name:       fakeKubeadmControlPlane.Name,
-				Namespace:  fakeKubeadmControlPlane.Namespace,
-			},
 		},
 	}
 
@@ -391,6 +385,31 @@ var (
 				},
 			},
 			Paused: true,
+		},
+	}
+
+	fakeClusterWithControlPlaneRef = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "test-namespace",
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(6443)),
+				Pods: &clusterv1.NetworkRanges{
+					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
+				},
+			},
+			ControlPlaneRef: &corev1.ObjectReference{
+				APIVersion: fakeKubeadmControlPlane.APIVersion,
+				Kind:       fakeKubeadmControlPlane.Kind,
+				Name:       fakeKubeadmControlPlane.Name,
+				Namespace:  fakeKubeadmControlPlane.Namespace,
+			},
 		},
 	}
 
@@ -710,7 +729,7 @@ func TestResolveKubernetesVersion(t *testing.T) {
 		{
 			name:            "creates a HelmReleaseProxy for a HelmChartProxy",
 			helmChartProxy:  fakeVersionMapHelmChartProxy,
-			cluster:         fakeCluster1,
+			cluster:         fakeClusterWithControlPlaneRef,
 			controlPlane:    fakeKubeadmControlPlane,
 			expectedVersion: "0.21",
 			expectedError:   "",
