@@ -40,7 +40,7 @@ func HasHelmReleaseBeenSuccessfullyInstalled(hrp *addonsv1alpha1.HelmReleaseProx
 func ResolveHelmChartVersion(kubernetesVersion string, versionMap map[string]string) (string, error) {
 	version, err := semver.NewVersion(kubernetesVersion)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse control plane version %s", kubernetesVersion)
+		return "", errors.Wrapf(err, "failed to parse control plane version '%s'", kubernetesVersion)
 	}
 
 	for kuberenetesVersionConstraint, helmChartVersion := range versionMap {
