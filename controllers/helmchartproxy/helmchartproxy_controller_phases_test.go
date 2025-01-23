@@ -316,13 +316,27 @@ var (
 		},
 	}
 
-	fakeKubeadmControlPlane = &kubeadmv1.KubeadmControlPlane{
+	fakeKubeadmControlPlane1 = &kubeadmv1.KubeadmControlPlane{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: kubeadmv1.GroupVersion.String(),
 			Kind:       "KubeadmControlPlane",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-kcp",
+			Name:      "test-kcp-1",
+			Namespace: "test-namespace",
+		},
+		Spec: kubeadmv1.KubeadmControlPlaneSpec{
+			Version: "v1.21.0",
+		},
+	}
+
+	fakeKubeadmControlPlane2 = &kubeadmv1.KubeadmControlPlane{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: kubeadmv1.GroupVersion.String(),
+			Kind:       "KubeadmControlPlane",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-kcp-2",
 			Namespace: "test-namespace",
 		},
 		Spec: kubeadmv1.KubeadmControlPlaneSpec{
@@ -405,10 +419,10 @@ var (
 				},
 			},
 			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: fakeKubeadmControlPlane.APIVersion,
-				Kind:       fakeKubeadmControlPlane.Kind,
-				Name:       fakeKubeadmControlPlane.Name,
-				Namespace:  fakeKubeadmControlPlane.Namespace,
+				APIVersion: fakeKubeadmControlPlane1.APIVersion,
+				Kind:       fakeKubeadmControlPlane1.Kind,
+				Name:       fakeKubeadmControlPlane1.Name,
+				Namespace:  fakeKubeadmControlPlane1.Namespace,
 			},
 		},
 	}
@@ -715,7 +729,7 @@ func TestReconcileForCluster(t *testing.T) {
 	}
 }
 
-func TestResolveKubernetesVersion(t *testing.T) {
+func TestGetHelmChartVersionForCluster(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
@@ -727,14 +741,37 @@ func TestResolveKubernetesVersion(t *testing.T) {
 		expectedError   string
 	}{
 		{
-			name:            "creates a HelmReleaseProxy for a HelmChartProxy",
+			name:            "look up version from versionMap",
 			helmChartProxy:  fakeVersionMapHelmChartProxy,
 			cluster:         fakeClusterWithControlPlaneRef,
-			controlPlane:    fakeKubeadmControlPlane,
+			controlPlane:    fakeKubeadmControlPlane1,
 			expectedVersion: "0.21",
 			expectedError:   "",
 		},
-		// TODO: add more tests
+		{
+			name:            "return version if versionMap is empty",
+			helmChartProxy:  fakeHelmChartProxy1,
+			cluster:         fakeClusterWithControlPlaneRef,
+			controlPlane:    fakeKubeadmControlPlane1,
+			expectedVersion: "test-version",
+			expectedError:   "",
+		},
+		{
+			name:            "return error if control plane ref is not found",
+			helmChartProxy:  fakeVersionMapHelmChartProxy,
+			cluster:         fakeCluster1,
+			controlPlane:    fakeKubeadmControlPlane1,
+			expectedVersion: "",
+			expectedError:   "control plane reference is not set",
+		},
+		{
+			name:            "return error if control plane is not found",
+			helmChartProxy:  fakeVersionMapHelmChartProxy,
+			cluster:         fakeClusterWithControlPlaneRef,
+			controlPlane:    fakeKubeadmControlPlane2, // Has different name than the one in the control plane ref
+			expectedVersion: "",
+			expectedError:   fmt.Errorf("failed to get control plane object %s: failed to retrieve KubeadmControlPlane %s/%s: kubeadmcontrolplanes.controlplane.cluster.x-k8s.io \"%s\" not found", fakeKubeadmControlPlane1.Name, fakeKubeadmControlPlane1.Namespace, fakeKubeadmControlPlane1.Name, fakeKubeadmControlPlane1.Name).Error(),
+		},
 	}
 
 	for _, tc := range testcases {

@@ -120,6 +120,8 @@ func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helm
 	return nil
 }
 
+// getHelmChartVersionForCluster gets the Helm chart version for the given cluster. If the version map is set, it will attempt to
+// resolve the version based on the Kubernetes version of the control plane. If the version map is not set, it will return the HelmChartProxy version.
 func (r *HelmChartProxyReconciler) getHelmChartVersionForCluster(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster *clusterv1.Cluster) (string, error) {
 	_ = ctrl.LoggerFrom(ctx)
 
@@ -140,7 +142,7 @@ func (r *HelmChartProxyReconciler) getHelmChartVersionForCluster(ctx context.Con
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get control plane version from object %s", cluster.Spec.ControlPlaneRef.Name)
 	}
-	if !found {
+	if !found { // Note: if spec.version is not a pointer, this will never be true as an empty string is considered found
 		return "", errors.New("control plane version not found")
 	}
 
