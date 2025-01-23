@@ -286,24 +286,24 @@ var (
 			RepoURL:          "https://test-repo-url",
 			ReleaseNamespace: "test-release-namespace",
 			VersionMap: map[string]string{
-				"> v1.32":      "v0.32",
-				"v1.31":        "v0.31",
-				"v1.30":        "v0.30",
-				"v1.29":        "v0.29",
-				"v1.28":        "v0.28",
-				"v1.27":        "v0.27",
-				"v1.26":        "v0.26",
-				"v1.25":        "v0.25",
-				"v1.24":        "v0.24",
-				"v1.23":        "v0.23",
-				"v1.22":        "v0.22",
-				"v1.21":        "v0.21",
-				"v1.20":        "v0.20",
-				"v1.19":        "v0.19",
-				"v1.18":        "v0.18",
-				"v1.17":        "v0.10",
-				"v1.9 - v1.16": "v0.4 - v0.9",
-				"v1.7 - v1.8":  "v0.3.0",
+				"> 1.32":     "0.32",
+				"1.31":       "0.31",
+				"1.30":       "0.30",
+				"1.29":       "0.29",
+				"1.28":       "0.28",
+				"1.27":       "0.27",
+				"1.26":       "0.26",
+				"1.25":       "0.25",
+				"1.24":       "0.24",
+				"1.23":       "0.23",
+				"1.22":       "0.22",
+				"1.21":       "0.21",
+				"1.20":       "0.20",
+				"1.19":       "0.19",
+				"1.18":       "0.18",
+				"1.17":       "0.10",
+				"1.9 - 1.16": "0.4 - 0.9",
+				"1.7 - 1.8":  "0.3.0",
 			},
 			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
 			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
@@ -696,54 +696,55 @@ func TestReconcileForCluster(t *testing.T) {
 	}
 }
 
-// func TestResolveKubernetesVersion(t *testing.T) {
-// 	t.Parallel()
+func TestResolveKubernetesVersion(t *testing.T) {
+	t.Parallel()
 
-// 	testcases := []struct {
-// 		name            string
-// 		helmChartProxy  *addonsv1alpha1.HelmChartProxy
-// 		cluster         *clusterv1.Cluster
-// 		controlPlane    client.Object
-// 		expectedVersion string
-// 		expectedError   string
-// 	}{
-// 		{
-// 			name:            "creates a HelmReleaseProxy for a HelmChartProxy",
-// 			helmChartProxy:  fakeVersionMapHelmChartProxy,
-// 			cluster:         fakeCluster1,
-// 			controlPlane:    fakeKubeadmControlPlane,
-// 			expectedVersion: "v0.21",
-// 			expectedError:   "",
-// 		},
-// 	}
+	testcases := []struct {
+		name            string
+		helmChartProxy  *addonsv1alpha1.HelmChartProxy
+		cluster         *clusterv1.Cluster
+		controlPlane    client.Object
+		expectedVersion string
+		expectedError   string
+	}{
+		{
+			name:            "creates a HelmReleaseProxy for a HelmChartProxy",
+			helmChartProxy:  fakeVersionMapHelmChartProxy,
+			cluster:         fakeCluster1,
+			controlPlane:    fakeKubeadmControlPlane,
+			expectedVersion: "0.21",
+			expectedError:   "",
+		},
+		// TODO: add more tests
+	}
 
-// 	for _, tc := range testcases {
-// 		tc := tc
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			g := NewWithT(t)
-// 			t.Parallel()
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			t.Parallel()
 
-// 			objects := []client.Object{tc.helmChartProxy, tc.cluster, tc.controlPlane}
-// 			r := &HelmChartProxyReconciler{
-// 				Client: fake.NewClientBuilder().
-// 					WithScheme(fakeScheme).
-// 					WithObjects(objects...).
-// 					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
-// 					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
-// 					Build(),
-// 			}
-// 			version, err := r.resolveKubernetesVersion(ctx, tc.helmChartProxy, *tc.cluster)
+			objects := []client.Object{tc.helmChartProxy, tc.cluster, tc.controlPlane}
+			r := &HelmChartProxyReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithObjects(objects...).
+					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
+			}
+			version, err := r.getHelmChartVersionForCluster(ctx, tc.helmChartProxy, tc.cluster)
 
-// 			if tc.expectedError != "" {
-// 				g.Expect(err).To(HaveOccurred())
-// 				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
-// 			} else {
-// 				g.Expect(err).NotTo(HaveOccurred())
-// 				g.Expect(version).To(Equal(tc.expectedVersion))
-// 			}
-// 		})
-// 	}
-// }
+			if tc.expectedError != "" {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(version).To(Equal(tc.expectedVersion))
+			}
+		})
+	}
+}
 
 func TestConstructHelmReleaseProxy(t *testing.T) {
 	testCases := []struct {

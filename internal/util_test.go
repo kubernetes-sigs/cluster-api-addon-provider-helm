@@ -24,24 +24,24 @@ import (
 
 var (
 	testMap = map[string]string{
-		"> 1.32":     "0.32.0",
-		"1.31":       "0.31.0",
-		"1.30.x":     "0.30.0",
-		"1.29":       "0.29.0",
-		"1.28":       "0.28.0",
-		"1.27":       "0.27.0",
-		"1.26":       "0.26.0",
-		"1.25":       "0.25.0",
-		"1.24":       "0.24.0",
-		"1.23":       "0.23.0",
-		"1.22":       "0.22.0",
-		"1.21":       "0.21.0",
-		"1.20":       "0.20.0",
-		"1.19":       "0.19.0",
-		"1.18":       "0.18.0",
-		"1.17":       "0.10.0",
-		"1.9 - 1.16": "0.9.0",
-		"1.7 - 1.8":  "0.3.0",
+		"> 1.32":     "0.32",
+		"1.31":       "0.31",
+		"1.30.x":     "0.30",
+		"1.29":       "0.29",
+		"1.28":       "0.28",
+		"1.27":       "0.27",
+		"1.26":       "0.26",
+		"1.25":       "0.25",
+		"1.24":       "0.24",
+		"1.23":       "0.23",
+		"1.22":       "0.22",
+		"1.21":       "0.21",
+		"1.20":       "0.20",
+		"1.19":       "0.19",
+		"1.18":       "0.18",
+		"1.17":       "0.10",
+		"1.9 - 1.16": "0.4 - 0.9",
+		"1.7 - 1.8":  "0.3",
 	}
 )
 
@@ -59,30 +59,31 @@ func TestResolveHelmChartVersion(t *testing.T) {
 			name:              "match exact minor version",
 			kubernetesVersion: "v1.31",
 			versionMap:        testMap,
-			expectedVersion:   "0.31.0",
+			expectedVersion:   "0.31",
 			expectedError:     "",
 		},
 		{
 			name:              "match wildcard patch version",
 			kubernetesVersion: "v1.30.1",
 			versionMap:        testMap,
-			expectedVersion:   "0.30.0",
+			expectedVersion:   "0.30",
 			expectedError:     "",
 		},
 		{
 			name:              "match version in range",
 			kubernetesVersion: "v1.10",
 			versionMap:        testMap,
-			expectedVersion:   "0.9.0",
+			expectedVersion:   "0.4 - 0.9",
 			expectedError:     "",
 		},
 		{
 			name:              "ensure range is inclusive",
 			kubernetesVersion: "v1.16",
 			versionMap:        testMap,
-			expectedVersion:   "0.9.0",
+			expectedVersion:   "0.4 - 0.9",
 			expectedError:     "",
 		},
+		// TODO: add more tests
 	}
 
 	for _, tc := range testcases {

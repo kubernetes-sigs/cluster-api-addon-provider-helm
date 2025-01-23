@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	kubeadmv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -731,5 +732,6 @@ func TestReconcileAfterMatchingClusterUnpaused(t *testing.T) {
 func init() {
 	_ = scheme.AddToScheme(fakeScheme)
 	_ = clusterv1.AddToScheme(fakeScheme)
+	_ = kubeadmv1.AddToScheme(fakeScheme)
 	_ = addonsv1alpha1.AddToScheme(fakeScheme)
 }

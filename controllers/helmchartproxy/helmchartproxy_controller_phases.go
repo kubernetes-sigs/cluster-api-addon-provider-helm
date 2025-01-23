@@ -127,7 +127,7 @@ func (r *HelmChartProxyReconciler) getHelmChartVersionForCluster(ctx context.Con
 		return helmChartProxy.Spec.Version, nil
 	}
 
-	if cluster.Spec.ControlPlaneRef != nil {
+	if cluster.Spec.ControlPlaneRef == nil {
 		return "", errors.New("control plane reference is not set")
 	}
 
@@ -187,10 +187,8 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 
 	version, err := r.getHelmChartVersionForCluster(ctx, helmChartProxy, cluster)
 	if err != nil {
-		// TODO: Should we set a condition here?
 		return errors.Wrapf(err, "failed to resolve Kubernetes version for cluster %s", cluster.Name)
 	}
-	// TODO: do something with the computed version
 
 	helmReleaseProxy := constructHelmReleaseProxy(existing, helmChartProxy, parsedValues, cluster, version)
 	if helmReleaseProxy == nil {
