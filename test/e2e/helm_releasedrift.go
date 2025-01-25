@@ -35,6 +35,13 @@ import (
 	"sigs.k8s.io/cluster-api/test/framework"
 )
 
+type ValidationType string
+
+const (
+	ValidationEventually   ValidationType = "Eventually"
+	ValidationConsistently ValidationType = "Consistently"
+)
+
 // HelmReleaseDriftInput specifies the input for Helm release drift Deployment validation and verifying that it was successful.
 type HelmReleaseDriftInput struct {
 	BootstrapClusterProxy      framework.ClusterProxy
@@ -44,6 +51,7 @@ type HelmReleaseDriftInput struct {
 	UpdatedDeploymentReplicas  int32
 	ExpectedDeploymentReplicas int32
 	ExpectedRevision           int
+	Validation                 ValidationType
 }
 
 func HelmReleaseDriftWithDeployment(ctx context.Context, inputGetter func() HelmReleaseDriftInput) {
@@ -54,6 +62,7 @@ func HelmReleaseDriftWithDeployment(ctx context.Context, inputGetter func() Helm
 	)
 	input = inputGetter()
 	hcp := input.HelmChartProxy
+	Expect(input.Validation).NotTo(BeEmpty(), "HelmReleaseDriftInput must contains validation type to be defined")
 
 	// Get workload Cluster proxy
 	By("creating a clusterctl proxy to the workload cluster")
@@ -73,17 +82,31 @@ func HelmReleaseDriftWithDeployment(ctx context.Context, inputGetter func() Helm
 	Expect(err).NotTo(HaveOccurred())
 
 	deploymentName := ctrlclient.ObjectKeyFromObject(deployment)
-	// Wait for Helm release Deployment replicas to be returned back
-	Eventually(func() error {
-		if err := mgmtClient.Get(ctx, deploymentName, deployment); err != nil {
-			return err
-		}
-		if *deployment.Spec.Replicas != input.ExpectedDeploymentReplicas && deployment.Status.ReadyReplicas != input.ExpectedDeploymentReplicas {
-			return fmt.Errorf("expected Deployment replicas to be %d, got %d", input.ExpectedDeploymentReplicas, deployment.Status.ReadyReplicas)
-		}
+	if input.Validation == ValidationEventually {
+		// Wait for Helm release Deployment replicas to be returned back
+		Eventually(func() error {
+			if err = mgmtClient.Get(ctx, deploymentName, deployment); err != nil {
+				return err
+			}
+			if *deployment.Spec.Replicas != input.ExpectedDeploymentReplicas && deployment.Status.ReadyReplicas != input.ExpectedDeploymentReplicas {
+				return fmt.Errorf("expected Deployment replicas to be %d, got %d", input.ExpectedDeploymentReplicas, deployment.Status.ReadyReplicas)
+			}
 
-		return nil
-	}, e2eConfig.GetIntervals("default", "wait-helm-release-drift")...).Should(Succeed())
+			return nil
+		}, e2eConfig.GetIntervals("default", "wait-helm-release-drift")...).Should(Succeed())
+	}
+	if input.Validation == ValidationConsistently {
+		Consistently(func() error {
+			if err = mgmtClient.Get(ctx, deploymentName, deployment); err != nil {
+				return err
+			}
+			if *deployment.Spec.Replicas != input.ExpectedDeploymentReplicas && deployment.Status.ReadyReplicas != input.ExpectedDeploymentReplicas {
+				return fmt.Errorf("expected Deployment replicas to be %d, got %d", input.ExpectedDeploymentReplicas, deployment.Status.ReadyReplicas)
+			}
+
+			return nil
+		}, e2eConfig.GetIntervals("default", "wait-helm-release-drift")...).Should(Succeed())
+	}
 
 	helmUpgradeInput := HelmUpgradeInput{
 		BootstrapClusterProxy: workloadClusterProxy,

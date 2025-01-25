@@ -226,6 +226,9 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		if !cmp.Equal(existing.Spec.Values, parsedValues) {
 			changed = true
 		}
+		if existing.Spec.ReleaseDrift != helmChartProxy.Spec.ReleaseDrift {
+			changed = true
+		}
 
 		if !changed {
 			return nil
@@ -288,6 +291,9 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 		return true
 	case existing.Spec.ReleaseNamespace != helmChartProxy.Spec.ReleaseNamespace:
 		log.V(2).Info("ReleaseNamespace changed", "existing", existing.Spec.ReleaseNamespace, "helmChartProxy", helmChartProxy.Spec.ReleaseNamespace)
+		return true
+	case existing.Spec.ReleaseDrift != helmChartProxy.Spec.ReleaseDrift:
+		log.V(2).Info("ReleaseDrift changed", "existing", existing.Spec.ReleaseDrift, "helmChartProxy", helmChartProxy.Spec.ReleaseDrift)
 		return true
 	}
 

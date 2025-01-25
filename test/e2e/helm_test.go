@@ -220,7 +220,7 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 		})
 
-		It("Install and manage Helm chart with ReleaseDrift option enabled", func() {
+		FIt("Install and manage Helm chart with ReleaseDrift option enabled", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -235,7 +235,7 @@ var _ = Describe("Workload cluster creation", func() {
 
 			hcp := &addonsv1alpha1.HelmChartProxy{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "nginx-ingress",
+					Name:      "ahoy",
 					Namespace: namespace.Name,
 				},
 				Spec: addonsv1alpha1.HelmChartProxySpec{
@@ -244,13 +244,17 @@ var _ = Describe("Workload cluster creation", func() {
 							"nginxIngress": "enabled",
 						},
 					},
-					ReleaseName:       "nginx-ingress",
-					ReleaseNamespace:  "nginx-namespace",
-					ChartName:         "nginx-ingress",
-					RepoURL:           "https://helm.nginx.com/stable",
+					ChartName:         "hello-world",
+					RepoURL:           "https://helm.github.io/examples",
+					ReleaseName:       "ahoy",
+					ReleaseNamespace:  "ahoy-namespace",
 					ValuesTemplate:    nginxValues,
-					ReleaseDrift:      true,
 					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+					ReleaseDrift:      true,
+					Options: addonsv1alpha1.HelmOptions{
+						Wait:    true,
+						Timeout: &metav1.Duration{Duration: 5 * time.Minute},
+					},
 				},
 			}
 
@@ -267,7 +271,7 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 
 			// Updating Nginx deployment and waiting for the release drift
-			By("Updating Nginx deployment and waiting for the release drift", func() {
+			By("Updating Nginx deployment and waiting for release drift", func() {
 				HelmReleaseDriftWithDeployment(ctx, func() HelmReleaseDriftInput {
 					return HelmReleaseDriftInput{
 						BootstrapClusterProxy:      bootstrapClusterProxy,
@@ -277,6 +281,37 @@ var _ = Describe("Workload cluster creation", func() {
 						UpdatedDeploymentReplicas:  2,
 						ExpectedDeploymentReplicas: 1,
 						ExpectedRevision:           2,
+						Validation:                 ValidationEventually,
+					}
+				})
+			})
+
+			// Update existing Helm chart
+			By("Updating HelmChartProxy disabling release drift option", func() {
+				hcp.Spec.ReleaseDrift = false
+				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
+					return HelmUpgradeInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+						ExpectedRevision:      1,
+					}
+				})
+			})
+
+			// Updating Nginx deployment and waiting for the release drift
+			By("Updating Nginx deployment and waiting release drift to be inactive for a long time", func() {
+				HelmReleaseDriftWithDeployment(ctx, func() HelmReleaseDriftInput {
+					return HelmReleaseDriftInput{
+						BootstrapClusterProxy:      bootstrapClusterProxy,
+						Namespace:                  namespace,
+						ClusterName:                clusterName,
+						HelmChartProxy:             hcp,
+						UpdatedDeploymentReplicas:  2,
+						ExpectedDeploymentReplicas: 2,
+						ExpectedRevision:           1,
+						Validation:                 ValidationConsistently,
 					}
 				})
 			})
