@@ -357,11 +357,15 @@ func normalizeHelmReleaseValues(_ context.Context, helmReleaseProxy *addonsv1alp
 
 	// Normalize the HelmReleaseProxy values.
 	var normalizedValues map[string]interface{}
-	Expect(yaml.Unmarshal([]byte(helmReleaseProxy.Spec.Values), &normalizedValues)).To(Succeed())
+	if helmReleaseProxy.Spec.Values != "" {
+		Expect(yaml.Unmarshal([]byte(helmReleaseProxy.Spec.Values), &normalizedValues)).To(Succeed())
+	}
 
 	// Normalize the Helm release values.
 	var normalizedReleaseValues map[string]interface{}
-	Expect(yaml.Unmarshal(releaseValues, &normalizedReleaseValues)).To(Succeed())
+	if helmReleaseProxy.Spec.Values != "" {
+		Expect(yaml.Unmarshal(releaseValues, &normalizedReleaseValues)).To(Succeed())
+	}
 
 	// Normalize the Helm release values.
 	Expect(normalizedReleaseValues).To(Equal(normalizedValues))

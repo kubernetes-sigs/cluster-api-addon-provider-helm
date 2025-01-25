@@ -248,7 +248,6 @@ var _ = Describe("Workload cluster creation", func() {
 					RepoURL:           "https://helm.github.io/examples",
 					ReleaseName:       "ahoy",
 					ReleaseNamespace:  "ahoy-namespace",
-					ValuesTemplate:    nginxValues,
 					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 					ReleaseDrift:      true,
 					Options: addonsv1alpha1.HelmOptions{

@@ -226,9 +226,6 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		if !cmp.Equal(existing.Spec.Values, parsedValues) {
 			changed = true
 		}
-		if existing.Spec.ReleaseDrift != helmChartProxy.Spec.ReleaseDrift {
-			changed = true
-		}
 
 		if !changed {
 			return nil
