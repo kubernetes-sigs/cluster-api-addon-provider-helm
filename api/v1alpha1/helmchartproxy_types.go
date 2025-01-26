@@ -84,6 +84,7 @@ type HelmChartProxySpec struct {
 	// +optional
 	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
 
+	// TODO (dmvolod) Add notes about release drift description and warning
 	ReleaseDrift bool `json:"releaseDrift,omitempty"`
 
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and

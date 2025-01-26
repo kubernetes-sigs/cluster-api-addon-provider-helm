@@ -383,7 +383,7 @@ func initializeConditions(ctx context.Context, patchHelper *patch.Helper, helmRe
 }
 
 // patchHelmReleaseProxy patches the HelmReleaseProxy object and sets the ReadyCondition as an aggregate of the other condition set.
-// TODO: Is this preferrable to client.Update() calls? Based on testing it seems like it avoids race conditions.
+// TODO: Is this preferable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) error {
 	conditions.SetSummary(helmReleaseProxy,
 		conditions.WithConditions(
@@ -507,7 +507,7 @@ func (r *HelmReleaseProxyReconciler) getCACertificateFromSecret(ctx context.Cont
 // writeCACertificateToFile writes the CA certificate to a temporary file.
 func writeCACertificateToFile(ctx context.Context, caCertificate []byte) (string, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Writing CA certficate to file")
+	log.V(2).Info("Writing CA certificate to file")
 	caCertFile, err := os.CreateTemp("", "ca-*.crt")
 	if err != nil {
 		return "", err

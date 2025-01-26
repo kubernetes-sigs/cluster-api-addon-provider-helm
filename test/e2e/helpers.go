@@ -312,6 +312,8 @@ func GetWaitForHelmReleaseProxyReadyInput(ctx context.Context, clusterProxy fram
 			return errors.Errorf("Non-generated ReleaseName mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.ReleaseName, helmChartProxy.Spec.ReleaseName)
 		case hrp.Spec.ReleaseNamespace != helmChartProxy.Spec.ReleaseNamespace:
 			return errors.Errorf("ReleaseNamespace mismatch, got `%s` but HelmChartProxy specifies `%s`", hrp.Spec.ReleaseNamespace, helmChartProxy.Spec.ReleaseNamespace)
+		case hrp.Spec.ReleaseDrift != helmChartProxy.Spec.ReleaseDrift:
+			return errors.Errorf("ReleaseDrift mismatch, got `%t` but HelmChartProxy specifies `%t`", hrp.Spec.ReleaseDrift, helmChartProxy.Spec.ReleaseDrift)
 		}
 
 		// If we made it past all the checks, then we have the correct HelmReleaseProxy.

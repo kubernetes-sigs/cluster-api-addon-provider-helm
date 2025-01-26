@@ -220,7 +220,7 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 		})
 
-		FIt("Install and manage Helm chart with ReleaseDrift option enabled", func() {
+		It("Install and manage Helm chart with ReleaseDrift option enabled", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -258,7 +258,7 @@ var _ = Describe("Workload cluster creation", func() {
 			}
 
 			// Create new Helm chart
-			By("Creating new HelmChartProxy to install nginx", func() {
+			By("Creating new HelmChartProxy to install hello-world chart", func() {
 				HelmInstallSpec(ctx, func() HelmInstallInput {
 					return HelmInstallInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -269,8 +269,8 @@ var _ = Describe("Workload cluster creation", func() {
 				})
 			})
 
-			// Updating Nginx deployment and waiting for the release drift
-			By("Updating Nginx deployment and waiting for release drift", func() {
+			// Updating hello-world deployment and waiting for the release drift
+			By("Updating hello-world deployment and waiting for release drift", func() {
 				HelmReleaseDriftWithDeployment(ctx, func() HelmReleaseDriftInput {
 					return HelmReleaseDriftInput{
 						BootstrapClusterProxy:      bootstrapClusterProxy,
@@ -299,8 +299,8 @@ var _ = Describe("Workload cluster creation", func() {
 				})
 			})
 
-			// Updating Nginx deployment and waiting for the release drift
-			By("Updating Nginx deployment and waiting release drift to be inactive for a long time", func() {
+			// Updating hello-world deployment and waiting for the release drift
+			By("Updating hello-world deployment and waiting release drift to be inactive for a long time", func() {
 				HelmReleaseDriftWithDeployment(ctx, func() HelmReleaseDriftInput {
 					return HelmReleaseDriftInput{
 						BootstrapClusterProxy:      bootstrapClusterProxy,
