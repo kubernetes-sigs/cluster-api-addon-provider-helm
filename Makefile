@@ -95,6 +95,10 @@ GINKGO_POLL_PROGRESS_AFTER ?= 60m
 GINKGO_POLL_PROGRESS_INTERVAL ?= 5m
 E2E_CONF_FILE ?= $(ROOT_DIR)/$(TEST_DIR)/e2e/config/helm.yaml
 E2E_CONF_FILE_ENVSUBST := $(ROOT_DIR)/test/e2e/config/helm-envsubst.yaml
+E2E_CALICO_CNI_VERSION ?= v3.29.1
+E2E_CALICO_CNI_REGISTRY ?= quay.io
+E2E_CALICO_CNI_METADATA ?= https://github.com/projectcalico/calico/releases/download/$(E2E_CALICO_CNI_VERSION)/metadata.yaml
+E2E_CALICO_CNI_IMAGES_YQ ?= ".images | .[] | select(. != \"*windows*\") | with(select(. != \"$(E2E_CALICO_CNI_REGISTRY)/*\"); . = \"$(E2E_CALICO_CNI_REGISTRY)/\" + .)"
 SKIP_RESOURCE_CLEANUP ?= false
 USE_EXISTING_CLUSTER ?= false
 GINKGO_NOCOLOR ?= false
@@ -401,6 +405,12 @@ docker-pull-prerequisites:
 	docker pull $(GO_CONTAINER_IMAGE)
 	docker pull $(DEPLOYMENT_BASE_IMAGE):$(DEPLOYMENT_BASE_IMAGE_TAG)
 
+.PHONY: docker-pull-cni-images
+docker-pull-cni-images: $(YQ) ## Pulling CNI docker images locally
+	@for image in $$(wget -O - -o /dev/null $(E2E_CALICO_CNI_METADATA) | $(YQ) -e $(E2E_CALICO_CNI_IMAGES_YQ)) ; do \
+		. ./scripts/ci-e2e-lib.sh; kind::prepullImage $$image ; \
+    done
+
 .PHONY: docker-build-all
 docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images for all architectures
 
@@ -471,10 +481,12 @@ test-e2e-run-skip-manifest: $(GINKGO) $(ENVSUBST) generate-e2e-templates install
 	    -e2e.skip-resource-cleanup=$(SKIP_RESOURCE_CLEANUP) -e2e.use-existing-cluster=$(USE_EXISTING_CLUSTER)
 
 .PHONY: test-e2e-run
-test-e2e-run: ## Run the end-to-end tests and set controller image and pull policy in the manifest.
+test-e2e-run: docker-pull-cni-images ## Run the end-to-end tests and set controller image and pull policy in the manifest.
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml" PULL_POLICY=IfNotPresent
 	MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
+	CALICO_CNI_VERSION=$(E2E_CALICO_CNI_VERSION) CALICO_CNI_REGISTRY=$(E2E_CALICO_CNI_REGISTRY) \
+	DOCKER_PRELOAD_IMAGES=$(shell echo "["$$(wget -O - -o /dev/null $(E2E_CALICO_CNI_METADATA) | $(YQ) -e $(E2E_CALICO_CNI_IMAGES_YQ) | tr '\n' ',')"]") \
 	$(MAKE) test-e2e-run-skip-manifest
 
 .PHONY: get-e2e-kubeconfig

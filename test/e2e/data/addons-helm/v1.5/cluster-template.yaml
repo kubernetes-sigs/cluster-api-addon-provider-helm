@@ -20,12 +20,13 @@ spec:
         ipPools:{{range $i, $cidr := .Cluster.spec.clusterNetwork.pods.cidrBlocks }}
         - cidr: {{ $cidr }}
           encapsulation: VXLAN{{end}}
-      registry: quay.io/
+      registry: ${CALICO_CNI_REGISTRY}/
     # Image and registry configuration for the tigera/operator pod.
     tigeraOperator:
-      registry: quay.io
+      registry: ${CALICO_CNI_REGISTRY}
     calicoctl:
-      image: quay.io/calico/ctl
+      image: ${CALICO_CNI_REGISTRY}/calico/ctl
+  version: ${CALICO_CNI_VERSION}
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: KubeadmConfigTemplate
