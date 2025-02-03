@@ -10,7 +10,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	go.uber.org/mock v0.5.0
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.16.4
