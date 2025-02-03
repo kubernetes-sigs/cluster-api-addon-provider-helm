@@ -71,6 +71,16 @@ type HelmChartProxySpec struct {
 	// +optional
 	Version string `json:"version,omitempty"`
 
+	// VersionMap is a map of Kubernetes versions to Helm chart versions. This is used to represent a compatibility matrix
+	// between Kubernetes versions and Helm chart versions. Both the Kubernetes versions and Helm chart versions can be specified
+	// not only as exact versions (i.e. v1.3, v1.3.2) but also as any valid semver range (i.e. >1.3, 1.3.x, 1.3 - 1.4, ^1.2.3, ~1.2.3).
+	//
+	// Note: version ranges specified using a hyphen (i.e. 1.3 - 1.4) must include a space on either side of the hyphen, 1.3-1.4 will
+	// be parsed as release 1.3 with pre-release 1.4.
+	// Note: exact versions with patch versions must be specified for OCI charts.
+	VersionMap map[string]string `json:"versionMap,omitempty"`
+	// TODO: verify how versions work for OCI charts
+
 	// ValuesTemplate is an inline YAML representing the values for the Helm chart. This YAML supports Go templating to reference
 	// fields from each selected workload Cluster and programatically create and set values.
 	// +optional

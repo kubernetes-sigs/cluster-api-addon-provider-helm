@@ -106,6 +106,13 @@ func (in *HelmChartProxyList) DeepCopyObject() runtime.Object {
 func (in *HelmChartProxySpec) DeepCopyInto(out *HelmChartProxySpec) {
 	*out = *in
 	in.ClusterSelector.DeepCopyInto(&out.ClusterSelector)
+	if in.VersionMap != nil {
+		in, out := &in.VersionMap, &out.VersionMap
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.Options.DeepCopyInto(&out.Options)
 	if in.Credentials != nil {
 		in, out := &in.Credentials, &out.Credentials
