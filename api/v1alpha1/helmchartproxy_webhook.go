@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,8 +76,21 @@ var _ webhook.Validator = &HelmChartProxy{}
 func (p *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 	helmchartproxylog.Info("validate create", "name", p.Name)
 
+	var allErrs field.ErrorList
+
 	if err := isUrlValid(p.Spec.RepoURL); err != nil {
-		return nil, err
+		allErrs = append(allErrs,
+			field.Invalid(field.NewPath("spec", "RepoURL"),
+				p.Spec.ReleaseNamespace, err.Error()),
+		)
+	}
+
+	if errs := validateVersionMap(p); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+
+	if len(allErrs) > 0 {
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmChartProxy").GroupKind(), p.Name, allErrs)
 	}
 
 	return nil, nil
@@ -97,6 +111,10 @@ func (p *HelmChartProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnin
 			field.Invalid(field.NewPath("spec", "RepoURL"),
 				p.Spec.ReleaseNamespace, err.Error()),
 		)
+	}
+
+	if errs := validateVersionMap(p); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
 	}
 
 	if p.Spec.ReconcileStrategy != old.Spec.ReconcileStrategy {
@@ -121,7 +139,7 @@ func (p *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-// isUrlValid returns true if specified repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.
+// isUrlValid returns nil if specified repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI and an error otherwise.
 func isUrlValid(repoURL string) error {
 	_, err := url.ParseRequestURI(repoURL)
 	if err != nil {
@@ -129,4 +147,27 @@ func isUrlValid(repoURL string) error {
 	}
 
 	return nil
+}
+
+// validateVersionMap validates that if the versionMap is set, the keys and values are valid semver constraints and that the version is not also set.
+func validateVersionMap(p *HelmChartProxy) field.ErrorList {
+	var allErrs field.ErrorList
+	if p.Spec.VersionMap != nil {
+		if p.Spec.Version != "" {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "Version"), "version and versionMap cannot be set at the same time"))
+		}
+
+		for k8sVersion, chartVersion := range p.Spec.VersionMap {
+			if _, err := semver.NewConstraint(k8sVersion); err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "VersionMap"), k8sVersion, fmt.Sprintf("failed to parse Kubernetes version constraint '%s'", k8sVersion)))
+			}
+
+			if _, err := semver.NewConstraint(chartVersion); err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "VersionMap"), chartVersion, fmt.Sprintf("failed to parse Helm chart version constraint '%s'", chartVersion)))
+			}
+		}
+
+	}
+
+	return allErrs
 }
