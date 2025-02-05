@@ -127,10 +127,10 @@ func TestResolveHelmChartVersion(t *testing.T) {
 		},
 		{
 			name:              "return error if constraint is invalid",
-			kubernetesVersion: "v1.31",
+			kubernetesVersion: "v1.32",
 			versionMap:        invalidMap,
 			expectedVersion:   "",
-			expectedError:     "failed to parse constraint invalid kubernetes version: improper constraint: invalid kubernetes version",
+			expectedError:     "failed to parse constraint 'invalid kubernetes version': improper constraint: invalid kubernetes version",
 		},
 	}
 
