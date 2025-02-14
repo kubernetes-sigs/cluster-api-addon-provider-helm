@@ -166,7 +166,6 @@ func validateVersionMap(p *HelmChartProxy) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "VersionMap"), chartVersion, fmt.Sprintf("failed to parse Helm chart version constraint '%s'", chartVersion)))
 			}
 		}
-
 	}
 
 	return allErrs
