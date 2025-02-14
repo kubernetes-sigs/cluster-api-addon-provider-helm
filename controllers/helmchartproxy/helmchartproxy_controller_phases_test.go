@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	kubeadmv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -270,6 +271,79 @@ var (
 		},
 	}
 
+	fakeVersionMapHelmChartProxy = &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "test-namespace",
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			VersionMap: map[string]string{
+				"> 1.32":     "0.32",
+				"1.31":       "0.31",
+				"1.30":       "0.30",
+				"1.29":       "0.29",
+				"1.28":       "0.28",
+				"1.27":       "0.27",
+				"1.26":       "0.26",
+				"1.25":       "0.25",
+				"1.24":       "0.24",
+				"1.23":       "0.23",
+				"1.22":       "0.22",
+				"1.21":       "0.21",
+				"1.20":       "0.20",
+				"1.19":       "0.19",
+				"1.18":       "0.18",
+				"1.17":       "0.10",
+				"1.9 - 1.16": "0.4 - 0.9",
+				"1.7 - 1.8":  "0.3.0",
+			},
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Options: addonsv1alpha1.HelmOptions{
+				EnableClientCache: true,
+				Timeout: &metav1.Duration{
+					Duration: 10 * time.Minute,
+				},
+			},
+		},
+	}
+
+	fakeKubeadmControlPlane1 = &kubeadmv1.KubeadmControlPlane{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: kubeadmv1.GroupVersion.String(),
+			Kind:       "KubeadmControlPlane",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-kcp-1",
+			Namespace: "test-namespace",
+		},
+		Spec: kubeadmv1.KubeadmControlPlaneSpec{
+			Version: "v1.21.0",
+		},
+	}
+
+	fakeKubeadmControlPlane2 = &kubeadmv1.KubeadmControlPlane{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: kubeadmv1.GroupVersion.String(),
+			Kind:       "KubeadmControlPlane",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-kcp-2",
+			Namespace: "test-namespace",
+		},
+		Spec: kubeadmv1.KubeadmControlPlaneSpec{
+			Version: "v1.21.0",
+		},
+	}
+
 	fakeCluster1 = &clusterv1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: clusterv1.GroupVersion.String(),
@@ -325,6 +399,31 @@ var (
 				},
 			},
 			Paused: true,
+		},
+	}
+
+	fakeClusterWithControlPlaneRef = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "test-namespace",
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(6443)),
+				Pods: &clusterv1.NetworkRanges{
+					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
+				},
+			},
+			ControlPlaneRef: &corev1.ObjectReference{
+				APIVersion: fakeKubeadmControlPlane1.APIVersion,
+				Kind:       fakeKubeadmControlPlane1.Kind,
+				Name:       fakeKubeadmControlPlane1.Name,
+				Namespace:  fakeKubeadmControlPlane1.Namespace,
+			},
 		},
 	}
 
@@ -625,6 +724,79 @@ func TestReconcileForCluster(t *testing.T) {
 					g.Expect(hrp).NotTo(BeNil())
 				}
 				tc.expect(g, tc.helmChartProxy, hrp)
+			}
+		})
+	}
+}
+
+func TestGetHelmChartVersionForCluster(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name            string
+		helmChartProxy  *addonsv1alpha1.HelmChartProxy
+		cluster         *clusterv1.Cluster
+		controlPlane    client.Object
+		expectedVersion string
+		expectedError   string
+	}{
+		{
+			name:            "look up version from versionMap",
+			helmChartProxy:  fakeVersionMapHelmChartProxy,
+			cluster:         fakeClusterWithControlPlaneRef,
+			controlPlane:    fakeKubeadmControlPlane1,
+			expectedVersion: "0.21",
+			expectedError:   "",
+		},
+		{
+			name:            "return version if versionMap is empty",
+			helmChartProxy:  fakeHelmChartProxy1,
+			cluster:         fakeClusterWithControlPlaneRef,
+			controlPlane:    fakeKubeadmControlPlane1,
+			expectedVersion: "test-version",
+			expectedError:   "",
+		},
+		{
+			name:            "return error if control plane ref is not found",
+			helmChartProxy:  fakeVersionMapHelmChartProxy,
+			cluster:         fakeCluster1,
+			controlPlane:    fakeKubeadmControlPlane1,
+			expectedVersion: "",
+			expectedError:   "control plane reference is not set",
+		},
+		{
+			name:            "return error if control plane is not found",
+			helmChartProxy:  fakeVersionMapHelmChartProxy,
+			cluster:         fakeClusterWithControlPlaneRef,
+			controlPlane:    fakeKubeadmControlPlane2, // Has different name than the one in the control plane ref
+			expectedVersion: "",
+			expectedError:   fmt.Errorf("failed to get control plane object %s: failed to retrieve KubeadmControlPlane %s/%s: kubeadmcontrolplanes.controlplane.cluster.x-k8s.io \"%s\" not found", fakeKubeadmControlPlane1.Name, fakeKubeadmControlPlane1.Namespace, fakeKubeadmControlPlane1.Name, fakeKubeadmControlPlane1.Name).Error(),
+		},
+	}
+
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			t.Parallel()
+
+			objects := []client.Object{tc.helmChartProxy, tc.cluster, tc.controlPlane}
+			r := &HelmChartProxyReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithObjects(objects...).
+					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
+			}
+			version, err := r.getHelmChartVersionForCluster(ctx, tc.helmChartProxy, tc.cluster)
+
+			if tc.expectedError != "" {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(version).To(Equal(tc.expectedVersion))
 			}
 		})
 	}
@@ -1365,7 +1537,10 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			result := constructHelmReleaseProxy(tc.existing, tc.helmChartProxy, tc.parsedValues, tc.cluster)
+			// TODO: figure out if we need to update this.
+			version := tc.helmChartProxy.Spec.Version
+
+			result := constructHelmReleaseProxy(tc.existing, tc.helmChartProxy, tc.parsedValues, tc.cluster, version)
 			diff := cmp.Diff(tc.expected, result)
 			g.Expect(diff).To(BeEmpty())
 		})
