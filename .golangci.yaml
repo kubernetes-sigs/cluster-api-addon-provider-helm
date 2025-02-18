@@ -1,8 +1,6 @@
 run:
   timeout: 5m
-  go: "1.20"
-  skip-files:
-    - "zz_generated.*\\.go$"
+  go: "1.22"
   allow-parallel-runners: true
 
 linters:
@@ -25,13 +23,13 @@ linters:
     - bodyclose
     - containedctx
     - contextcheck
+    - copyloopvar
     - dogsled
     - durationcheck
     - errchkjson
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - forcetypeassert
     - gci
     - ginkgolinter
@@ -130,6 +128,8 @@ issues:
     # supported will be caught by the default case in the switches.
     - "missing cases in switch of type v1.PlatformType: (\\.*)"
   exclude-use-default: false
+  exclude-files:
+    - "zz_generated.*\\.go$"
   exclude-rules:
     # Exclude some linters from running on tests files.
     - path: _test\.go

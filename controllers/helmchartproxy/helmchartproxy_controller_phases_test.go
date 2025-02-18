@@ -593,7 +593,6 @@ func TestReconcileForCluster(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			t.Parallel()
@@ -1360,8 +1359,6 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
@@ -1536,8 +1533,6 @@ func TestShouldReinstallHelmRelease(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
@@ -1672,8 +1667,6 @@ func TestGetOrphanedHelmReleaseProxies(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
