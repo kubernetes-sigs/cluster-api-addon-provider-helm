@@ -442,7 +442,6 @@ func TestReconcileNormal(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			t.Parallel()
@@ -508,7 +507,6 @@ func TestReconcileNormalWithCredentialRef(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			t.Parallel()
@@ -574,7 +572,6 @@ func TestReconcileNormalWithACertificateRef(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			t.Parallel()
@@ -681,7 +678,6 @@ func TestReconcileDelete(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			t.Parallel()
@@ -746,7 +742,6 @@ func TestTLSSettings(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 			t.Parallel()
