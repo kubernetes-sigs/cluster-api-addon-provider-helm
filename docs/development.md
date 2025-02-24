@@ -3,7 +3,7 @@
 ## Prerequisites
 
 The prerequisites include:
-- [Go](https://go.dev/dl/) 1.18
+- [Go](https://go.dev/dl/) 1.22
 - [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/)
 - make
 - [Docker](https://www.docker.com/)
@@ -11,7 +11,7 @@ The prerequisites include:
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 - [Tilt](https://docs.tilt.dev/install.html) (for running with Tilt)
 
-In addition, you also need to install the prerequisites for [Cluster API](https://cluster-api.sigs.k8s.io/developer/tilt.html) as well in order to run it alongside this controller.
+In addition, you also need to install the prerequisites for [Developing Cluster API with Tilt](https://cluster-api.sigs.k8s.io/developer/core/tilt.html) as well in order to run it alongside this controller.
 
 ## Rapid, iterative development with Tilt
 
@@ -23,7 +23,7 @@ Clone the Cluster API and CAAPH repositories into your Go src folder:
 
 ```bash
 $ git clone git@github.com:kubernetes-sigs/cluster-api.git ${GOPATH}/src/cluster-api
-$ git clone git@github.com:Jont828/cluster-api-addon-provider-helm.git ${GOPATH}/src/cluster-api-addon-provider-helm
+$ git clone git@github.com:kubernetes-sigs/cluster-api-addon-provider-helm.git ${GOPATH}/src/cluster-api-addon-provider-helm
 ```
 
 Afterwards your folder structure should look like this:
@@ -36,7 +36,7 @@ src/
 
 #### 2. Set up Tilt settings in `src/cluster-api`
 
-Refer to [this guide](https://cluster-api.sigs.k8s.io/developer/tilt.html) to set up Tilt for Cluster API.
+Refer to [this guide](https://cluster-api.sigs.k8s.io/developer/core/tilt.html) to set up Tilt for Cluster API.
 
 In particular, for our purposes we only need to set up `tilt-settings.yaml` in Cluster API to enable CAAPH as a provider. Add the following fields to the lists in `tilt-settings.yaml`:
 
