@@ -24,7 +24,7 @@ jobs:
       id: go
     - name: Check out code into the Go module directory
       uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # tag=v4.1.6
-    - uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # tag=v4.2.0
+    - uses: actions/cache@0c907a75c2c80ebcb7f088228285e798b750cf8f # tag=v4.2.1
       name: Restore go cache
       with:
         path: |
