@@ -50,7 +50,7 @@ import (
 )
 
 var (
-	controllerName = "cluster-api-addon-provider-helm"
+	controllerName = "cluster-api-helm-controller-manager"
 	scheme         = runtime.NewScheme()
 	setupLog       = ctrl.Log.WithName("setup")
 
