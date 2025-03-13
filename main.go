@@ -37,8 +37,10 @@ import (
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/version"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/controllers/remote"
 	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/feature"
+	"sigs.k8s.io/cluster-api/util/apiwarnings"
 	"sigs.k8s.io/cluster-api/util/flags"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -48,8 +50,9 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	controllerName = "cluster-api-helm-controller-manager"
+	scheme         = runtime.NewScheme()
+	setupLog       = ctrl.Log.WithName("setup")
 
 	enableLeaderElection        bool
 	leaderElectionLeaseDuration time.Duration
@@ -61,6 +64,8 @@ var (
 	helmChartProxyConcurrency   int
 	helmReleaseProxyConcurrency int
 	syncPeriod                  time.Duration
+	restConfigQPS               float32
+	restConfigBurst             int
 	healthAddr                  string
 	webhookPort                 int
 	webhookCertDir              string
@@ -108,6 +113,12 @@ func InitFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&syncPeriod, "sync-period", 10*time.Minute,
 		"Minimum interval at which watched resources are reconciled (e.g. 15m)")
+
+	fs.Float32Var(&restConfigQPS, "kube-api-qps", 20,
+		"Maximum queries per second from the controller client to the Kubernetes API server.")
+
+	fs.IntVar(&restConfigBurst, "kube-api-burst", 30,
+		"Maximum number of queries that should be allowed in one burst from the controller client to the Kubernetes API server.")
 
 	fs.IntVar(&webhookPort, "webhook-port", 9443,
 		"Webhook Server port")
@@ -159,7 +170,13 @@ func main() {
 	// klog.Background will automatically use the right logger.
 	ctrl.SetLogger(klog.Background())
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	restConfig := ctrl.GetConfigOrDie()
+	restConfig.QPS = restConfigQPS
+	restConfig.Burst = restConfigBurst
+	restConfig.UserAgent = remote.DefaultClusterAPIUserAgent(controllerName)
+	restConfig.WarningHandler = apiwarnings.DefaultHandler(klog.Background().WithName("API Server Warning"))
+
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "controller-leader-election-caaph",
