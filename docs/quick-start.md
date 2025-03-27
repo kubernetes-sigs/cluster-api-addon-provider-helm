@@ -139,9 +139,11 @@ You can then use your OCI registry by setting the `repoURL` to `oci://<my-regist
 ```yaml
 spec:
   repoURL: oci://<my-registry>
-  credentialsSecretRef:
-    name: oci-creds
-    namespace: caaph-system
+  credentials:
+    key: config.json
+    secret:
+      name: oci-creds
+      namespace: caaph-system
 ```
 
 Note that in this case the credentials in the secret must be stored in a file named `config.json` at the root of the secret, e.g:
