@@ -18,3 +18,5 @@ aliases:
     - Jont828
     - jackfrancis
     - mboersma
+  cluster-api-addon-helm-reviewers:
+    - dmvolod
