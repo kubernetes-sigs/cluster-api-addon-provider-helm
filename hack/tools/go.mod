@@ -1,6 +1,8 @@
 module sigs.k8s.io/cluster-api-provider-azure/hack/tools
 
-go 1.19
+go 1.23.0
+
+toolchain go1.23.10
 
 require (
 	github.com/hashicorp/go-multierror v1.1.1
