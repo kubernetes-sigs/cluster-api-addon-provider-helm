@@ -82,13 +82,13 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 					ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
 						WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
 					},
-					InitWithKubernetesVersion:       e2eConfig.GetVariable(KubernetesVersionAPIUpgradeFrom),
-					InitWithBinary:                  fmt.Sprintf("https://github.com/kubernetes-sigs/cluster-api/releases/download/%s/clusterctl-{OS}-{ARCH}", e2eConfig.GetVariable(OldCAPIUpgradeVersion)),
-					InitWithCoreProvider:            "cluster-api:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion),
-					InitWithBootstrapProviders:      []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-					InitWithControlPlaneProviders:   []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-					InitWithInfrastructureProviders: []string{"docker:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-					InitWithAddonProviders:          []string{"helm:" + e2eConfig.GetVariable(OldProviderUpgradeVersion)},
+					InitWithKubernetesVersion:       e2eConfig.GetVariableOrEmpty(KubernetesVersionAPIUpgradeFrom),
+					InitWithBinary:                  fmt.Sprintf("https://github.com/kubernetes-sigs/cluster-api/releases/download/%s/clusterctl-{OS}-{ARCH}", e2eConfig.GetVariableOrEmpty(OldCAPIUpgradeVersion)),
+					InitWithCoreProvider:            "cluster-api:" + e2eConfig.GetVariableOrEmpty(OldCAPIUpgradeVersion),
+					InitWithBootstrapProviders:      []string{"kubeadm:" + e2eConfig.GetVariableOrEmpty(OldCAPIUpgradeVersion)},
+					InitWithControlPlaneProviders:   []string{"kubeadm:" + e2eConfig.GetVariableOrEmpty(OldCAPIUpgradeVersion)},
+					InitWithInfrastructureProviders: []string{"docker:" + e2eConfig.GetVariableOrEmpty(OldCAPIUpgradeVersion)},
+					InitWithAddonProviders:          []string{"helm:" + e2eConfig.GetVariableOrEmpty(OldProviderUpgradeVersion)},
 				}
 			})
 		})
