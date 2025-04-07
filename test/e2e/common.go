@@ -277,7 +277,7 @@ func createApplyClusterTemplateInput(specName string, changes ...func(*clusterct
 			Flavor:                   clusterctl.DefaultFlavor,
 			Namespace:                "default",
 			ClusterName:              "cluster",
-			KubernetesVersion:        e2eConfig.GetVariable(capi_e2e.KubernetesVersion),
+			KubernetesVersion:        e2eConfig.GetVariableOrEmpty(capi_e2e.KubernetesVersion),
 			ControlPlaneMachineCount: ptr.To[int64](1),
 			WorkerMachineCount:       ptr.To[int64](1),
 		},
