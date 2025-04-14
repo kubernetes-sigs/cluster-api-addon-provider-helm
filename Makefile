@@ -123,7 +123,8 @@ KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 CLUSTER_API_VERSION := $(call get_go_version,sigs.k8s.io/cluster-api)
 CLUSTER_API_CRD_LOCATION = tmp/cluster-api/crd
 
-MOCKGEN_VER := v0.4.0
+MOCKGEN_PKG := go.uber.org/mock
+MOCKGEN_VER := $(call get_go_version,$(MOCKGEN_PKG))
 MOCKGEN_BIN := mockgen
 MOCKGEN := $(TOOLS_BIN_DIR)/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
 
@@ -798,7 +799,7 @@ $(KUSTOMIZE): # Build kustomize from tools folder.
 	CGO_ENABLED=0 GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(KUSTOMIZE_PKG) $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
 
 $(MOCKGEN): ## Build mockgen from tools folder.
-	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) go.uber.org/mock/mockgen $(MOCKGEN_BIN) $(MOCKGEN_VER)
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(MOCKGEN_PKG)/$(MOCKGEN_BIN) $(MOCKGEN_BIN) $(MOCKGEN_VER)
 
 $(SETUP_ENVTEST): # Build setup-envtest from tools folder.
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(SETUP_ENVTEST_PKG) $(SETUP_ENVTEST_BIN) $(SETUP_ENVTEST_VER)
