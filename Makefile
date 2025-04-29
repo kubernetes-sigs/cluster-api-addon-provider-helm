@@ -123,7 +123,7 @@ KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 CLUSTER_API_VERSION := $(call get_go_version,sigs.k8s.io/cluster-api)
 CLUSTER_API_CRD_LOCATION = tmp/cluster-api/crd
 
-MOCKGEN_VER := v0.4.0
+MOCKGEN_VER := v0.5.1
 MOCKGEN_BIN := mockgen
 MOCKGEN := $(TOOLS_BIN_DIR)/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
 
