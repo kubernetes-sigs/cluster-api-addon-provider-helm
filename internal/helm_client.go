@@ -18,10 +18,14 @@ package internal
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
@@ -255,21 +259,68 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 
 // newDefaultRegistryClient creates registry client object with default config which can be used to install/upgrade helm charts.
 func newDefaultRegistryClient(credentialsPath string, enableCache bool, caFilePath string, insecureSkipTLSVerify bool) (*registry.Client, error) {
-	if caFilePath == "" && !insecureSkipTLSVerify {
-		opts := []registry.ClientOption{
-			registry.ClientOptDebug(true),
-			registry.ClientOptEnableCache(enableCache),
-			registry.ClientOptWriter(os.Stderr),
-		}
-		if credentialsPath != "" {
-			// Create a new registry client with credentials
-			opts = append(opts, registry.ClientOptCredentialsFile(credentialsPath))
-		}
-
-		return registry.NewClient(opts...)
+	opts := []registry.ClientOption{
+		registry.ClientOptDebug(true),
+		registry.ClientOptEnableCache(enableCache),
+		registry.ClientOptWriter(os.Stderr),
+	}
+	if credentialsPath != "" {
+		// Create a new registry client with credentials
+		opts = append(opts, registry.ClientOptCredentialsFile(credentialsPath))
 	}
 
-	return registry.NewRegistryClientWithTLS(os.Stderr, "", "", caFilePath, insecureSkipTLSVerify, credentialsPath, true)
+	if caFilePath != "" || insecureSkipTLSVerify {
+		tlsConf, err := newClientTLS(caFilePath, insecureSkipTLSVerify)
+		if err != nil {
+			return nil, fmt.Errorf("can't create TLS config for client: %w", err)
+		}
+		opts = append(opts, registry.ClientOptHTTPClient(&http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConf,
+				Proxy:           http.ProxyFromEnvironment,
+				// This registry client is not reused and is discarded after a single reconciliation
+				// loop. Limit how long can be the idle connection open. Otherwise its possible that
+				// a registry server that keeps the connection open for a long time could result in
+				// connections being openend in the controller for a long time.
+				IdleConnTimeout: 1 * time.Second,
+			},
+		}),
+		)
+	}
+
+	return registry.NewClient(opts...)
+}
+
+// newClientTLS creates a new TLS config for the registry client based on the provided
+// CA file and insecureSkipTLSverify flag.
+func newClientTLS(caFile string, insecureSkipTLSverify bool) (*tls.Config, error) {
+	config := tls.Config{
+		InsecureSkipVerify: insecureSkipTLSverify,
+	}
+
+	if caFile != "" {
+		cp, err := certPoolFromFile(caFile)
+		if err != nil {
+			return nil, err
+		}
+		config.RootCAs = cp
+	}
+
+	return &config, nil
+}
+
+// certPoolFromFile creates a new CertPool and appends the certificates from the given file.
+func certPoolFromFile(filename string) (*x509.CertPool, error) {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't read CA file: %s", filename)
+	}
+	cp := x509.NewCertPool()
+	if !cp.AppendCertsFromPEM(b) {
+		return nil, errors.Errorf("failed to append certificates from file: %s", filename)
+	}
+
+	return cp, nil
 }
 
 // getHelmChartAndRepoName returns chartName, repoURL as per the format requirred in helm install/upgrade config.
