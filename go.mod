@@ -1,8 +1,8 @@
 module sigs.k8s.io/cluster-api-addon-provider-helm
 
-go 1.22.0
+go 1.23
 
-toolchain go1.22.12
+toolchain go1.24.1
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -11,7 +11,7 @@ require (
 	github.com/onsi/gomega v1.36.2
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.6
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.2
 	gopkg.in/yaml.v2 v2.4.0
 	helm.sh/helm/v3 v3.16.4
 	k8s.io/api v0.31.3
