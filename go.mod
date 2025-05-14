@@ -224,6 +224,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.3
+replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.6
 
 replace github.com/databus23/helm-diff/v3 => github.com/dmvolod/helm-diff/v3 v3.9.10-fix.2
