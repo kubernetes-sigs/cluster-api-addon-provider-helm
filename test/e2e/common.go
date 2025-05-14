@@ -44,10 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	kubesystem = "kube-system"
-)
-
 // EnsureControlPlaneInitialized waits for the cluster KubeadmControlPlane object to be initialized
 // and then installs cloud-provider-azure components via Helm.
 // Fulfills the clusterctl.Waiter type so that it can be used as ApplyClusterTemplateAndWaitInput data
@@ -75,7 +71,7 @@ func EnsureControlPlaneInitialized(ctx context.Context, input clusterctl.ApplyCu
 	Eventually(func(g Gomega) {
 		ns := &corev1.Namespace{}
 		clusterProxy := input.ClusterProxy.GetWorkloadCluster(ctx, input.Namespace, input.ClusterName)
-		g.Expect(clusterProxy.GetClient().Get(ctx, client.ObjectKey{Name: kubesystem}, ns)).To(Succeed(), "Failed to get kube-system namespace")
+		g.Expect(clusterProxy.GetClient().Get(ctx, client.ObjectKey{Name: metav1.NamespaceSystem}, ns)).To(Succeed(), "Failed to get kube-system namespace")
 	}, input.WaitForControlPlaneIntervals...).Should(Succeed(), "API Server was not reachable in time")
 
 	By("Ensure calico is ready after control plane is initialized")
@@ -96,7 +92,7 @@ const (
 	calicoHelmChartName      string = "tigera-operator"
 )
 
-// EnsureCalicoIsReady verifies that the calico deployments exist and and are available on the workload cluster.
+// EnsureCalicoIsReady verifies that the calico deployments exist and are available on the workload cluster.
 func EnsureCalicoIsReady(ctx context.Context, input clusterctl.ApplyCustomClusterTemplateAndWaitInput) {
 	specName := "ensure-calico"
 
@@ -275,7 +271,7 @@ func createApplyClusterTemplateInput(specName string, changes ...func(*clusterct
 			KubeconfigPath:           bootstrapClusterProxy.GetKubeconfigPath(),
 			InfrastructureProvider:   clusterctl.DefaultInfrastructureProvider,
 			Flavor:                   clusterctl.DefaultFlavor,
-			Namespace:                "default",
+			Namespace:                metav1.NamespaceDefault,
 			ClusterName:              "cluster",
 			KubernetesVersion:        e2eConfig.GetVariable(capi_e2e.KubernetesVersion),
 			ControlPlaneMachineCount: ptr.To[int64](1),

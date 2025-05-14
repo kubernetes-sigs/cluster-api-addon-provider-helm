@@ -17,16 +17,22 @@ limitations under the License.
 package internal
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	_ "embed"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 
+	"github.com/databus23/helm-diff/v3/diff"
+	"github.com/databus23/helm-diff/v3/manifest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
@@ -36,6 +42,7 @@ import (
 	helmCli "helm.sh/helm/v3/pkg/cli"
 	helmVals "helm.sh/helm/v3/pkg/cli/values"
 	helmGetter "helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/registry"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
@@ -45,6 +52,8 @@ import (
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 type Client interface {
@@ -53,7 +62,26 @@ type Client interface {
 	UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
 }
 
+var (
+	_ Client                  = (*HelmClient)(nil)
+	_ postrender.PostRenderer = (*releaseDriftPostRenderer)(nil)
+)
+
+//go:embed data/kustomization.yaml
+var releaseDriftKustomization string
+
 type HelmClient struct{}
+
+type HelmInstallOverride struct {
+	DryRun       bool
+	DisableHooks bool
+	SkipCRDs     bool
+	IsUpgrade    bool
+}
+
+type releaseDriftPostRenderer struct {
+	releaseName string
+}
 
 // GetActionConfig returns a new Helm action configuration.
 func GetActionConfig(ctx context.Context, namespace string, config *rest.Config) (*helmAction.Configuration, error) {
@@ -107,7 +135,7 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig
 	existingRelease, err := c.GetHelmRelease(ctx, restConfig, spec)
 	if err != nil {
 		if errors.Is(err, helmDriver.ErrReleaseNotFound) {
-			return c.InstallHelmRelease(ctx, restConfig, credentialsPath, caFilePath, spec)
+			return c.InstallHelmRelease(ctx, restConfig, credentialsPath, caFilePath, spec, nil)
 		}
 
 		return nil, err
@@ -117,7 +145,7 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig
 }
 
 // generateHelmInstallConfig generates default helm install config using helmOptions specified in HCP CR spec.
-func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Install {
+func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions, overrideOptions *HelmInstallOverride) *helmAction.Install {
 	installClient := helmAction.NewInstall(actionConfig)
 	installClient.CreateNamespace = true
 	if actionConfig.RegistryClient != nil {
@@ -139,6 +167,12 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 	installClient.Atomic = helmOptions.Atomic
 	installClient.IncludeCRDs = helmOptions.Install.IncludeCRDs
 	installClient.CreateNamespace = helmOptions.Install.CreateNamespace
+	if overrideOptions != nil {
+		installClient.SkipCRDs = overrideOptions.SkipCRDs
+		installClient.DisableHooks = overrideOptions.DisableHooks
+		installClient.DryRun = overrideOptions.DryRun
+		installClient.IsUpgrade = overrideOptions.IsUpgrade
+	}
 
 	return installClient
 }
@@ -174,7 +208,7 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 }
 
 // InstallHelmRelease installs a Helm release.
-func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec, overrideOptions *HelmInstallOverride) (*helmRelease.Release, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	settings, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
@@ -198,10 +232,13 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 		return nil, err
 	}
 
-	installClient := generateHelmInstallConfig(actionConfig, &spec.Options)
+	installClient := generateHelmInstallConfig(actionConfig, &spec.Options, overrideOptions)
 	installClient.RepoURL = repoURL
 	installClient.Version = spec.Version
 	installClient.Namespace = spec.ReleaseNamespace
+	if spec.ReleaseDrift {
+		installClient.PostRenderer = releaseDriftPostRenderer{releaseName: spec.ReleaseName}
+	}
 
 	if spec.ReleaseName == "" {
 		installClient.GenerateName = true
@@ -255,6 +292,18 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 	log.V(1).Info("Installing with Helm", "chart", spec.ChartName, "repo", spec.RepoURL)
 
 	return installClient.RunWithContext(ctx, chartRequested, vals) // Can return error and a release
+}
+
+// TemplateHelmRelease generate a template for the Helm release.
+func (c *HelmClient) TemplateHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error) {
+	overrideOptions := &HelmInstallOverride{
+		DryRun:       true,
+		DisableHooks: true,
+		SkipCRDs:     true,
+		IsUpgrade:    true,
+	}
+
+	return c.InstallHelmRelease(ctx, restConfig, credentialsPath, caFilePath, spec, overrideOptions)
 }
 
 // newDefaultRegistryClient creates registry client object with default config which can be used to install/upgrade helm charts.
@@ -369,6 +418,9 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, restConfig
 	upgradeClient.RepoURL = repoURL
 	upgradeClient.Version = spec.Version
 	upgradeClient.Namespace = spec.ReleaseNamespace
+	if spec.ReleaseDrift {
+		upgradeClient.PostRenderer = releaseDriftPostRenderer{releaseName: spec.ReleaseName}
+	}
 
 	log.V(2).Info("Locating chart...")
 	cp, err := upgradeClient.ChartPathOptions.LocateChart(chartName, settings)
@@ -414,7 +466,7 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, restConfig
 		return nil, errors.Errorf("failed to load request chart %s", chartName)
 	}
 
-	shouldUpgrade, err := shouldUpgradeHelmRelease(ctx, *existing, chartRequested, vals)
+	shouldUpgrade, err := c.shouldUpgradeHelmRelease(ctx, restConfig, credentialsPath, caFilePath, *existing, chartRequested, vals, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -447,7 +499,7 @@ func writeValuesToFile(ctx context.Context, spec addonsv1alpha1.HelmReleaseProxy
 }
 
 // shouldUpgradeHelmRelease determines if a Helm release should be upgraded.
-func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {
+func (c *HelmClient) shouldUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, existing helmRelease.Release, chartRequested *chart.Chart, values map[string]interface{}, spec addonsv1alpha1.HelmReleaseProxySpec) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	if existing.Chart == nil || existing.Chart.Metadata == nil {
@@ -476,7 +528,31 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 		return false, errors.Wrapf(err, "failed to new release values")
 	}
 
-	return !cmp.Equal(oldValues, newValues), nil
+	if !cmp.Equal(oldValues, newValues) {
+		return true, nil
+	}
+
+	if spec.ReleaseDrift {
+		klog.V(2).Info("release drift is enabled. Trying to detect release diff")
+		install, err := c.TemplateHelmRelease(ctx, restConfig, credentialsPath, caFilePath, spec)
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to generate release template")
+		}
+		_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to init helm client")
+		}
+		releaseManifest, installManifest, err := manifest.Generate(actionConfig, []byte(existing.Manifest), []byte(install.Manifest))
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to generate existing and installing release manifests")
+		}
+		currentSpecs := manifest.Parse(string(releaseManifest), spec.ReleaseNamespace, true, manifest.Helm3TestHook, manifest.Helm2TestSuccessHook)
+		newSpecs := manifest.Parse(string(installManifest), spec.ReleaseNamespace, true, manifest.Helm3TestHook, manifest.Helm2TestSuccessHook)
+
+		return diff.Manifests(currentSpecs, newSpecs, &diff.Options{}, io.Discard), nil
+	}
+
+	return false, nil
 }
 
 // GetHelmRelease returns a Helm release if it exists.
@@ -561,4 +637,26 @@ func (c *HelmClient) RollbackHelmRelease(ctx context.Context, restConfig *rest.C
 	rollbackClient := helmAction.NewRollback(actionConfig)
 
 	return rollbackClient.Run(spec.ReleaseName)
+}
+
+func (r releaseDriftPostRenderer) Run(renderedManifests *bytes.Buffer) (modifiedManifests *bytes.Buffer, err error) {
+	fSys := filesys.MakeFsInMemory()
+	if err := fSys.WriteFile("kustomization.yaml", []byte(strings.Replace(releaseDriftKustomization, "$RELEASE_NAME", r.releaseName, 1))); err != nil {
+		return nil, err
+	}
+	if err := fSys.WriteFile("rendered-manifests.yaml", renderedManifests.Bytes()); err != nil {
+		return nil, err
+	}
+
+	kustomizer := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
+	m, err := kustomizer.Run(fSys, ".")
+	if err != nil {
+		return nil, err
+	}
+	yml, err := m.AsYaml()
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes.NewBuffer(yml), nil
 }
