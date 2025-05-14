@@ -48,7 +48,6 @@ var excludeCreateEventsPredicate = predicate.Funcs{
 	},
 	UpdateFunc: func(e event.UpdateEvent) bool {
 		return shouldFilteredByManager(e.ObjectNew.GetManagedFields())
-
 	},
 	DeleteFunc: func(e event.DeleteEvent) bool {
 		return shouldFilteredByManager(e.Object.GetManagedFields())
