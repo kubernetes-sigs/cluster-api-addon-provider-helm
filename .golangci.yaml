@@ -57,13 +57,13 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - stylecheck
-    - tenv
     - testableexamples
     - thelper
     - tparallel
     - unconvert
     - unparam
     - usestdlibvars
+    - usetesting
     - wastedassign
     - whitespace
 
