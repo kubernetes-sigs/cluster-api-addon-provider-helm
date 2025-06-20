@@ -105,7 +105,7 @@ _SKIP_ARGS := $(foreach arg,$(strip $(GINKGO_SKIP)),-skip="$(arg)")
 endif
 
 # Helper function to get dependency version from go.mod
-get_go_version = $(shell go list -f "{{.Version}}" -m $1)
+get_go_version = $(shell go list -m $1 | rev | cut -d' ' -f1 | rev)
 
 #
 # Binaries.
