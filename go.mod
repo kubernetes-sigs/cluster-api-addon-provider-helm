@@ -21,8 +21,8 @@ require (
 	k8s.io/component-base v0.31.3
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
-	sigs.k8s.io/cluster-api v1.9.6
-	sigs.k8s.io/cluster-api/test v1.9.6
+	sigs.k8s.io/cluster-api v1.9.9
+	sigs.k8s.io/cluster-api/test v1.9.9
 	sigs.k8s.io/controller-runtime v0.19.6
 )
 
@@ -47,7 +47,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
-	github.com/cloudflare/circl v1.3.7 // indirect
+	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/containerd v1.7.23 // indirect
 	github.com/containerd/errdefs v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -206,4 +206,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.6
+replace sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.9.9
