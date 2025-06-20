@@ -14,7 +14,7 @@
 - [Development guide](./docs/development.md)
 - [Project design outline](https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20220712-cluster-api-addon-orchestration.md)
 
-## ✨ What is Cluster API Add-on Provider for Helm?
+## ✨ What is the Cluster API Add-on Provider for Helm?
 
 Cluster API Add-on Provider for Helm extends Cluster API by managing the installation, configuration, upgrade, and deletion of cluster add-ons using Helm charts. CAAPH is based on the [Cluster API Add-on Orchestration Proposal](https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20220712-cluster-api-addon-orchestration.md), a larger effort to bring orchestration for add-ons to CAPI by using existing package management tools. 
 
