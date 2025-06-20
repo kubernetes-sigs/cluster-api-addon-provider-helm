@@ -1,0 +1,9 @@
+# Labels to add to all resources.
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/instance: $RELEASE_NAME
+    includeSelectors: false
+
+resources:
+  - rendered-manifests.yaml

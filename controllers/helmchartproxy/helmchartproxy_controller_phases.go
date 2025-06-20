@@ -233,6 +233,7 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	}
 
 	helmReleaseProxy.Spec.ReconcileStrategy = helmChartProxy.Spec.ReconcileStrategy
+	helmReleaseProxy.Spec.ReleaseDrift = helmChartProxy.Spec.ReleaseDrift
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
@@ -287,6 +288,9 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 		return true
 	case existing.Spec.ReleaseNamespace != helmChartProxy.Spec.ReleaseNamespace:
 		log.V(2).Info("ReleaseNamespace changed", "existing", existing.Spec.ReleaseNamespace, "helmChartProxy", helmChartProxy.Spec.ReleaseNamespace)
+		return true
+	case existing.Spec.ReleaseDrift != helmChartProxy.Spec.ReleaseDrift:
+		log.V(2).Info("ReleaseDrift changed", "existing", existing.Spec.ReleaseDrift, "helmChartProxy", helmChartProxy.Spec.ReleaseDrift)
 		return true
 	}
 
