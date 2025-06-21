@@ -82,7 +82,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Fetch the HelmChartProxy instance.
 	helmChartProxy := &addonsv1alpha1.HelmChartProxy{}
-	if err := r.Client.Get(ctx, req.NamespacedName, helmChartProxy); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, helmChartProxy); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(2).Info("HelmChartProxy resource not found, skipping reconciliation", "helmChartProxy", req.NamespacedName)
 			return ctrl.Result{}, nil
@@ -133,7 +133,7 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
-	if helmChartProxy.ObjectMeta.DeletionTimestamp.IsZero() {
+	if helmChartProxy.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
@@ -190,7 +190,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 	log.V(2).Info("Starting reconcileNormal for chart proxy", "name", helmChartProxy.Name, "strategy", helmChartProxy.Spec.ReconcileStrategy)
 
 	// If Reconcile strategy is not InstallOnce, delete orphaned HelmReleaseProxies
-	if !(helmChartProxy.Spec.ReconcileStrategy == string(addonsv1alpha1.ReconcileStrategyInstallOnce)) {
+	if helmChartProxy.Spec.ReconcileStrategy != string(addonsv1alpha1.ReconcileStrategyInstallOnce) {
 		err := r.deleteOrphanedHelmReleaseProxies(ctx, helmChartProxy, clusters, helmReleaseProxies)
 		if err != nil {
 			return err
@@ -199,7 +199,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	for _, cluster := range clusters {
 		// Don't reconcile if the Cluster is being deleted
-		if !cluster.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !cluster.DeletionTimestamp.IsZero() {
 			continue
 		}
 
@@ -258,7 +258,7 @@ func (r *HelmChartProxyReconciler) listClustersWithLabels(ctx context.Context, n
 		return nil, err
 	}
 
-	if err := r.Client.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: labelselector}); err != nil {
+	if err := r.List(ctx, clusterList, client.InNamespace(namespace), client.MatchingLabelsSelector{Selector: labelselector}); err != nil {
 		return nil, err
 	}
 
@@ -270,7 +270,7 @@ func (r *HelmChartProxyReconciler) listInstalledReleases(ctx context.Context, na
 	releaseList := &addonsv1alpha1.HelmReleaseProxyList{}
 
 	// TODO: should we use client.MatchingLabels or try to use the labelSelector itself?
-	if err := r.Client.List(ctx, releaseList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
+	if err := r.List(ctx, releaseList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 
@@ -352,7 +352,7 @@ func (r *HelmChartProxyReconciler) ClusterToHelmChartProxiesMapper(ctx context.C
 
 	// TODO: Figure out if we want this search to be cross-namespaces.
 
-	if err := r.Client.List(ctx, helmChartProxies, client.InNamespace(cluster.Namespace)); err != nil {
+	if err := r.List(ctx, helmChartProxies, client.InNamespace(cluster.Namespace)); err != nil {
 		return nil
 	}
 
@@ -390,7 +390,7 @@ func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object
 
 	// Check if the controller reference is already set and
 	// return an empty result when one is found.
-	for _, ref := range helmReleaseProxy.ObjectMeta.OwnerReferences {
+	for _, ref := range helmReleaseProxy.OwnerReferences {
 		if ref.Controller != nil && *ref.Controller {
 			name := client.ObjectKey{
 				Namespace: helmReleaseProxy.GetNamespace(),
