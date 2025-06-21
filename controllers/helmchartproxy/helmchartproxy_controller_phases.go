@@ -135,7 +135,7 @@ func (r *HelmChartProxyReconciler) getExistingHelmReleaseProxy(ctx context.Conte
 	// TODO: Figure out if we want this search to be cross-namespaces.
 
 	log.V(2).Info("Attempting to fetch existing HelmReleaseProxy with Cluster and HelmChartProxy labels", "cluster", cluster.Name, "helmChartProxy", helmChartProxy.Name)
-	if err := r.Client.List(ctx, helmReleaseProxyList, listOpts...); err != nil {
+	if err := r.List(ctx, helmReleaseProxyList, listOpts...); err != nil {
 		return nil, err
 	}
 
@@ -161,12 +161,12 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 		return nil
 	}
 	if existing == nil {
-		if err := r.Client.Create(ctx, helmReleaseProxy); err != nil {
+		if err := r.Create(ctx, helmReleaseProxy); err != nil {
 			return errors.Wrapf(err, "failed to create HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
 	} else {
 		// TODO: should this use patchHelmReleaseProxy() instead of Update() in case there's a race condition?
-		if err := r.Client.Update(ctx, helmReleaseProxy); err != nil {
+		if err := r.Update(ctx, helmReleaseProxy); err != nil {
 			return errors.Wrapf(err, "failed to update HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
 	}
@@ -178,7 +178,7 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 func (r *HelmChartProxyReconciler) deleteHelmReleaseProxy(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	if err := r.Client.Delete(ctx, helmReleaseProxy); err != nil {
+	if err := r.Delete(ctx, helmReleaseProxy); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(2).Info("HelmReleaseProxy already deleted, nothing to do", "helmReleaseProxy", helmReleaseProxy.Name)
 			return nil

@@ -101,7 +101,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Fetch the HelmReleaseProxy instance.
 	helmReleaseProxy := &addonsv1alpha1.HelmReleaseProxy{}
-	if err := r.Client.Get(ctx, req.NamespacedName, helmReleaseProxy); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, helmReleaseProxy); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(2).Info("HelmReleaseProxy resource not found, skipping reconciliation", "helmReleaseProxy", req.NamespacedName)
 			return ctrl.Result{}, nil
@@ -136,7 +136,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// examine DeletionTimestamp to determine if object is under deletion
-	if helmReleaseProxy.ObjectMeta.DeletionTimestamp.IsZero() {
+	if helmReleaseProxy.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
@@ -151,7 +151,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(helmReleaseProxy, addonsv1alpha1.HelmReleaseProxyFinalizer) {
 			// our finalizer is present, so lets handle any external dependency
-			if err := r.Client.Get(ctx, clusterKey, cluster); err == nil {
+			if err := r.Get(ctx, clusterKey, cluster); err == nil {
 				log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
 				restConfig, err := remote.RESTConfig(ctx, "caaph", r.Client, clusterKey)
 				if err != nil {
@@ -190,7 +190,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.Client.Get(ctx, clusterKey, cluster); err != nil {
+	if err := r.Get(ctx, clusterKey, cluster); err != nil {
 		// TODO: add check to tell if Cluster is deleted so we can remove the HelmReleaseProxy.
 		wrappedErr := errors.Wrapf(err, "failed to get cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
 		conditions.MarkFalse(helmReleaseProxy, addonsv1alpha1.ClusterAvailableCondition, addonsv1alpha1.GetClusterFailedReason, clusterv1.ConditionSeverityError, "%s", wrappedErr.Error())
@@ -446,7 +446,7 @@ func (r *HelmReleaseProxyReconciler) getCAFile(ctx context.Context, helmReleaseP
 // getCredentialsFromSecret returns the OCI credentials from a Secret.
 func (r *HelmReleaseProxyReconciler) getCredentialsFromSecret(ctx context.Context, name, namespace, key string) ([]byte, error) {
 	secret := &corev1.Secret{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
 		return nil, err
 	}
 
@@ -477,7 +477,7 @@ func writeCredentialsToFile(ctx context.Context, credentials []byte) (string, er
 // getCredentialsFromSecret returns the OCI credentials from a Secret.
 func (r *HelmReleaseProxyReconciler) getCACertificateFromSecret(ctx context.Context, name, namespace string) ([]byte, error) {
 	secret := &corev1.Secret{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
 		return nil, err
 	}
 
