@@ -213,7 +213,7 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 	installClient.ReleaseName = spec.ReleaseName
 
 	log.V(2).Info("Locating chart...")
-	cp, err := installClient.ChartPathOptions.LocateChart(chartName, settings)
+	cp, err := installClient.LocateChart(chartName, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, restConfig
 	upgradeClient.Namespace = spec.ReleaseNamespace
 
 	log.V(2).Info("Locating chart...")
-	cp, err := upgradeClient.ChartPathOptions.LocateChart(chartName, settings)
+	cp, err := upgradeClient.LocateChart(chartName, settings)
 	if err != nil {
 		return nil, err
 	}
