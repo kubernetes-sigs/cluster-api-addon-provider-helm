@@ -139,6 +139,7 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 	installClient.Atomic = helmOptions.Atomic
 	installClient.IncludeCRDs = helmOptions.Install.IncludeCRDs
 	installClient.CreateNamespace = helmOptions.Install.CreateNamespace
+	installClient.TakeOwnership = helmOptions.TakeOwnership
 
 	return installClient
 }
@@ -169,6 +170,7 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 	upgradeClient.ResetThenReuseValues = helmOptions.Upgrade.ResetThenReuseValues
 	upgradeClient.MaxHistory = helmOptions.Upgrade.MaxHistory
 	upgradeClient.CleanupOnFail = helmOptions.Upgrade.CleanupOnFail
+	upgradeClient.TakeOwnership = helmOptions.TakeOwnership
 
 	return upgradeClient
 }

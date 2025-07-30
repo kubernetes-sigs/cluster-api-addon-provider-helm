@@ -197,6 +197,12 @@ spec:
                       By default, CRDs are installed if not already present.
                       If set, no CRDs will be installed.
                     type: boolean
+                  takeOwnership:
+                    description: TakeOwnership represents CLI --take-ownership flag
+                      passed to Helm upgrade or install operation. If set, install
+                      will ignore the check for helm annotations and take ownership
+                      of the existing resources
+                    type: boolean
                   timeout:
                     description: |-
                       Timeout is the time to wait for any individual Kubernetes operation (like
