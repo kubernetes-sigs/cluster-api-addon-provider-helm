@@ -159,6 +159,10 @@ type HelmOptions struct {
 	// +kubebuilder:default=false
 	// +optional
 	EnableClientCache bool `json:"enableClientCache,omitempty"`
+
+	// TakeOwnership represents CLI --take-ownership flag passed to Helm upgrade or install operation. If set, install will ignore the check for helm annotations and take ownership of the existing resources
+	// +optional
+	TakeOwnership bool `json:"takeOwnership,omitempty"`
 }
 
 type HelmInstallOptions struct {
