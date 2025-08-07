@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -37,6 +37,8 @@ var helmchartproxylog = logf.Log.WithName("helmchartproxy-resource")
 func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(r).
+		WithValidator(r).
 		Complete()
 }
 
@@ -44,12 +46,10 @@ func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 //+kubebuilder:webhook:path=/mutate-addons-cluster-x-k8s-io-v1alpha1-helmchartproxy,mutating=true,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=create;update,versions=v1alpha1,name=helmchartproxy.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &HelmChartProxy{}
-
 const helmTimeout = 10 * time.Minute
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type.
-func (p *HelmChartProxy) Default() {
+func (p *HelmChartProxy) Default(_ context.Context, _ runtime.Object) error {
 	helmchartproxylog.Info("default", "name", p.Name)
 
 	if p.Spec.ReleaseNamespace == "" {
@@ -64,15 +64,15 @@ func (p *HelmChartProxy) Default() {
 	if p.Spec.Options.Timeout == nil {
 		p.Spec.Options.Timeout = &metav1.Duration{Duration: helmTimeout}
 	}
+
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-addons-cluster-x-k8s-io-v1alpha1-helmchartproxy,mutating=false,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=create;update,versions=v1alpha1,name=vhelmchartproxy.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &HelmChartProxy{}
-
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
+func (p *HelmChartProxy) ValidateCreate(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate create", "name", p.Name)
 
 	if err := isUrlValid(p.Spec.RepoURL); err != nil {
@@ -83,7 +83,7 @@ func (p *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmChartProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
+func (p *HelmChartProxy) ValidateUpdate(_ context.Context, _ runtime.Object, oldRaw runtime.Object) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate update", "name", p.Name)
 
 	var allErrs field.ErrorList
@@ -114,7 +114,7 @@ func (p *HelmChartProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnin
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
+func (p *HelmChartProxy) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate delete", "name", p.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
