@@ -463,6 +463,11 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 		return true, nil
 	}
 
+	if existing.Info.Status == helmRelease.StatusPendingInstall || existing.Info.Status == helmRelease.StatusPendingUpgrade {
+		log.Info("Release is in a pending state, upgrading")
+		return true, nil
+	}
+
 	klog.V(2).Infof("Diff between values is:\n%s", cmp.Diff(existing.Config, values))
 
 	// TODO: Comparing yaml is not ideal, but it's the best we can do since DeepEquals fails. This is because int64 types
