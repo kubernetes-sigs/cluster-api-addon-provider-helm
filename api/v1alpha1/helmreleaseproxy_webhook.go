@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -33,89 +34,113 @@ import (
 var helmreleaseproxylog = logf.Log.WithName("helmreleaseproxy-resource")
 
 func (r *HelmReleaseProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	w := new(helmReleaseProxyWebhook)
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
 //+kubebuilder:webhook:path=/mutate-addons-cluster-x-k8s-io-v1alpha1-helmreleaseproxy,mutating=true,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=create;update,versions=v1alpha1,name=helmreleaseproxy.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &HelmReleaseProxy{}
+type helmReleaseProxyWebhook struct{}
+
+var (
+	_ webhook.CustomValidator = &helmReleaseProxyWebhook{}
+	_ webhook.CustomDefaulter = &helmReleaseProxyWebhook{}
+)
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type.
-func (p *HelmReleaseProxy) Default() {
-	helmreleaseproxylog.Info("default", "name", p.Name)
-
-	if p.Spec.ReleaseNamespace == "" {
-		p.Spec.ReleaseNamespace = "default"
+func (*helmReleaseProxyWebhook) Default(_ context.Context, objRaw runtime.Object) error {
+	obj, ok := objRaw.(*HelmReleaseProxy)
+	if !ok {
+		return apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", objRaw))
 	}
+	helmreleaseproxylog.Info("default", "name", obj.Name)
+
+	if obj.Spec.ReleaseNamespace == "" {
+		obj.Spec.ReleaseNamespace = "default"
+	}
+
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-addons-cluster-x-k8s-io-v1alpha1-helmreleaseproxy,mutating=false,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=create;update,versions=v1alpha1,name=vhelmreleaseproxy.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &HelmReleaseProxy{}
-
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmReleaseProxy) ValidateCreate() (admission.Warnings, error) {
-	helmreleaseproxylog.Info("validate create", "name", p.Name)
+func (*helmReleaseProxyWebhook) ValidateCreate(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
+	newObj, ok := objRaw.(*HelmReleaseProxy)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", objRaw))
+	}
+
+	helmreleaseproxylog.Info("validate create", "name", newObj.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmReleaseProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
-	helmreleaseproxylog.Info("validate update", "name", p.Name)
-
+func (*helmReleaseProxyWebhook) ValidateUpdate(_ context.Context, oldRaw, newRaw runtime.Object) (admission.Warnings, error) {
 	var allErrs field.ErrorList
-	old, ok := oldRaw.(*HelmReleaseProxy)
+	oldObj, ok := oldRaw.(*HelmReleaseProxy)
 	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", old))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", oldRaw))
+	}
+	newObj, ok := newRaw.(*HelmReleaseProxy)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", newRaw))
 	}
 
-	if !reflect.DeepEqual(p.Spec.RepoURL, old.Spec.RepoURL) {
+	helmreleaseproxylog.Info("validate update", "name", newObj.Name)
+
+	if !reflect.DeepEqual(newObj.Spec.RepoURL, oldObj.Spec.RepoURL) {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "RepoURL"),
-				p.Spec.RepoURL, "field is immutable"),
+				newObj.Spec.RepoURL, "field is immutable"),
 		)
 	}
 
-	if !reflect.DeepEqual(p.Spec.ChartName, old.Spec.ChartName) {
+	if !reflect.DeepEqual(newObj.Spec.ChartName, oldObj.Spec.ChartName) {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "ChartName"),
-				p.Spec.ChartName, "field is immutable"),
+				newObj.Spec.ChartName, "field is immutable"),
 		)
 	}
 
-	if !reflect.DeepEqual(p.Spec.ReleaseNamespace, old.Spec.ReleaseNamespace) {
+	if !reflect.DeepEqual(newObj.Spec.ReleaseNamespace, oldObj.Spec.ReleaseNamespace) {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "ReleaseNamespace"),
-				p.Spec.ReleaseNamespace, "field is immutable"),
+				newObj.Spec.ReleaseNamespace, "field is immutable"),
 		)
 	}
 
-	if p.Spec.ReconcileStrategy != old.Spec.ReconcileStrategy {
+	if newObj.Spec.ReconcileStrategy != oldObj.Spec.ReconcileStrategy {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "ReconcileStrategy"),
-				p.Spec.ReconcileStrategy, "field is immutable"),
+				newObj.Spec.ReconcileStrategy, "field is immutable"),
 		)
 	}
 
 	// TODO: add webhook for ReleaseName. Currently it's being set if the release name is generated.
 
 	if len(allErrs) > 0 {
-		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmReleaseProxy").GroupKind(), p.Name, allErrs)
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmReleaseProxy").GroupKind(), newObj.Name, allErrs)
 	}
 
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (r *HelmReleaseProxy) ValidateDelete() (admission.Warnings, error) {
-	helmreleaseproxylog.Info("validate delete", "name", r.Name)
+func (*helmReleaseProxyWebhook) ValidateDelete(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
+	obj, ok := objRaw.(*HelmReleaseProxy)
+	if !ok {
+		return nil, fmt.Errorf("expected a HelmReleaseProxy object but got %T", objRaw)
+	}
+	helmreleaseproxylog.Info("validate delete", "name", obj.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil

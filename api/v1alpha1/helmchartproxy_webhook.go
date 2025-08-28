@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"time"
@@ -35,47 +36,62 @@ import (
 var helmchartproxylog = logf.Log.WithName("helmchartproxy-resource")
 
 func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	w := new(helmChartProxyWebhook)
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(w).
+		WithValidator(w).
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
 //+kubebuilder:webhook:path=/mutate-addons-cluster-x-k8s-io-v1alpha1-helmchartproxy,mutating=true,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=create;update,versions=v1alpha1,name=helmchartproxy.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &HelmChartProxy{}
+type helmChartProxyWebhook struct{}
+
+var (
+	_ webhook.CustomValidator = &helmChartProxyWebhook{}
+	_ webhook.CustomDefaulter = &helmChartProxyWebhook{}
+)
 
 const helmTimeout = 10 * time.Minute
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type.
-func (p *HelmChartProxy) Default() {
-	helmchartproxylog.Info("default", "name", p.Name)
+func (*helmChartProxyWebhook) Default(_ context.Context, objRaw runtime.Object) error {
+	newObj, ok := objRaw.(*HelmChartProxy)
+	if !ok {
+		return apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", objRaw))
+	}
+	helmchartproxylog.Info("default", "name", newObj.Name)
 
-	if p.Spec.ReleaseNamespace == "" {
-		p.Spec.ReleaseNamespace = "default"
+	if newObj.Spec.ReleaseNamespace == "" {
+		newObj.Spec.ReleaseNamespace = "default"
 	}
 
-	if p.Spec.Options.Atomic {
-		p.Spec.Options.Wait = true
+	if newObj.Spec.Options.Atomic {
+		newObj.Spec.Options.Wait = true
 	}
 
 	// Note: timeout is also needed to ensure that Spec.Options.Wait works.
-	if p.Spec.Options.Timeout == nil {
-		p.Spec.Options.Timeout = &metav1.Duration{Duration: helmTimeout}
+	if newObj.Spec.Options.Timeout == nil {
+		newObj.Spec.Options.Timeout = &metav1.Duration{Duration: helmTimeout}
 	}
+
+	return nil
 }
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-addons-cluster-x-k8s-io-v1alpha1-helmchartproxy,mutating=false,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=create;update,versions=v1alpha1,name=vhelmchartproxy.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &HelmChartProxy{}
-
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
-	helmchartproxylog.Info("validate create", "name", p.Name)
+func (*helmChartProxyWebhook) ValidateCreate(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
+	newObj, ok := objRaw.(*HelmChartProxy)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", objRaw))
+	}
 
-	if err := isUrlValid(p.Spec.RepoURL); err != nil {
+	helmchartproxylog.Info("validate create", "name", newObj.Name)
+
+	if err := isUrlValid(newObj.Spec.RepoURL); err != nil {
 		return nil, err
 	}
 
@@ -83,39 +99,48 @@ func (p *HelmChartProxy) ValidateCreate() (admission.Warnings, error) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmChartProxy) ValidateUpdate(oldRaw runtime.Object) (admission.Warnings, error) {
-	helmchartproxylog.Info("validate update", "name", p.Name)
-
+func (*helmChartProxyWebhook) ValidateUpdate(_ context.Context, oldRaw, newRaw runtime.Object) (admission.Warnings, error) {
 	var allErrs field.ErrorList
-	old, ok := oldRaw.(*HelmChartProxy)
+	oldObj, ok := oldRaw.(*HelmChartProxy)
 	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", old))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", oldRaw))
+	}
+	newObj, ok := newRaw.(*HelmChartProxy)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", newRaw))
 	}
 
-	if err := isUrlValid(p.Spec.RepoURL); err != nil {
+	helmchartproxylog.Info("validate update", "name", newObj.Name)
+
+	if err := isUrlValid(newObj.Spec.RepoURL); err != nil {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "RepoURL"),
-				p.Spec.ReleaseNamespace, err.Error()),
+				newObj.Spec.ReleaseNamespace, err.Error()),
 		)
 	}
 
-	if p.Spec.ReconcileStrategy != old.Spec.ReconcileStrategy {
+	if newObj.Spec.ReconcileStrategy != oldObj.Spec.ReconcileStrategy {
 		allErrs = append(allErrs,
 			field.Invalid(field.NewPath("spec", "ReconcileStrategy"),
-				p.Spec.ReconcileStrategy, "field is immutable"),
+				newObj.Spec.ReconcileStrategy, "field is immutable"),
 		)
 	}
 
 	if len(allErrs) > 0 {
-		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmChartProxy").GroupKind(), p.Name, allErrs)
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmChartProxy").GroupKind(), newObj.Name, allErrs)
 	}
 
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (p *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
-	helmchartproxylog.Info("validate delete", "name", p.Name)
+func (*helmChartProxyWebhook) ValidateDelete(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
+	obj, ok := objRaw.(*HelmChartProxy)
+	if !ok {
+		return nil, fmt.Errorf("expected a HelmChartProxy object but got %T", objRaw)
+	}
+
+	helmchartproxylog.Info("validate delete", "name", obj.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil
@@ -123,8 +148,7 @@ func (p *HelmChartProxy) ValidateDelete() (admission.Warnings, error) {
 
 // isUrlValid returns true if specified repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.
 func isUrlValid(repoURL string) error {
-	_, err := url.ParseRequestURI(repoURL)
-	if err != nil {
+	if _, err := url.ParseRequestURI(repoURL); err != nil {
 		return fmt.Errorf("specified repoURL %s is not valid: %w", repoURL, err)
 	}
 
