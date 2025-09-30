@@ -529,7 +529,7 @@ RELEASE_NOTES_DIR := _releasenotes
 GIT_REPO_NAME ?= cluster-api-addon-provider-helm
 GIT_ORG_NAME ?= kubernetes-sigs
 USER_FORK ?= $(shell git config --get remote.origin.url | cut -d/ -f4) # only works on https://github.com/<username>/cluster-api-addon-provider-helm.git style URLs
-ifdef USER_FORK
+ifeq ($(USER_FORK),)
 USER_FORK := $(shell git config --get remote.origin.url | cut -d: -f2 | cut -d/ -f1) # for git@github.com:<username>/cluster-api-addon-provider-helm.git style URLs
 endif
 IMAGE_REVIEWERS ?= $(shell ./hack/get-project-maintainers.sh)
