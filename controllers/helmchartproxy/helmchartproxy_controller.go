@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -236,10 +235,9 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				rltMeta.hrpExists = true
 			}
 
-			hrpReadyCond := conditions.Get(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition)
 			// If HelmReleaseProxiesReadyCondition is false, reconcile existing
 			// HelmReleaseProxies and exit.
-			if hrpReadyCond != nil && (hrpReadyCond.Status == corev1.ConditionFalse) {
+			if conditions.IsFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition) {
 				for _, hrpRltMeta := range clusterRolloutMeta {
 					if hrpRltMeta.hrpExists {
 						// Don't reconcile if the Cluster is being deleted
