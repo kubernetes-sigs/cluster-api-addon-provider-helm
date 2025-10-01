@@ -240,11 +240,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			if conditions.IsFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition) {
 				for _, hrpRltMeta := range clusterRolloutMeta {
 					if hrpRltMeta.hrpExists {
-						// Don't reconcile if the Cluster is being deleted
-						if !hrpRltMeta.cluster.DeletionTimestamp.IsZero() {
-							continue
-						}
-
 						err := r.reconcileForCluster(ctx, helmChartProxy, hrpRltMeta.cluster)
 						if err != nil {
 							return err
@@ -272,12 +267,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				if hrpRltMeta.hrpExists {
 					continue
 				}
-
-				// Don't reconcile if the Cluster is being deleted
-				if !hrpRltMeta.cluster.DeletionTimestamp.IsZero() {
-					continue
-				}
-
 				err := r.reconcileForCluster(ctx, helmChartProxy, hrpRltMeta.cluster)
 				if err != nil {
 					return err
@@ -304,11 +293,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	// Continue with reconciling for all clusters after initial rollout.
 	for _, cluster := range clusters {
-		// Don't reconcile if the Cluster is being deleted
-		if !cluster.DeletionTimestamp.IsZero() {
-			continue
-		}
-
 		err := r.reconcileForCluster(ctx, helmChartProxy, cluster)
 		if err != nil {
 			return err
