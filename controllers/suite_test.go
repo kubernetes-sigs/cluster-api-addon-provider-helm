@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmchartproxy"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal/mocks"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -109,7 +109,7 @@ var _ = BeforeSuite(func() {
 	err = clusterv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

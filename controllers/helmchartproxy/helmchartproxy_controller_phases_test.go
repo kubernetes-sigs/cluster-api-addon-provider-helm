@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -280,9 +280,9 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(6443)),
-				Pods: &clusterv1.NetworkRanges{
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(6443),
+				Pods: clusterv1.NetworkRanges{
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
 			},
@@ -299,9 +299,9 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(1234)),
-				Pods: &clusterv1.NetworkRanges{
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(1234),
+				Pods: clusterv1.NetworkRanges{
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
 			},
@@ -318,13 +318,13 @@ var (
 			Namespace: "test-namespace",
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(1234)),
-				Pods: &clusterv1.NetworkRanges{
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(1234),
+				Pods: clusterv1.NetworkRanges{
 					CIDRBlocks: []string{"10.0.0.0/16", "20.0.0.0/16"},
 				},
 			},
-			Paused: true,
+			Paused: ptr.To(true),
 		},
 	}
 
@@ -464,9 +464,8 @@ func TestReconcileForCluster(t *testing.T) {
 			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				specsReady := conditions.Get(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)
-				g.Expect(specsReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(specsReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(specsReady.Reason).To(Equal(addonsv1alpha1.ValueParsingFailedReason))
-				g.Expect(specsReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
 				g.Expect(specsReady.Message).To(Equal("failed to parse values on cluster test-cluster: template: test-chart-name-test-cluster:1: bad character U+002D '-'"))
 			},
 			expectedError: "failed to parse values on cluster test-cluster: template: test-chart-name-test-cluster:1: bad character U+002D '-'",
@@ -480,9 +479,8 @@ func TestReconcileForCluster(t *testing.T) {
 			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				specsReady := conditions.Get(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)
-				g.Expect(specsReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(specsReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(specsReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseProxyReinstallingReason))
-				g.Expect(specsReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 				g.Expect(specsReady.Message).To(Equal(fmt.Sprintf("HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", fakeCluster1.Name)))
 			},
 			expectedError: "",
@@ -528,9 +526,8 @@ func TestReconcileForCluster(t *testing.T) {
 			expect: func(g *WithT, hcp *addonsv1alpha1.HelmChartProxy, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				specsReady := conditions.Get(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)
-				g.Expect(specsReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(specsReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(specsReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseProxyReinstallingReason))
-				g.Expect(specsReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 				g.Expect(specsReady.Message).To(Equal(fmt.Sprintf("HelmReleaseProxy on cluster '%s' successfully deleted, preparing to reinstall", fakeCluster1.Name)))
 			},
 			expectedError: "",
