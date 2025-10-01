@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -83,6 +84,14 @@ type HelmChartProxySpec struct {
 	// +kubebuilder:validation:Enum="";InstallOnce;Continuous;
 	// +optional
 	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
+
+	// RolloutStepSize is an opt-in feature that defines the step size during
+	// initial rollout of HelmReleaseProxy resources on matching clusters.
+	// Once all existing HelmReleaseProxy resources are ready=true, the next
+	// batch of HelmReleaseProxy resources are reconciled.
+	// If undefined, will default to creating HelmReleaseProxy resources for all
+	// matching clusters.
+	RolloutStepSize *intstr.IntOrString `json:"rolloutStepSize,omitempty"`
 
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
@@ -286,6 +295,17 @@ func (c *HelmChartProxy) GetConditions() clusterv1.Conditions {
 // SetConditions will set the given conditions on an HelmChartProxy object.
 func (c *HelmChartProxy) SetConditions(conditions clusterv1.Conditions) {
 	c.Status.Conditions = conditions
+}
+
+func (c *HelmChartProxy) GetHelmReleaseProxyReadyCondition() *clusterv1.Condition {
+	cnds := c.GetConditions()
+	for _, cnd := range cnds {
+		if cnd.Type == HelmReleaseProxiesReadyCondition {
+			return &cnd
+		}
+	}
+
+	return nil
 }
 
 // SetMatchingClusters will set the given list of matching clusters on an HelmChartProxy object.
