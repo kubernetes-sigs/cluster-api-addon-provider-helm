@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/rest"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal/mocks"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -101,18 +101,18 @@ var (
 		Status: addonsv1alpha1.HelmReleaseProxyStatus{
 			Status:   string(helmRelease.StatusDeployed),
 			Revision: 1,
-			Conditions: clusterv1.Conditions{
+			Conditions: []metav1.Condition{
 				{
 					Type:   addonsv1alpha1.HelmReleaseReadyCondition,
-					Status: corev1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 				},
 				{
 					Type:   addonsv1alpha1.ClusterAvailableCondition,
-					Status: corev1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 				},
 				{
 					Type:   clusterv1.ReadyCondition,
-					Status: corev1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -345,9 +345,8 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusPendingInstall))
 
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
-				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmReleasePendingReason))
-				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 			},
 			expectedError: "",
 		},
@@ -362,9 +361,8 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
-				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmInstallOrUpgradeFailedReason))
-				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
 				g.Expect(releaseReady.Message).To(Equal(errInternal.Error()))
 			},
 			expectedError: errInternal.Error(),
@@ -386,10 +384,9 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
-				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmInstallOrUpgradeFailedReason))
-				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
-				g.Expect(releaseReady.Message).To(Equal(fmt.Sprintf("Helm release failed: %s", helmRelease.StatusFailed)))
+				g.Expect(releaseReady.Message).To(Equal(fmt.Sprintf("Helm release is in a failed state: %s", helmRelease.StatusFailed)))
 			},
 			expectedError: "",
 		},
@@ -626,9 +623,8 @@ func TestReconcileDelete(t *testing.T) {
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
-				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseDeletedReason))
-				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 			},
 			expectedError: "",
 		},
@@ -641,9 +637,8 @@ func TestReconcileDelete(t *testing.T) {
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
-				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseDeletedReason))
-				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityInfo))
 			},
 			expectedError: "",
 		},
@@ -656,9 +651,8 @@ func TestReconcileDelete(t *testing.T) {
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
-				g.Expect(releaseReady.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmReleaseGetFailedReason))
-				g.Expect(releaseReady.Severity).To(Equal(clusterv1.ConditionSeverityError))
 			},
 			expectedError: errInternal.Error(),
 		},
