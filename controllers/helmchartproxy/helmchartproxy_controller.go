@@ -218,7 +218,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			conditions.MarkFalse(
 				helmChartProxy,
 				addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition,
-				addonsv1alpha1.HelmReleaseProxiesRolloutNotReady,
+				addonsv1alpha1.HelmReleaseProxiesRolloutNotCompleteReason,
 				clusterv1.ConditionSeverityInfo,
 				"%d Helm release proxies not yet rolled out",
 				len(clusters)-len(helmReleaseProxies),
@@ -297,9 +297,9 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		conditions.MarkTrueWithNegativePolarity(
 			helmChartProxy,
 			addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition,
-			addonsv1alpha1.HelmReleaseProxiesRolloutUndefined,
+			addonsv1alpha1.HelmReleaseProxiesRolloutUndefinedReason,
 			clusterv1.ConditionSeverityInfo,
-			"HelmChartProxy does not use Rollout Step Size",
+			"HelmChartProxy does not use rollout step",
 		)
 	}
 

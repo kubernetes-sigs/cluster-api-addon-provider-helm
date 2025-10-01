@@ -42,13 +42,13 @@ const (
 	// ClusterSelectionFailedReason indicates that the HelmChartProxy controller failed to select the workload Clusters.
 	ClusterSelectionFailedReason = "ClusterSelectionFailed"
 
-	// HelmReleaseProxiesRolloutNotReady indicates that the initial rollout
+	// HelmReleaseProxiesRolloutNotCompleteReason indicates that the initial rollout
 	// of HelmReleaseProxies has not been completed.
-	HelmReleaseProxiesRolloutNotReady = "HelmReleaseProxiesRolloutNotReady"
+	HelmReleaseProxiesRolloutNotCompleteReason = "HelmReleaseProxiesRolloutNotComplete"
 
-	// HelmReleaseProxiesRolloutUndefined indicates that HelmChartProxy doesn't
+	// HelmReleaseProxiesRolloutUndefinedReason indicates that HelmChartProxy doesn't
 	// use Rollout Step Size to reconcile HelmReleaseProxies.
-	HelmReleaseProxiesRolloutUndefined = "HelmReleaseProxiesRolloutUndefined"
+	HelmReleaseProxiesRolloutUndefinedReason = "HelmReleaseProxiesRolloutUndefined"
 
 	// HelmReleaseProxiesReadyCondition indicates that the HelmReleaseProxies are ready, meaning that the Helm installation, upgrade
 	// or deletion is complete.
