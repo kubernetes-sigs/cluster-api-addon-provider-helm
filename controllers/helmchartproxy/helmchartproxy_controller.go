@@ -236,7 +236,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				rltMeta.hrpExists = true
 			}
 
-			hrpReadyCond := helmChartProxy.GetHelmReleaseProxyReadyCondition()
+			hrpReadyCond := conditions.Get(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition)
 			// If HelmReleaseProxiesReadyCondition is false, reconcile existing
 			// HelmReleaseProxies and exit.
 			if hrpReadyCond != nil && (hrpReadyCond.Status == corev1.ConditionFalse) {

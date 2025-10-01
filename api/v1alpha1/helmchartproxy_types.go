@@ -297,17 +297,6 @@ func (c *HelmChartProxy) SetConditions(conditions clusterv1.Conditions) {
 	c.Status.Conditions = conditions
 }
 
-func (c *HelmChartProxy) GetHelmReleaseProxyReadyCondition() *clusterv1.Condition {
-	cnds := c.GetConditions()
-	for _, cnd := range cnds {
-		if cnd.Type == HelmReleaseProxiesReadyCondition {
-			return &cnd
-		}
-	}
-
-	return nil
-}
-
 // SetMatchingClusters will set the given list of matching clusters on an HelmChartProxy object.
 func (c *HelmChartProxy) SetMatchingClusters(clusterList []clusterv1.Cluster) {
 	matchingClusters := make([]corev1.ObjectReference, 0, len(clusterList))
