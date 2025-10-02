@@ -18,6 +18,7 @@ package helmchartproxy
 
 import (
 	"context"
+	"slices"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -225,22 +226,52 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 			// Identifies clusters by their NamespacedName and gathers their
 			// helmReleaseProxyRolloutMeta.
-			clusterRolloutMeta := map[string]*helmReleaseProxyRolloutMeta{}
-			for _, cls := range clusters {
-				clusterRolloutMeta[types.NamespacedName{Namespace: cls.Namespace, Name: cls.Name}.String()] = &helmReleaseProxyRolloutMeta{cluster: cls}
+			clusterNnRolloutMeta := map[string]*helmReleaseProxyRolloutMeta{}
+			for _, c := range clusters {
+				nn := getNnStringFor(c.Namespace, c.Name)
+				clusterNnRolloutMeta[nn] = &helmReleaseProxyRolloutMeta{
+					cluster: c,
+				}
 			}
-			for _, hrp := range helmReleaseProxies {
-				hrpClsRef := hrp.Spec.ClusterRef
-				rltMeta := clusterRolloutMeta[types.NamespacedName{Namespace: hrpClsRef.Namespace, Name: hrpClsRef.Name}.String()]
-				rltMeta.hrpExists = true
+			for _, h := range helmReleaseProxies {
+				ref := h.Spec.ClusterRef
+				nn := getNnStringFor(ref.Namespace, ref.Name)
+				meta := clusterNnRolloutMeta[nn]
+				meta.hrpExists = true
 			}
+
+			// Sort helmReleaseProxy rollout metadata by cluster namespaced name to
+			// ensure orderliness.
+			rolloutMetaSorted := make([]*helmReleaseProxyRolloutMeta, len(clusterNnRolloutMeta))
+			i := 0
+			for _, m := range clusterNnRolloutMeta {
+				rolloutMetaSorted[i] = m
+				i++
+			}
+			for m := range clusterNnRolloutMeta {
+				delete(clusterNnRolloutMeta, m)
+			}
+
+			slices.SortStableFunc(rolloutMetaSorted, func(a, b *helmReleaseProxyRolloutMeta) int {
+				nnA := getNnStringFor(a.cluster.Namespace, a.cluster.Name)
+				nnB := getNnStringFor(b.cluster.Namespace, b.cluster.Name)
+				if nnA < nnB {
+					return -1
+				}
+
+				if nnA > nnB {
+					return 1
+				}
+
+				return 0
+			})
 
 			// If HelmReleaseProxiesReadyCondition is false, reconcile existing
 			// HelmReleaseProxies and exit.
 			if conditions.IsFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition) {
-				for _, hrpRltMeta := range clusterRolloutMeta {
-					if hrpRltMeta.hrpExists {
-						err := r.reconcileForCluster(ctx, helmChartProxy, hrpRltMeta.cluster)
+				for _, meta := range rolloutMetaSorted {
+					if meta.hrpExists {
+						err := r.reconcileForCluster(ctx, helmChartProxy, meta.cluster)
 						if err != nil {
 							return err
 						}
@@ -257,17 +288,17 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			if err != nil {
 				return err
 			}
-			for _, hrpRltMeta := range clusterRolloutMeta {
+			for _, meta := range rolloutMetaSorted {
 				// The next batch of helmReleaseProxies have been reconciled.
 				if count >= stepSize {
 					return nil
 				}
 
 				// Skip reconciling the cluster if its HelmReleaseProxy already exists.
-				if hrpRltMeta.hrpExists {
+				if meta.hrpExists {
 					continue
 				}
-				err := r.reconcileForCluster(ctx, helmChartProxy, hrpRltMeta.cluster)
+				err := r.reconcileForCluster(ctx, helmChartProxy, meta.cluster)
 				if err != nil {
 					return err
 				}
@@ -498,4 +529,9 @@ func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object
 	}
 
 	return nil
+}
+
+// getNnStringFor to retrieve the namespaced name as a string.
+func getNnStringFor(namespace, name string) string {
+	return types.NamespacedName{Namespace: namespace, Name: name}.String()
 }
