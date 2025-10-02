@@ -57,6 +57,11 @@ func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.
 
 // reconcileForCluster will create or update a HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster clusterv1.Cluster) error {
+	// Don't reconcile if the Cluster is being deleted
+	if !cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	log := ctrl.LoggerFrom(ctx)
 
 	// Don't reconcile if the Cluster or the helmChartProxy is paused.
