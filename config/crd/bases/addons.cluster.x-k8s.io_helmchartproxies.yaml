@@ -284,12 +284,12 @@ spec:
                 - type: integer
                 - type: string
                 description: |-
-                  RolloutStepSize is an opt-in feature that defines the step size during
-                  initial rollout of HelmReleaseProxy resources on matching clusters.
-                  Once all existing HelmReleaseProxy resources are ready=true, the next
-                  batch of HelmReleaseProxy resources are reconciled.
-                  If undefined, will default to creating HelmReleaseProxy resources for all
-                  matching clusters.
+                  RolloutStepSize is an opt-in feature that defines a step size during the
+                  initial rollout of HelmReleaseProxies on matching clusters. Once all
+                  rolled out HelmReleaseProxy resources are ready=true, the next batch of
+                  HelmReleaseProxy resources are reconciled. If undefined, will default to
+                  creating HelmReleaseProxy resources for all matching clusters.
+                  e.g. an int (5) or percentage of count of total matching clusters (25%)
                 x-kubernetes-int-or-string: true
               tlsConfig:
                 description: TLSConfig contains the TLS configuration for a HelmChartProxy.
