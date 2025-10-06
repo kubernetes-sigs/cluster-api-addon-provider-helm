@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -106,6 +107,11 @@ func (in *HelmChartProxyList) DeepCopyObject() runtime.Object {
 func (in *HelmChartProxySpec) DeepCopyInto(out *HelmChartProxySpec) {
 	*out = *in
 	in.ClusterSelector.DeepCopyInto(&out.ClusterSelector)
+	if in.RolloutStepSize != nil {
+		in, out := &in.RolloutStepSize, &out.RolloutStepSize
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	in.Options.DeepCopyInto(&out.Options)
 	if in.Credentials != nil {
 		in, out := &in.Credentials, &out.Credentials

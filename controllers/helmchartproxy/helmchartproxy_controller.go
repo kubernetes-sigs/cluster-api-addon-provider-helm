@@ -18,12 +18,15 @@ package helmchartproxy
 
 import (
 	"context"
+	"slices"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -43,6 +46,15 @@ type HelmChartProxyReconciler struct {
 
 	// WatchFilterValue is the label value used to filter events prior to reconciliation.
 	WatchFilterValue string
+}
+
+// helmReleaseProxyRolloutMeta is used to gather HelmReleaseProxy  rollout
+// metadata for matching clusters.
+type helmReleaseProxyRolloutMeta struct {
+	cluster clusterv1.Cluster
+
+	// Identifies whether HelmReleaseProxy exists for the cluster.
+	hrpExists bool
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -197,12 +209,121 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 		}
 	}
 
-	for _, cluster := range clusters {
-		// Don't reconcile if the Cluster is being deleted
-		if !cluster.DeletionTimestamp.IsZero() {
-			continue
-		}
+	// RolloutStepSize is defined; check if count of HelmReleaseProxies matches
+	// the count of matching clusters.
+	if helmChartProxy.Spec.RolloutStepSize != nil {
+		if len(clusters) != len(helmReleaseProxies) {
+			// Set HelmReleaseProxiesRolloutCompletedCondition to false as
+			// HelmReleaseProxies are being rolled out.
+			conditions.MarkFalse(
+				helmChartProxy,
+				addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition,
+				addonsv1alpha1.HelmReleaseProxiesRolloutNotCompleteReason,
+				clusterv1.ConditionSeverityInfo,
+				"%d Helm release proxies not yet rolled out",
+				len(clusters)-len(helmReleaseProxies),
+			)
 
+			// Identifies clusters by their NamespacedName and gathers their
+			// helmReleaseProxyRolloutMeta.
+			clusterNnRolloutMeta := map[string]*helmReleaseProxyRolloutMeta{}
+			for _, c := range clusters {
+				nn := getNnStringFor(c.Namespace, c.Name)
+				clusterNnRolloutMeta[nn] = &helmReleaseProxyRolloutMeta{
+					cluster: c,
+				}
+			}
+			for _, h := range helmReleaseProxies {
+				ref := h.Spec.ClusterRef
+				nn := getNnStringFor(ref.Namespace, ref.Name)
+				meta := clusterNnRolloutMeta[nn]
+				meta.hrpExists = true
+			}
+
+			// Sort helmReleaseProxy rollout metadata by cluster namespaced name to
+			// ensure orderliness.
+			rolloutMetaSorted := make([]*helmReleaseProxyRolloutMeta, len(clusterNnRolloutMeta))
+			i := 0
+			for _, m := range clusterNnRolloutMeta {
+				rolloutMetaSorted[i] = m
+				i++
+			}
+			for m := range clusterNnRolloutMeta {
+				delete(clusterNnRolloutMeta, m)
+			}
+
+			slices.SortStableFunc(rolloutMetaSorted, func(a, b *helmReleaseProxyRolloutMeta) int {
+				nnA := getNnStringFor(a.cluster.Namespace, a.cluster.Name)
+				nnB := getNnStringFor(b.cluster.Namespace, b.cluster.Name)
+				if nnA < nnB {
+					return -1
+				}
+
+				if nnA > nnB {
+					return 1
+				}
+
+				return 0
+			})
+
+			// If HelmReleaseProxiesReadyCondition is false, reconcile existing
+			// HelmReleaseProxies and exit.
+			if conditions.IsFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition) {
+				for _, meta := range rolloutMetaSorted {
+					if meta.hrpExists {
+						err := r.reconcileForCluster(ctx, helmChartProxy, meta.cluster)
+						if err != nil {
+							return err
+						}
+					}
+				}
+
+				return nil
+			}
+
+			// HelmReleaseProxyReadyCondition is True; continue with reconciling the
+			// next batch of HelmReleaseProxies.
+			count := 0
+			stepSize, err := intstr.GetScaledValueFromIntOrPercent(helmChartProxy.Spec.RolloutStepSize, len(clusters), true)
+			if err != nil {
+				return err
+			}
+			for _, meta := range rolloutMetaSorted {
+				// The next batch of helmReleaseProxies have been reconciled.
+				if count >= stepSize {
+					return nil
+				}
+
+				// Skip reconciling the cluster if its HelmReleaseProxy already exists.
+				if meta.hrpExists {
+					continue
+				}
+				err := r.reconcileForCluster(ctx, helmChartProxy, meta.cluster)
+				if err != nil {
+					return err
+				}
+				count++
+			}
+
+			// In cases where the count of remaining HelmReleaseProxies to be rolled
+			// out is less than rollout step size.
+			return nil
+		}
+		// RolloutStepSize is defined and all HelmReleaseProxies have been rolled out.
+		conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)
+	} else {
+		// RolloutStepSize is undefined. Set HelmReleaseProxiesRolloutCompletedCondition to True with reason.
+		conditions.MarkTrueWithNegativePolarity(
+			helmChartProxy,
+			addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition,
+			addonsv1alpha1.HelmReleaseProxiesRolloutUndefinedReason,
+			clusterv1.ConditionSeverityInfo,
+			"HelmChartProxy does not use rollout step",
+		)
+	}
+
+	// Continue with reconciling for all clusters after initial rollout.
+	for _, cluster := range clusters {
 		err := r.reconcileForCluster(ctx, helmChartProxy, cluster)
 		if err != nil {
 			return err
@@ -321,6 +442,7 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 		conditions.WithConditions(
 			addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
 			addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+			addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition,
 		),
 	)
 
@@ -332,6 +454,7 @@ func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmCha
 			clusterv1.ReadyCondition,
 			addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
 			addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+			addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition,
 		}},
 		patch.WithStatusObservedGeneration{},
 	)
@@ -406,4 +529,9 @@ func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object
 	}
 
 	return nil
+}
+
+// getNnStringFor to retrieve the namespaced name as a string.
+func getNnStringFor(namespace, name string) string {
+	return types.NamespacedName{Namespace: namespace, Name: name}.String()
 }
