@@ -228,14 +228,14 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			// helmReleaseProxyRolloutMeta.
 			clusterNnRolloutMeta := map[string]*helmReleaseProxyRolloutMeta{}
 			for _, c := range clusters {
-				nn := getNnStringFor(c.Namespace, c.Name)
+				nn := getNamespacedNameStringFor(c.Namespace, c.Name)
 				clusterNnRolloutMeta[nn] = &helmReleaseProxyRolloutMeta{
 					cluster: c,
 				}
 			}
 			for _, h := range helmReleaseProxies {
 				ref := h.Spec.ClusterRef
-				nn := getNnStringFor(ref.Namespace, ref.Name)
+				nn := getNamespacedNameStringFor(ref.Namespace, ref.Name)
 				meta := clusterNnRolloutMeta[nn]
 				meta.hrpExists = true
 			}
@@ -253,8 +253,8 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			}
 
 			slices.SortStableFunc(rolloutMetaSorted, func(a, b *helmReleaseProxyRolloutMeta) int {
-				nnA := getNnStringFor(a.cluster.Namespace, a.cluster.Name)
-				nnB := getNnStringFor(b.cluster.Namespace, b.cluster.Name)
+				nnA := getNamespacedNameStringFor(a.cluster.Namespace, a.cluster.Name)
+				nnB := getNamespacedNameStringFor(b.cluster.Namespace, b.cluster.Name)
 				if nnA < nnB {
 					return -1
 				}
@@ -531,7 +531,7 @@ func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object
 	return nil
 }
 
-// getNnStringFor to retrieve the namespaced name as a string.
-func getNnStringFor(namespace, name string) string {
+// getNamespacedNameStringFor to retrieve the namespaced name as a string.
+func getNamespacedNameStringFor(namespace, name string) string {
 	return types.NamespacedName{Namespace: namespace, Name: name}.String()
 }
