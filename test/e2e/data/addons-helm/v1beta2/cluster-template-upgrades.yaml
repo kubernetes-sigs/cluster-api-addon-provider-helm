@@ -1,0 +1,108 @@
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: calico
+spec:
+  chartName: tigera-operator
+  clusterSelector:
+    matchLabels:
+      cni: calico
+  namespace: tigera-operator
+  releaseName: projectcalico
+  repoURL: https://docs.tigera.io/calico/charts
+  valuesTemplate: |
+    installation:
+      cni:
+        type: Calico
+      calicoNetwork:
+        bgp: Disabled
+        mtu: 1350
+        ipPools:{{range $i, $cidr := .Cluster.spec.clusterNetwork.pods.cidrBlocks }}
+        - cidr: {{ $cidr }}
+          encapsulation: VXLAN{{end}}
+      registry: quay.io/
+    # Image and registry configuration for the tigera/operator pod.
+    tigeraOperator:
+      registry: quay.io
+    calicoctl:
+      image: quay.io/calico/ctl
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  labels:
+    cni: calico
+  name: ${CLUSTER_NAME}
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - ${DOCKER_POD_CIDRS}
+    serviceDomain: ${DOCKER_SERVICE_DOMAIN}
+    services:
+      cidrBlocks:
+      - ${DOCKER_SERVICE_CIDRS}
+  topology:
+    classRef:
+      name: quick-start
+      namespace: ${CLUSTER_CLASS_NAMESPACE:-${NAMESPACE}}
+    controlPlane:
+      deletion:
+        nodeDeletionTimeoutSeconds: 30
+        nodeVolumeDetachTimeoutSeconds: 300
+      metadata:
+        annotations:
+          Cluster.topology.controlPlane.annotation: Cluster.topology.controlPlane.annotationValue
+          Cluster.topology.controlPlane.annotation.node.cluster.x-k8s.io: Cluster.topology.controlPlane.nodeAnnotationValue
+        labels:
+          Cluster.topology.controlPlane.label: Cluster.topology.controlPlane.labelValue
+          Cluster.topology.controlPlane.label.node.cluster.x-k8s.io: Cluster.topology.controlPlane.nodeLabelValue
+      replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+    variables:
+    - name: etcdImageTag
+      value: ""
+    - name: coreDNSImageTag
+      value: ""
+    - name: preLoadImages
+      value: ${DOCKER_PRELOAD_IMAGES:-[]}
+    version: ${KUBERNETES_VERSION}
+    workers:
+      machineDeployments:
+      - class: default-worker
+        deletion:
+          nodeDeletionTimeoutSeconds: 30
+          nodeVolumeDetachTimeoutSeconds: 300
+        failureDomain: fd4
+        metadata:
+          annotations:
+            Cluster.topology.machineDeployment.annotation: Cluster.topology.machineDeployment.annotationValue
+            Cluster.topology.md.annotation.node.cluster.x-k8s.io: Cluster.topology.machineDeployment.nodeAnnotationValue
+          labels:
+            Cluster.topology.machineDeployment.label: Cluster.topology.machineDeployment.labelValue
+            Cluster.topology.machineDeployment.label.node.cluster.x-k8s.io: Cluster.topology.machineDeployment.nodeLabelValue
+        minReadySeconds: 5
+        name: md-0
+        replicas: ${WORKER_MACHINE_COUNT}
+        rollout:
+          strategy:
+            rollingUpdate:
+              maxSurge: 20%
+              maxUnavailable: 0
+            type: RollingUpdate
+      machinePools:
+      - class: default-worker
+        deletion:
+          nodeDeletionTimeoutSeconds: 30
+          nodeVolumeDetachTimeoutSeconds: 300
+        failureDomains:
+        - fd4
+        metadata:
+          annotations:
+            Cluster.topology.machinePool.annotation: Cluster.topology.machinePool.annotationValue
+          labels:
+            Cluster.topology.machinePool.label: Cluster.topology.machinePool.labelValue
+            Cluster.topology.machinePool.label.node.cluster.x-k8s.io: Cluster.topology.machinePool.nodeLabelValue
+        minReadySeconds: 5
+        name: mp-0
+        replicas: ${WORKER_MACHINE_COUNT}

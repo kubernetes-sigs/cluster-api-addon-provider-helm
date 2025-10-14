@@ -36,9 +36,9 @@ import (
 	releasecontroller "sigs.k8s.io/cluster-api-addon-provider-helm/controllers/helmreleaseproxy"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/version"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	kcpv1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/remote"
-	kcpv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/feature"
 	"sigs.k8s.io/cluster-api/util/apiwarnings"
 	"sigs.k8s.io/cluster-api/util/flags"
@@ -77,7 +77,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(addonsv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 // InitFlags initializes the flags.
@@ -222,7 +222,7 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "HelmChartProxy")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err = (&releasecontroller.HelmReleaseProxyReconciler{
 		Client:           mgr.GetClient(),
@@ -237,7 +237,7 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "HelmReleaseProxy")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
