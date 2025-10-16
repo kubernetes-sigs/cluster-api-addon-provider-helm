@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -83,6 +84,15 @@ type HelmChartProxySpec struct {
 	// +kubebuilder:validation:Enum="";InstallOnce;Continuous;
 	// +optional
 	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
+
+	// RolloutStepSize is an opt-in feature that defines a step size during the
+	// initial rollout of HelmReleaseProxies on matching clusters. Once all
+	// rolled out HelmReleaseProxy resources are ready=true, the next batch of
+	// HelmReleaseProxy resources are reconciled. If undefined, will default to
+	// creating HelmReleaseProxy resources for all matching clusters.
+	// e.g. an int (5) or percentage of count of total matching clusters (25%)
+	// +optional
+	RolloutStepSize *intstr.IntOrString `json:"rolloutStepSize,omitempty"`
 
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
