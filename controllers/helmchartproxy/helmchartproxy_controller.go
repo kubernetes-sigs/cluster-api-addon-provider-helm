@@ -270,6 +270,38 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				return 0
 			})
 
+			// If HelmReleaseProxiesReadyCondition is Unknown, create the first batch
+			// of HelmReleaseProxies and exit.
+			if conditions.IsUnknown(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition) {
+				count := 0
+				stepSize, err := intstr.GetScaledValueFromIntOrPercent(helmChartProxy.Spec.RolloutStepSize, len(clusters), true)
+				if err != nil {
+					return err
+				}
+
+				// If HelmReleaseProxiesReadyCondition is Unknown and the first batch of HelmReleaseProxies have
+				// been created, then exit early.
+				if stepSize == len(helmReleaseProxies) {
+					return nil
+				}
+
+				for _, meta := range rolloutMetaSorted {
+					// The first batch of helmReleaseProxies have been reconciled.
+					if count >= stepSize {
+						return nil
+					}
+
+					err := r.reconcileForCluster(ctx, helmChartProxy, meta.cluster)
+					if err != nil {
+						return err
+					}
+					count++
+				}
+				// In cases where the count of remaining HelmReleaseProxies to be rolled
+				// out is less than rollout step size.
+				return nil
+			}
+
 			// If HelmReleaseProxiesReadyCondition is false, reconcile existing
 			// HelmReleaseProxies and exit.
 			if conditions.IsFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition) {
