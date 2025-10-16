@@ -318,9 +318,10 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			// In cases where the count of remaining HelmReleaseProxies to be rolled
 			// out is less than rollout step size.
 			return nil
+		} else {
+			// RolloutStepSize is defined and all HelmReleaseProxies have been rolled out.
+			conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)
 		}
-		// RolloutStepSize is defined and all HelmReleaseProxies have been rolled out.
-		conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)
 	} else {
 		// RolloutStepSize is undefined. Set HelmReleaseProxiesRolloutCompletedCondition to True with reason.
 		conditions.MarkTrueWithNegativePolarity(
