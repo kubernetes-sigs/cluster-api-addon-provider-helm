@@ -55,6 +55,9 @@ type helmReleaseProxyRolloutMeta struct {
 
 	// Identifies whether HelmReleaseProxy exists for the cluster.
 	hrpExists bool
+
+	// Identifies whether HelmReleaseProxy's ready condition is True.
+	hrpReady bool
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -238,6 +241,7 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				nn := getNamespacedNameStringFor(ref.Namespace, ref.Name)
 				meta := clusterNnRolloutMeta[nn]
 				meta.hrpExists = true
+				meta.hrpReady = conditions.IsTrue(&h, addonsv1alpha1.HelmReleaseReadyCondition)
 			}
 
 			// Sort helmReleaseProxy rollout metadata by cluster namespaced name to
@@ -288,7 +292,14 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 			if err != nil {
 				return err
 			}
+
 			for _, meta := range rolloutMetaSorted {
+				// Exit if HelmReleaseProxyReadyCondition has not caught up to existing
+				// HelmReleaseProxies status.
+				if meta.hrpExists && !meta.hrpReady {
+					return nil
+				}
+
 				// The next batch of helmReleaseProxies have been reconciled.
 				if count >= stepSize {
 					return nil
@@ -304,7 +315,6 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 				}
 				count++
 			}
-
 			// In cases where the count of remaining HelmReleaseProxies to be rolled
 			// out is less than rollout step size.
 			return nil
