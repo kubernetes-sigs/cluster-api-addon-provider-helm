@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -84,6 +85,13 @@ type HelmChartProxySpec struct {
 	// +optional
 	ReconcileStrategy string `json:"reconcileStrategy,omitempty"`
 
+	// Rollout is used to define install and upgrade level rollout options that
+	// will be used when rolling out HelmReleaseProxy resources changes. If
+	// undefined, it defaults to no rollout; i.e it applies changes to all
+	// matching clusters at once.
+	// +optional
+	Rollout *Rollout `json:"rollout,omitempty"`
+
 	// Options represents CLI flags passed to Helm operations (i.e. install, upgrade, delete) and
 	// include options such as wait, skipCRDs, timeout, waitForJobs, etc.
 	// +optional
@@ -96,6 +104,46 @@ type HelmChartProxySpec struct {
 	// TLSConfig contains the TLS configuration for a HelmChartProxy.
 	// +optional
 	TLSConfig *TLSConfig `json:"tlsConfig,omitempty"`
+}
+
+// Rollout defines install and upgrade level rollout options when rolling out
+// HelmReleaseProxy resource changes.
+type Rollout struct {
+	// Install rollout options. If left empty, it defaults to no rollout; i.e. it
+	// applies changes to all matching clusters at once.
+	// +optional
+	Install *RolloutOptions `json:"install,omitempty"`
+
+	// Upgrade rollout options. If left empty, it defaults to no rollout; i.e. it
+	// applies changes to all matching clusters at once.
+	// +optional
+	Upgrade *RolloutOptions `json:"upgrade,omitempty"`
+}
+
+// RolloutOptions defines rollout options to be used when rolling out
+// HelmReleaseProxy resource changes.
+type RolloutOptions struct {
+	// StepInit defines the initial step to start from during rollout.
+	// e.g. an int (5) or percentage of count of total matching clusters (25%)
+	StepInit *intstr.IntOrString `json:"stepInit"`
+
+	// StepIncrement defines the increment to be added to existing stepSize
+	// during rollout.
+	// If StepIncrement is undefined, step size is set to stepInit.
+	// e.g. an int (5) or percentage of count of total matching clusters (25%)
+	// +optional
+	StepIncrement *intstr.IntOrString `json:"stepIncrement,omitempty"`
+
+	// StepLimit defines the upper limit on stepSize during rollout.
+	// If defined and computes to less than stepInit, step size can reach 100%;
+	// meaning that no upper limit is set.
+	// If stepIncrement is defined and stepLimit is omitted, step size can reach
+	// 100%; meaning that no upper limit is set.
+	// If StepIncrement is undefined and if stepLimit is omitted, step size is
+	// defaulted to the value computed from stepInit.
+	// e.g. an int (5) or percentage of count of total matching clusters (25%)
+	// +optional
+	StepLimit *intstr.IntOrString `json:"stepLimit,omitempty"`
 }
 
 type HelmOptions struct {
@@ -238,6 +286,11 @@ type TLSConfig struct {
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
+type RolloutStatus struct {
+	Count    *int `json:"count,omitempty"`
+	StepSize *int `json:"stepSize,omitempty"`
+}
+
 // HelmChartProxyStatus defines the observed state of HelmChartProxy.
 type HelmChartProxyStatus struct {
 	// Conditions defines current state of the HelmChartProxy.
@@ -247,6 +300,8 @@ type HelmChartProxyStatus struct {
 	// MatchingClusters is the list of references to Clusters selected by the ClusterSelector.
 	// +optional
 	MatchingClusters []corev1.ObjectReference `json:"matchingClusters"`
+
+	Rollout *RolloutStatus `json:"rollout,omitempty"`
 
 	// ObservedGeneration is the latest generation observed by the controller.
 	// +optional
