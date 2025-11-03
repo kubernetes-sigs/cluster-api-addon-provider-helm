@@ -105,7 +105,7 @@ func InitFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&profilerAddress, "profiler-address", "",
 		"Bind address to expose the pprof profiler (e.g. localhost:6060)")
 
-	fs.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 10,
+	fs.IntVar(&helmChartProxyConcurrency, "helm-chart-proxy-concurrency", 1,
 		"Number of HelmChartProxies to process concurrently.")
 
 	fs.IntVar(&helmReleaseProxyConcurrency, "helm-release-proxy-concurrency", 10,
