@@ -6,7 +6,7 @@
 <img src="https://img.shields.io/badge/join%20slack-%23cluster--api-brightgreen"></a>
 </p>
 
-# Cluster API Add-on Provider for Helm
+# Cluster API Add-on Provider for Helm!
 
 ### 👋 Welcome to CAAPH! Here are some links to help you get started:
 
