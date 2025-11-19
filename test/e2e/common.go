@@ -88,12 +88,11 @@ func EnsureControlPlaneInitialized(ctx context.Context, input clusterctl.ApplyCu
 }
 
 const (
-	calicoHelmChartRepoURL   string = "https://docs.tigera.io/calico/charts"
-	calicoOperatorNamespace  string = "tigera-operator"
-	CalicoSystemNamespace    string = "calico-system"
-	CalicoAPIServerNamespace string = "calico-apiserver"
-	calicoHelmReleaseName    string = "projectcalico"
-	calicoHelmChartName      string = "tigera-operator"
+	calicoHelmChartRepoURL  string = "https://docs.tigera.io/calico/charts"
+	calicoOperatorNamespace string = "tigera-operator"
+	CalicoSystemNamespace   string = "calico-system"
+	calicoHelmReleaseName   string = "projectcalico"
+	calicoHelmChartName     string = "tigera-operator"
 )
 
 // EnsureCalicoIsReady verifies that the calico deployments exist and and are available on the workload cluster.
@@ -115,7 +114,7 @@ func EnsureCalicoIsReady(ctx context.Context, input clusterctl.ApplyCustomCluste
 	}
 	By("Waiting for Ready calico-apiserver deployment pods")
 	for _, d := range []string{"calico-apiserver"} {
-		waitInput := GetWaitForDeploymentsAvailableInput(ctx, clusterProxy, d, CalicoAPIServerNamespace, specName)
+		waitInput := GetWaitForDeploymentsAvailableInput(ctx, clusterProxy, d, CalicoSystemNamespace, specName)
 		WaitForDeploymentsAvailable(ctx, waitInput, e2eConfig.GetIntervals(specName, "wait-deployment")...)
 	}
 }
