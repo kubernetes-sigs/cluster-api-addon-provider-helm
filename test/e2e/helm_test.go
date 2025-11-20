@@ -31,23 +31,20 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
+
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
-var nginxValues = `controller:
-  name: "{{ .ControlPlane.metadata.name }}-nginx"
-  nginxStatus:
-    allowCidrs: {{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}`
+var metallbValues = `prometheus: 
+  scrapeAnnotations: false`
 
-var newNginxValues = `controller:
-  name: "{{ .Cluster.metadata.name }}-nginx"
-  nginxStatus:
-    allowCidrs: 127.0.0.1,::1,{{ index .Cluster.spec.clusterNetwork.pods.cidrBlocks 0 }}`
+var newMetallbValues = `prometheus: 
+  scrapeAnnotations: true`
 
 var _ = Describe("Workload cluster creation", func() {
 	var (
@@ -120,7 +117,7 @@ var _ = Describe("Workload cluster creation", func() {
 	})
 
 	Context("Creating workload cluster [REQUIRED]", func() {
-		It("With default template to install, upgrade, and uninstall nginx Helm chart", func() {
+		It("With default template to install, upgrade, and uninstall metallb Helm chart", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -135,26 +132,27 @@ var _ = Describe("Workload cluster creation", func() {
 
 			hcp := &addonsv1alpha1.HelmChartProxy{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "nginx-ingress",
+					Name:      "metallb",
 					Namespace: namespace.Name,
 				},
 				Spec: addonsv1alpha1.HelmChartProxySpec{
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"nginxIngress": "enabled",
+							"MetalLBChart": "enabled",
 						},
 					},
-					ReleaseName:       "nginx-ingress",
-					ReleaseNamespace:  "nginx-namespace",
-					ChartName:         "nginx-ingress",
-					RepoURL:           "https://helm.nginx.com/stable",
-					ValuesTemplate:    nginxValues,
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
 					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
 				},
 			}
 
 			// Create new Helm chart
-			By("Creating new HelmChartProxy to install nginx", func() {
+			By("Creating new HelmChartProxy to install metallb", func() {
 				HelmInstallSpec(ctx, func() HelmInstallInput {
 					return HelmInstallInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -166,8 +164,8 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 
 			// Update existing Helm chart
-			By("Updating nginx HelmChartProxy valuesTemplate", func() {
-				hcp.Spec.ValuesTemplate = newNginxValues
+			By("Updating metallb HelmChartProxy valueTemplate", func() {
+				hcp.Spec.ValuesTemplate = newMetallbValues
 				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
 					return HelmUpgradeInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -181,7 +179,7 @@ var _ = Describe("Workload cluster creation", func() {
 
 			// Force reinstall of existing Helm chart by changing the release namespace
 			By("Updating HelmChartProxy release namespace", func() {
-				hcp.Spec.ReleaseNamespace = "new-nginx-namespace"
+				hcp.Spec.ReleaseNamespace = "new-metallb-namespace"
 				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
 					return HelmUpgradeInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -195,7 +193,7 @@ var _ = Describe("Workload cluster creation", func() {
 
 			// Force reinstall of existing Helm chart by changing the release name
 			By("Updating HelmChartProxy release name", func() {
-				hcp.Spec.ReleaseName = "new-nginx-name"
+				hcp.Spec.ReleaseName = "new-metallb-name"
 				HelmUpgradeSpec(ctx, func() HelmUpgradeInput {
 					return HelmUpgradeInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -222,7 +220,7 @@ var _ = Describe("Workload cluster creation", func() {
 	})
 
 	Context("Creating workload cluster [REQUIRED]", func() {
-		It("With default template to install and orphan an nginx Helm chart with InstallOnce strategy", func() {
+		It("With default template to install and orphan an metallb Helm chart with InstallOnce strategy", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -237,26 +235,27 @@ var _ = Describe("Workload cluster creation", func() {
 
 			hcp := &addonsv1alpha1.HelmChartProxy{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "nginx-ingress",
+					Name:      "metallb",
 					Namespace: namespace.Name,
 				},
 				Spec: addonsv1alpha1.HelmChartProxySpec{
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"nginxIngress": "enabled",
+							"MetalLBChart": "enabled",
 						},
 					},
-					ReleaseName:       "nginx-ingress",
-					ReleaseNamespace:  "nginx-namespace",
-					ChartName:         "nginx-ingress",
-					RepoURL:           "https://helm.nginx.com/stable",
-					ValuesTemplate:    nginxValues,
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
 					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyInstallOnce),
 				},
 			}
 
 			// Create new Helm chart
-			By("Creating new HelmChartProxy to install nginx", func() {
+			By("Creating new HelmChartProxy to install metallb", func() {
 				HelmInstallSpec(ctx, func() HelmInstallInput {
 					return HelmInstallInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -268,8 +267,8 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 
 			// Update existing Helm chart and expect Helm release to remain unchanged
-			By("Updating nginx HelmChartProxy valuesTemplate", func() {
-				hcp.Spec.ValuesTemplate = newNginxValues
+			By("Updating metallb HelmChartProxy valuesTemplate", func() {
+				hcp.Spec.ValuesTemplate = newMetallbValues
 				HelmReleaseUnchangedSpec(ctx, func() HelmReleaseUnchangedInput {
 					return HelmReleaseUnchangedInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -289,7 +288,7 @@ var _ = Describe("Workload cluster creation", func() {
 							Namespace:             namespace,
 							ClusterName:           clusterName,
 							HelmChartProxy:        hcp,
-							Values:                []string{fmt.Sprintf("--controller.name=new-nginx-controller-%d", i)},
+							Values:                []string{fmt.Sprintf("--prometheus.metricsPort=%d", 7470+i)},
 							WaitPeriod:            installOnceWaitPeriod,
 						}
 					})
@@ -316,7 +315,7 @@ var _ = Describe("Workload cluster creation", func() {
 	})
 
 	Context("Creating multiple workload clusters [REQUIRED]", func() {
-		It("With default template to install and uninstall nginx Helm chart", func() {
+		It("With default template to install and uninstall metallb Helm chart", func() {
 			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
@@ -361,25 +360,26 @@ var _ = Describe("Workload cluster creation", func() {
 
 			hcp := &addonsv1alpha1.HelmChartProxy{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "nginx-ingress",
+					Name:      "metallb",
 					Namespace: namespace.Name,
 				},
 				Spec: addonsv1alpha1.HelmChartProxySpec{
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"nginxIngress": "enabled",
+							"MetalLBChart": "enabled",
 						},
 					},
-					ReleaseName:      "nginx-ingress",
-					ReleaseNamespace: "nginx-namespace",
-					ChartName:        "nginx-ingress",
-					RepoURL:          "https://helm.nginx.com/stable",
-					ValuesTemplate:   nginxValues,
+					ReleaseName:      "metallb-name",
+					ReleaseNamespace: "metallb-namespace",
+					ChartName:        "metallb",
+					RepoURL:          "https://metallb.github.io/metallb",
+					Version:          "0.15.2",
+					ValuesTemplate:   metallbValues,
 				},
 			}
 
 			// Create a new HelmChartProxy and install on Cluster 1
-			By("Creating new HelmChartProxy to install nginx on Cluster 1", func() {
+			By("Creating new HelmChartProxy to install metallb on Cluster 1", func() {
 				HelmInstallSpec(ctx, func() HelmInstallInput {
 					return HelmInstallInput{
 						BootstrapClusterProxy: bootstrapClusterProxy,
@@ -391,7 +391,7 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 
 			// Patch Cluster 2 labels to match HelmChartProxy's clusterSelector.
-			By("Patching Cluster 2 labels to install nginx", func() {
+			By("Patching Cluster 2 labels to install metallb", func() {
 				installInput := &HelmInstallInput{
 					BootstrapClusterProxy: bootstrapClusterProxy,
 					Namespace:             namespace,
@@ -414,7 +414,7 @@ var _ = Describe("Workload cluster creation", func() {
 			})
 
 			// Ensure that Helm chart is still installed on Cluster 2.
-			By("Ensuring that nginx is still installed on Cluster 2", func() {
+			By("Ensuring that metallb is still installed on Cluster 2", func() {
 				installInput := &HelmInstallInput{
 					BootstrapClusterProxy: bootstrapClusterProxy,
 					Namespace:             namespace,
