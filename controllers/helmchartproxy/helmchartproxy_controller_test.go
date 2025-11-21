@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
@@ -336,6 +337,381 @@ var (
 	}
 )
 
+// TestRolloutReconcile cluster metadata.
+var (
+	cluster5 = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-5",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"test-label": "rollout-value",
+			},
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(1234)),
+				ServiceDomain: "test-domain-1",
+			},
+		},
+	}
+
+	cluster6 = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-6",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"test-label": "rollout-value",
+			},
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(1234)),
+				ServiceDomain: "test-domain-1",
+			},
+		},
+	}
+
+	cluster7 = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-7",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"test-label": "rollout-value",
+			},
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(1234)),
+				ServiceDomain: "test-domain-1",
+			},
+		},
+	}
+
+	cluster8 = &clusterv1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: clusterv1.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-8",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"test-label": "rollout-value",
+			},
+		},
+		Spec: clusterv1.ClusterSpec{
+			ClusterNetwork: &clusterv1.ClusterNetwork{
+				APIServerPort: ptr.To(int32(1234)),
+				ServiceDomain: "test-domain-1",
+			},
+		},
+	}
+
+	hrpReady5 = &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hrp-5",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         addonsv1alpha1.GroupVersion.String(),
+					Kind:               "HelmChartProxy",
+					Name:               "test-hcp",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:             "test-cluster-5",
+				addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+			},
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+				Name:       "test-cluster-5",
+				Namespace:  "test-namespace",
+			},
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			Version:          "test-version",
+			Values:           "apiServerPort: 1234",
+			Options:          addonsv1alpha1.HelmOptions{},
+		},
+		Status: addonsv1alpha1.HelmReleaseProxyStatus{
+			Conditions: []clusterv1.Condition{
+				{
+					Type:   addonsv1alpha1.HelmReleaseReadyCondition,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	hrpNotReady5 = &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hrp-5",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         addonsv1alpha1.GroupVersion.String(),
+					Kind:               "HelmChartProxy",
+					Name:               "test-hcp",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:             "test-cluster-5",
+				addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+			},
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+				Name:       "test-cluster-5",
+				Namespace:  "test-namespace",
+			},
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			Version:          "test-version",
+			Values:           "apiServerPort: 1234",
+			Options:          addonsv1alpha1.HelmOptions{},
+		},
+		Status: addonsv1alpha1.HelmReleaseProxyStatus{
+			Conditions: []clusterv1.Condition{
+				{
+					Type:     addonsv1alpha1.HelmReleaseReadyCondition,
+					Status:   corev1.ConditionFalse,
+					Severity: clusterv1.ConditionSeverityInfo,
+				},
+			},
+		},
+	}
+
+	hrpReady6 = &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hrp-6",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         addonsv1alpha1.GroupVersion.String(),
+					Kind:               "HelmChartProxy",
+					Name:               "test-hcp",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:             "test-cluster-6",
+				addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+			},
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+				Name:       "test-cluster-6",
+				Namespace:  "test-namespace",
+			},
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			Version:          "test-version",
+			Values:           "apiServerPort: 1234",
+			Options:          addonsv1alpha1.HelmOptions{},
+		},
+		Status: addonsv1alpha1.HelmReleaseProxyStatus{
+			Conditions: []clusterv1.Condition{
+				{
+					Type:   addonsv1alpha1.HelmReleaseReadyCondition,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	hrpReady7 = &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hrp-7",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         addonsv1alpha1.GroupVersion.String(),
+					Kind:               "HelmChartProxy",
+					Name:               "test-hcp",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:             "test-cluster-7",
+				addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+			},
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+				Name:       "test-cluster-7",
+				Namespace:  "test-namespace",
+			},
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			Version:          "test-version",
+			Values:           "apiServerPort: 1234",
+			Options:          addonsv1alpha1.HelmOptions{},
+		},
+		Status: addonsv1alpha1.HelmReleaseProxyStatus{
+			Conditions: []clusterv1.Condition{
+				{
+					Type:   addonsv1alpha1.HelmReleaseReadyCondition,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	hrpReady8 = &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hrp-8",
+			Namespace: "test-namespace",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         addonsv1alpha1.GroupVersion.String(),
+					Kind:               "HelmChartProxy",
+					Name:               "test-hcp",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel:             "test-cluster-8",
+				addonsv1alpha1.HelmChartProxyLabelName: "test-hcp",
+			},
+			Annotations: map[string]string{
+				addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation: "true",
+			},
+		},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			ClusterRef: corev1.ObjectReference{
+				APIVersion: clusterv1.GroupVersion.String(),
+				Kind:       "Cluster",
+				Name:       "test-cluster-8",
+				Namespace:  "test-namespace",
+			},
+			ReleaseName:      "test-release-name",
+			ChartName:        "test-chart-name",
+			RepoURL:          "https://test-repo-url",
+			ReleaseNamespace: "test-release-namespace",
+			Version:          "test-version",
+			Values:           "apiServerPort: 1234",
+			Options:          addonsv1alpha1.HelmOptions{},
+		},
+		Status: addonsv1alpha1.HelmReleaseProxyStatus{
+			Conditions: []clusterv1.Condition{
+				{
+					Type:   addonsv1alpha1.HelmReleaseReadyCondition,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+)
+
+type rolloutProxyOption func(h *addonsv1alpha1.HelmChartProxy)
+
+func newRolloutProxy(opts ...rolloutProxyOption) *addonsv1alpha1.HelmChartProxy {
+	h := &addonsv1alpha1.HelmChartProxy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: addonsv1alpha1.GroupVersion.String(),
+			Kind:       "HelmChartProxy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-hcp",
+			Namespace:  "test-namespace",
+			Generation: 1,
+		},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			ClusterSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"test-label": "rollout-value",
+				},
+			},
+			ReleaseName:       "test-release-name",
+			ChartName:         "test-chart-name",
+			RepoURL:           "https://test-repo-url",
+			ReleaseNamespace:  "test-release-namespace",
+			Version:           "test-version",
+			ValuesTemplate:    "apiServerPort: {{ .Cluster.spec.clusterNetwork.apiServerPort }}",
+			ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+			Options:           addonsv1alpha1.HelmOptions{},
+		},
+	}
+
+	for _, o := range opts {
+		o(h)
+	}
+
+	return h
+}
+
+func withRollout(r *addonsv1alpha1.Rollout) rolloutProxyOption {
+	return func(h *addonsv1alpha1.HelmChartProxy) {
+		h.Spec.Rollout = r
+	}
+}
+
+func withGeneration(g int64) rolloutProxyOption {
+	return func(h *addonsv1alpha1.HelmChartProxy) {
+		h.Generation = g
+	}
+}
+
+func withRolloutStatus(r *addonsv1alpha1.RolloutStatus) rolloutProxyOption {
+	return func(h *addonsv1alpha1.HelmChartProxy) {
+		h.Status.Rollout = r
+	}
+}
+
+func withConditions(cs []clusterv1.Condition) rolloutProxyOption {
+	return func(h *addonsv1alpha1.HelmChartProxy) {
+		h.Status.Conditions = cs
+	}
+}
+
 func TestReconcileNormal(t *testing.T) {
 	t.Parallel()
 
@@ -447,6 +823,9 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.GetReason(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeIdenticalTo(addonsv1alpha1.HelmReleaseProxiesRolloutUndefinedReason))
 				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
@@ -476,6 +855,9 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.GetReason(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeIdenticalTo(addonsv1alpha1.HelmReleaseProxiesRolloutUndefinedReason))
 				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
@@ -506,6 +888,9 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.GetReason(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeIdenticalTo(addonsv1alpha1.HelmReleaseProxiesRolloutUndefinedReason))
 				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
 				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
@@ -676,6 +1061,553 @@ func TestReconcileNormal(t *testing.T) {
 			} else {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(result).To(Equal(reconcile.Result{}))
+
+				hcp := &addonsv1alpha1.HelmChartProxy{}
+				g.Expect(r.Client.Get(ctx, request.NamespacedName, hcp)).To(Succeed())
+
+				tc.expect(g, r.Client, hcp)
+			}
+		})
+	}
+}
+
+func TestRolloutReconcile(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name            string
+		helmChartProxy  *addonsv1alpha1.HelmChartProxy
+		objects         []client.Object
+		expect          func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy)
+		expectedError   string
+		reconcileResult reconcile.Result
+	}{
+		{
+			name:            "when rollout is not used, exit early",
+			helmChartProxy:  continuousProxy,
+			objects:         []client.Object{},
+			expectedError:   "",
+			expect:          func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {},
+			reconcileResult: reconcile.Result{},
+		},
+		{
+			name: "successfully set rollout completion condition to true when all hrp are rolled out",
+
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{StepInit: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"}}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(1), Count: ptr.To(4)}),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpReady5, hrpReady6, hrpReady7, hrpReady8},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError: "",
+		},
+		{
+			name: "successfully set rollout completion condition to false when not all hrp are rolled out",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{StepInit: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"}}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(1), Count: ptr.To(1)}),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpNotReady5},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is unknown, requeue early if hrp and has non-zero hrps",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{StepInit: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"}}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(1), Count: ptr.To(0)}),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpNotReady5},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is unknown, requeue with count of 1 and step size of 1 when hcp rollout step init is 25% and has zero hrps",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{StepInit: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"}}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(0), Count: ptr.To(0)}),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(1)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(1)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is unknown, requeue with count of 2 and step size of 2 when hcp rollout step init is 50% and has zero hrps",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{StepInit: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"}}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(0), Count: ptr.To(0)}),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(2)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(2)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is false, reconciles existing hrps and keeps count to 1 and step size to 1",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{StepInit: &intstr.IntOrString{Type: intstr.String, StrVal: "25%"}}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(1), Count: ptr.To(1)}),
+				withConditions(
+					[]clusterv1.Condition{
+						{
+							Type:     addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+							Status:   corev1.ConditionFalse,
+							Severity: clusterv1.ConditionSeverityInfo,
+						},
+					},
+				),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpNotReady5},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(1)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(1)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is true and 1 out of 4 hrp is rolled out and ready, it rolls out 2 more, sets count to 3 and step size to 2",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{
+					StepInit:      &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					StepIncrement: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					StepLimit:     &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+				}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(1), Count: ptr.To(1)}),
+				withConditions(
+					[]clusterv1.Condition{
+						{
+							Type:   addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpReady5},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(3)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(2)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is true and 3 hrps are rolled out and ready, rolls out final hrp and sets count to 4 and step size to 2",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{
+					StepInit:      &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					StepIncrement: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					StepLimit:     &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+				}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(2), Count: ptr.To(3)}),
+				withConditions(
+					[]clusterv1.Condition{
+						{
+							Type:   addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpReady5, hrpReady6, hrpReady7},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeFalse())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(4)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(2)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError:   "",
+			reconcileResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name: "when HelmReleaseProxiesReadyCondition is true and 4 hrps are rolled out and ready, sets Rollout Completed condition to True and marks hcp as ready",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{Install: &addonsv1alpha1.RolloutOptions{
+					StepInit:      &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					StepIncrement: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					StepLimit:     &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+				}}),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(2), Count: ptr.To(4)}),
+				withConditions(
+					[]clusterv1.Condition{
+						{
+							Type:   addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpReady5, hrpReady6, hrpReady7, hrpReady8},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(4)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(2)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError: "",
+		},
+		{
+			name: "during upgrade, when HelmReleaseProxiesReadyCondition is true and 4 hrps are rolled out and ready, sets Rollout Completed condition to True and marks hcp as ready",
+			helmChartProxy: newRolloutProxy(
+				withRollout(&addonsv1alpha1.Rollout{
+					Upgrade: &addonsv1alpha1.RolloutOptions{
+						StepInit:      &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						StepIncrement: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						StepLimit:     &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+					},
+				},
+				),
+				withRolloutStatus(&addonsv1alpha1.RolloutStatus{StepSize: ptr.To(2), Count: ptr.To(4)}),
+				withConditions(
+					[]clusterv1.Condition{
+						{
+							Type:   addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				),
+				withGeneration(2),
+			),
+			objects: []client.Object{cluster5, cluster6, cluster7, cluster8, hrpReady5, hrpReady6, hrpReady7, hrpReady8},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEquivalentTo([]corev1.ObjectReference{
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-5",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-6",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-7",
+						Namespace:  "test-namespace",
+					},
+					{
+						APIVersion: clusterv1.GroupVersion.String(),
+						Kind:       "Cluster",
+						Name:       "test-cluster-8",
+						Namespace:  "test-namespace",
+					},
+				}))
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesRolloutCompletedCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect((hcp.Status.Rollout.Count)).To(Equal(ptr.To(4)))
+				g.Expect((hcp.Status.Rollout.StepSize)).To(Equal(ptr.To(2)))
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			t.Parallel()
+			request := reconcile.Request{
+				NamespacedName: util.ObjectKey(tc.helmChartProxy),
+			}
+
+			tc.objects = append(tc.objects, tc.helmChartProxy)
+			r := &HelmChartProxyReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(fakeScheme).
+					WithObjects(tc.objects...).
+					WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+					WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+					Build(),
+			}
+			result, err := r.Reconcile(ctx, request)
+
+			if tc.expectedError != "" {
+				g.Expect(err).To(HaveOccurred())
+				g.Expect(err).To(MatchError(tc.expectedError), err.Error())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result).To(Equal(tc.reconcileResult))
 
 				hcp := &addonsv1alpha1.HelmChartProxy{}
 				g.Expect(r.Client.Get(ctx, request.NamespacedName, hcp)).To(Succeed())
