@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // ReconcileStrategy is a string representation of the reconciliation strategy of a HelmChartProxy.
@@ -242,7 +242,7 @@ type TLSConfig struct {
 type HelmChartProxyStatus struct {
 	// Conditions defines current state of the HelmChartProxy.
 	// +optional
-	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// MatchingClusters is the list of references to Clusters selected by the ClusterSelector.
 	// +optional
@@ -269,7 +269,7 @@ type HelmChartProxy struct {
 	Status HelmChartProxyStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // HelmChartProxyList contains a list of HelmChartProxy.
 type HelmChartProxyList struct {
@@ -279,12 +279,12 @@ type HelmChartProxyList struct {
 }
 
 // GetConditions returns the list of conditions for an HelmChartProxy API object.
-func (c *HelmChartProxy) GetConditions() clusterv1.Conditions {
+func (c *HelmChartProxy) GetConditions() []metav1.Condition {
 	return c.Status.Conditions
 }
 
 // SetConditions will set the given conditions on an HelmChartProxy object.
-func (c *HelmChartProxy) SetConditions(conditions clusterv1.Conditions) {
+func (c *HelmChartProxy) SetConditions(conditions []metav1.Condition) {
 	c.Status.Conditions = conditions
 }
 

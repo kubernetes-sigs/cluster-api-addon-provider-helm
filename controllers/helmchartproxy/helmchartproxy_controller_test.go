@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -158,8 +158,8 @@ var (
 			},
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(1234)),
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(1234),
 				ServiceDomain: "test-domain-1",
 			},
 		},
@@ -179,8 +179,8 @@ var (
 			},
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(5678)),
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(5678),
 				ServiceDomain: "test-domain-2",
 			},
 		},
@@ -199,8 +199,8 @@ var (
 			},
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(6443)),
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(6443),
 				ServiceDomain: "test-domain-3",
 			},
 		},
@@ -219,8 +219,8 @@ var (
 			},
 		},
 		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: &clusterv1.ClusterNetwork{
-				APIServerPort: ptr.To(int32(6443)),
+			ClusterNetwork: clusterv1.ClusterNetwork{
+				APIServerPort: int32(6443),
 				ServiceDomain: "test-domain-4",
 			},
 		},
@@ -239,7 +239,7 @@ var (
 			},
 		},
 		Spec: clusterv1.ClusterSpec{
-			Paused: true,
+			Paused: ptr.To(true),
 		},
 	}
 
@@ -280,10 +280,10 @@ var (
 			Options:          addonsv1alpha1.HelmOptions{},
 		},
 		Status: addonsv1alpha1.HelmReleaseProxyStatus{
-			Conditions: []clusterv1.Condition{
+			Conditions: []metav1.Condition{
 				{
 					Type:   clusterv1.ReadyCondition,
-					Status: corev1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -326,10 +326,10 @@ var (
 			Options:          addonsv1alpha1.HelmOptions{},
 		},
 		Status: addonsv1alpha1.HelmReleaseProxyStatus{
-			Conditions: []clusterv1.Condition{
+			Conditions: []metav1.Condition{
 				{
 					Type:   clusterv1.ReadyCondition,
-					Status: corev1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -368,7 +368,8 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				// This is false as the HelmReleaseProxies won't be ready until the HelmReleaseProxy controller runs.
-				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeFalse())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsUnknown(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 			},
 			expectedError: "",
 		},
@@ -394,7 +395,8 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				// This is false as the HelmReleaseProxies won't be ready until the HelmReleaseProxy controller runs.
-				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeFalse())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsUnknown(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 			},
 			expectedError: "",
 		},
@@ -420,7 +422,8 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
 				// This is false as the HelmReleaseProxies won't be ready until the HelmReleaseProxy controller runs.
-				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeFalse())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsUnknown(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
 			},
 			expectedError: "",
 		},
@@ -714,7 +717,7 @@ func TestReconcileAfterMatchingClusterUnpaused(t *testing.T) {
 
 	// Unpause the cluster and reconcile again.
 	unpausedCluster := clusterPaused.DeepCopy()
-	unpausedCluster.Spec.Paused = false
+	unpausedCluster.Spec.Paused = ptr.To(false)
 	g.Expect(c.Update(ctx, unpausedCluster)).To(Succeed())
 
 	result, err = r.Reconcile(ctx, request)

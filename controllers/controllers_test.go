@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,8 +81,8 @@ var (
 				},
 			},
 			Spec: clusterv1.ClusterSpec{
-				ClusterNetwork: &clusterv1.ClusterNetwork{
-					APIServerPort: ptr.To(int32(1234)),
+				ClusterNetwork: clusterv1.ClusterNetwork{
+					APIServerPort: int32(1234),
 				},
 			},
 		}
@@ -152,7 +152,7 @@ var _ = Describe("Testing HelmChartProxy and HelmReleaseProxy reconcile", func()
 			Expect(err).ToNot(HaveOccurred())
 
 			patch := client.MergeFrom(cluster.DeepCopy())
-			conditions.MarkTrue(cluster, clusterv1.ControlPlaneInitializedCondition)
+			cluster.Status.Initialization.ControlPlaneInitialized = ptr.To(true)
 			err = k8sClient.Status().Patch(ctx, cluster, patch)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -224,8 +224,8 @@ var _ = Describe("Testing HelmChartProxy and HelmReleaseProxy reconcile", func()
 
 		readyCondition := conditions.Get(helmChartProxy, clusterv1.ReadyCondition)
 		Expect(readyCondition).NotTo(BeNil())
-		Expect(readyCondition.Status).To(Equal(corev1.ConditionFalse))
-		Expect(readyCondition.Message).To(Equal(releaseFailedMessage))
+		Expect(readyCondition.Status).To(Equal(metav1.ConditionFalse))
+		Expect(readyCondition.Message).To(ContainSubstring(releaseFailedMessage))
 
 		By("Making HelmChartProxy uninstallable")
 		failedHelmUninstall = false
