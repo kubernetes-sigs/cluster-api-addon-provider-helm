@@ -16,13 +16,11 @@ limitations under the License.
 
 package v1alpha1
 
-import clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-
 // HelmChartProxy Conditions and Reasons.
 const (
 	// HelmReleaseProxySpecsUpToDateCondition indicates that the HelmReleaseProxy specs are up to date with the HelmChartProxy specs,
 	// meaning that the HelmReleaseProxies are created/updated, value template parsing succeeded, and the orphaned HelmReleaseProxies are deleted.
-	HelmReleaseProxySpecsUpToDateCondition clusterv1.ConditionType = "HelmReleaseProxySpecsUpToDate"
+	HelmReleaseProxySpecsUpToDateCondition = "HelmReleaseProxySpecsUpToDate"
 
 	// HelmReleaseProxySpecsUpdatingReason indicates that the HelmReleaseProxy entity is not yet updated by the corresponding controller.
 	HelmReleaseProxySpecsUpdatingReason = "HelmReleaseProxySpecsUpdating"
@@ -44,13 +42,13 @@ const (
 
 	// HelmReleaseProxiesReadyCondition indicates that the HelmReleaseProxies are ready, meaning that the Helm installation, upgrade
 	// or deletion is complete.
-	HelmReleaseProxiesReadyCondition clusterv1.ConditionType = "HelmReleaseProxiesReady"
+	HelmReleaseProxiesReadyCondition = "HelmReleaseProxiesReady"
 )
 
 // HelmReleaseProxy Conditions and Reasons.
 const (
 	// HelmReleaseReadyCondition indicates the current status of the underlying Helm release managed by the HelmReleaseProxy.
-	HelmReleaseReadyCondition clusterv1.ConditionType = "HelmReleaseReady"
+	HelmReleaseReadyCondition = "HelmReleaseReady"
 
 	// PreparingToHelmInstallReason indicates that the HelmReleaseProxy is preparing to install the Helm release.
 	PreparingToHelmInstallReason = "PreparingToHelmInstall"
@@ -71,7 +69,7 @@ const (
 	HelmReleaseGetFailedReason = "HelmReleaseGetFailed"
 
 	// ClusterAvailableCondition indicates that the Cluster to install the Helm release on is available.
-	ClusterAvailableCondition clusterv1.ConditionType = "ClusterAvailable"
+	ClusterAvailableCondition = "ClusterAvailable"
 
 	// GetClusterFailedReason indicates that the HelmReleaseProxy failed to get the Cluster.
 	GetClusterFailedReason = "GetClusterFailed"
