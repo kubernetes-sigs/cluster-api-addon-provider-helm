@@ -319,16 +319,16 @@ download-cluster-api-crd: generate-modules ## Run to download Cluster API CRDs f
 DOCKER_TEMPLATES := test/e2e/data/addons-helm
 
 .PHONY: generate-e2e-templates
-generate-e2e-templates: $(KUSTOMIZE) $(addprefix generate-e2e-templates-, v1.5 main) ## Generate cluster templates for all versions
+generate-e2e-templates: $(KUSTOMIZE) $(addprefix generate-e2e-templates-, v1beta1 main) ## Generate cluster templates for all versions
 
-.PHONY: generate-e2e-templates-v1.5
-generate-e2e-templates-v1.5: $(KUSTOMIZE)
-	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1.5/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1.5/cluster-template.yaml
+.PHONY: generate-e2e-templates-v1beta1
+generate-e2e-templates-v1beta1: $(KUSTOMIZE)
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template.yaml
 
 .PHONY: generate-e2e-templates-main
 generate-e2e-templates-main: $(KUSTOMIZE) ## Generate templates for e2e tests on main branch.
-	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template.yaml
-	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades.yaml
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta2/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta2/cluster-template.yaml
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta2/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta2/cluster-template-upgrades.yaml
 
 .PHONY: generate-flavors
 generate-flavors: $(KUSTOMIZE)  ## Generate template flavors.

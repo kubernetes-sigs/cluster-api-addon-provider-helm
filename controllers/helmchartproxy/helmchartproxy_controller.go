@@ -18,6 +18,8 @@ package helmchartproxy
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/cluster-api/util/predicates"
@@ -64,14 +66,14 @@ func (r *HelmChartProxyReconciler) SetupWithManager(ctx context.Context, mgr ctr
 		Complete(r)
 }
 
-//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/finalizers,verbs=update
-//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=list;watch
-//+kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,verbs=list;get;watch
-//+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io;clusterctl.cluster.x-k8s.io,resources=*,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=list;
+// +kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmchartproxies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=list;watch
+// +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=kubeadmcontrolplanes,verbs=list;get;watch
+// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io;bootstrap.cluster.x-k8s.io;controlplane.cluster.x-k8s.io;clusterctl.cluster.x-k8s.io,resources=*,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -116,7 +118,12 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// to not have errors. An idea would be to check the deletion timestamp.
 	clusterList, err := r.listClustersWithLabels(ctx, helmChartProxy.Namespace, selector)
 	if err != nil {
-		conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.ClusterSelectionFailedReason, clusterv1.ConditionSeverityError, "%s", err.Error())
+		conditions.Set(helmChartProxy, metav1.Condition{
+			Type:    addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
+			Status:  metav1.ConditionFalse,
+			Reason:  addonsv1alpha1.ClusterSelectionFailedReason,
+			Message: err.Error(),
+		})
 
 		return ctrl.Result{}, err
 	}
@@ -171,7 +178,12 @@ func (r *HelmChartProxyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)
+	conditions.Set(helmChartProxy, metav1.Condition{
+		Type:    addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
+		Status:  metav1.ConditionTrue,
+		Reason:  clusterv1.UpToDateReason,
+		Message: "",
+	})
 
 	err = r.aggregateHelmReleaseProxyReadyCondition(ctx, helmChartProxy)
 	if err != nil {
@@ -241,9 +253,21 @@ func (r *HelmChartProxyReconciler) reconcileDelete(ctx context.Context, helmChar
 	}
 
 	if len(getters) > 0 {
-		conditions.SetAggregate(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition, getters, conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
+		if err := conditions.SetAggregateCondition(
+			getters,
+			helmChartProxy,
+			clusterv1.ReadyCondition,
+			conditions.TargetConditionType(addonsv1alpha1.HelmReleaseProxiesReadyCondition),
+			conditions.CustomMergeStrategy{
+				MergeStrategy: &addSourceRef{
+					defaultStrategy: conditions.DefaultMergeStrategy(),
+				},
+			},
+		); err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "failed to set aggregate condition on HelmChartProxy %s", helmChartProxy.Name)
+		}
 
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: 1}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -295,7 +319,12 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 	if len(releaseList.Items) == 0 {
 		// Consider it to be vacuously true if there are no releases. This should only be reached if we previously had HelmReleaseProxies but they were all deleted
 		// due to the Clusters being unselected. In that case, we should consider the condition to be true.
-		conditions.MarkTrue(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition)
+		conditions.Set(helmChartProxy, metav1.Condition{
+			Type:   addonsv1alpha1.HelmReleaseProxiesReadyCondition,
+			Status: metav1.ConditionTrue,
+			Reason: clusterv1.ReadyReason,
+		})
+
 		return nil
 	}
 
@@ -303,13 +332,31 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 	for i := range releaseList.Items {
 		helmReleaseProxy := &releaseList.Items[i]
 		if helmReleaseProxy.Generation != helmReleaseProxy.Status.ObservedGeneration {
-			conditions.MarkFalse(helmChartProxy, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition, addonsv1alpha1.HelmReleaseProxySpecsUpdatingReason, clusterv1.ConditionSeverityInfo, "Helm release proxy '%s' is not updated yet", helmReleaseProxy.Name)
+			conditions.Set(helmChartProxy, metav1.Condition{
+				Type:    addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonsv1alpha1.HelmReleaseProxySpecsUpdatingReason,
+				Message: fmt.Sprintf("Helm release proxy '%s' is not updated yet", helmReleaseProxy.Name),
+			})
+
 			return nil
 		}
 		getters = append(getters, helmReleaseProxy)
 	}
 
-	conditions.SetAggregate(helmChartProxy, addonsv1alpha1.HelmReleaseProxiesReadyCondition, getters, conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
+	if err := conditions.SetAggregateCondition(
+		getters,
+		helmChartProxy,
+		clusterv1.ReadyCondition,
+		conditions.TargetConditionType(addonsv1alpha1.HelmReleaseProxiesReadyCondition),
+		conditions.CustomMergeStrategy{
+			MergeStrategy: &addSourceRef{
+				defaultStrategy: conditions.DefaultMergeStrategy(),
+			},
+		},
+	); err != nil {
+		return errors.Wrapf(err, "failed to set aggregate condition on HelmChartProxy %s", helmChartProxy.Name)
+	}
 
 	return nil
 }
@@ -317,18 +364,23 @@ func (r *HelmChartProxyReconciler) aggregateHelmReleaseProxyReadyCondition(ctx c
 // patchHelmChartProxy patches the HelmChartProxy object and sets the ReadyCondition as an aggregate of the other condition set.
 // TODO: Is this preferable to client.Update() calls? Based on testing it seems like it avoids race conditions.
 func patchHelmChartProxy(ctx context.Context, patchHelper *patch.Helper, helmChartProxy *addonsv1alpha1.HelmChartProxy) error {
-	conditions.SetSummary(helmChartProxy,
-		conditions.WithConditions(
+	if err := conditions.SetSummaryCondition(
+		helmChartProxy,
+		helmChartProxy,
+		clusterv1.ReadyCondition,
+		conditions.ForConditionTypes{
 			addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
 			addonsv1alpha1.HelmReleaseProxiesReadyCondition,
-		),
-	)
+		},
+	); err != nil {
+		return fmt.Errorf("failed to set summary condition: %w", err)
+	}
 
 	// Patch the object, ignoring conflicts on the conditions owned by this controller.
 	return patchHelper.Patch(
 		ctx,
 		helmChartProxy,
-		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
+		patch.WithOwnedConditions{Conditions: []string{
 			clusterv1.ReadyCondition,
 			addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition,
 			addonsv1alpha1.HelmReleaseProxiesReadyCondition,
@@ -406,4 +458,29 @@ func HelmReleaseProxyToHelmChartProxyMapper(ctx context.Context, o client.Object
 	}
 
 	return nil
+}
+
+// addSourceRef is a custom merge strategy that adds the source reference to the message.
+type addSourceRef struct {
+	defaultStrategy conditions.MergeStrategy
+}
+
+// Merge merges the conditions and adds the source reference to the message.
+func (s *addSourceRef) Merge(op conditions.MergeOperation, conditions []conditions.ConditionWithOwnerInfo, conditionTypes []string) (metav1.ConditionStatus, string, string, error) {
+	status, reason, message, err := s.defaultStrategy.Merge(op, conditions, conditionTypes)
+	if err != nil {
+		return status, reason, message, err
+	}
+	var refs []string
+	for _, c := range conditions {
+		if c.OwnerResource.Kind != "" && c.OwnerResource.Name != "" {
+			ref := fmt.Sprintf("%s/%s", c.OwnerResource.Kind, c.OwnerResource.Name)
+			refs = append(refs, ref)
+		}
+	}
+	if len(refs) > 0 {
+		message = fmt.Sprintf("%s (sources: %s)", message, strings.Join(refs, ", "))
+	}
+
+	return status, reason, message, nil
 }

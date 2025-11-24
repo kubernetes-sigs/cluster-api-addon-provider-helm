@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,11 +67,19 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 		},
 	}
 
-	if cluster.Spec.ControlPlaneRef != nil {
-		references["ControlPlane"] = *cluster.Spec.ControlPlaneRef
+	if cluster.Spec.ControlPlaneRef.Name != "" && cluster.Spec.ControlPlaneRef.Kind != "" {
+		references["ControlPlane"] = corev1.ObjectReference{
+			APIVersion: cluster.Spec.ControlPlaneRef.APIGroup + "/" + cluster.GroupVersionKind().Version,
+			Kind:       cluster.Spec.ControlPlaneRef.Kind,
+			Name:       cluster.Spec.ControlPlaneRef.Name,
+		}
 	}
-	if cluster.Spec.InfrastructureRef != nil {
-		references["InfraCluster"] = *cluster.Spec.InfrastructureRef
+	if cluster.Spec.InfrastructureRef.Name != "" && cluster.Spec.InfrastructureRef.Kind != "" {
+		references["InfraCluster"] = corev1.ObjectReference{
+			APIVersion: cluster.Spec.InfrastructureRef.APIGroup + "/" + cluster.GroupVersionKind().Version,
+			Kind:       cluster.Spec.InfrastructureRef.Kind,
+			Name:       cluster.Spec.InfrastructureRef.Name,
+		}
 	}
 	// TODO: would we want to add ControlPlaneMachineTemplate?
 

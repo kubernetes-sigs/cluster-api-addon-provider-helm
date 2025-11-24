@@ -35,13 +35,14 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	kubeadmv1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
+	kubeadmv1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
 const (
@@ -61,15 +62,15 @@ func EnsureControlPlaneInitialized(ctx context.Context, input clusterctl.ApplyCu
 	})
 	kubeadmControlPlane := &kubeadmv1.KubeadmControlPlane{}
 	key := client.ObjectKey{
-		Namespace: cluster.Spec.ControlPlaneRef.Namespace,
+		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ControlPlaneRef.Name,
 	}
 
 	By("Ensuring KubeadmControlPlane is initialized")
 	Eventually(func(g Gomega) {
-		g.Expect(getter.Get(ctx, key, kubeadmControlPlane)).To(Succeed(), "Failed to get KubeadmControlPlane object %s/%s", cluster.Spec.ControlPlaneRef.Namespace, cluster.Spec.ControlPlaneRef.Name)
-		g.Expect(kubeadmControlPlane.Status.Initialized).To(BeTrue(), "KubeadmControlPlane is not yet initialized")
-	}, input.WaitForControlPlaneIntervals...).Should(Succeed(), "KubeadmControlPlane object %s/%s was not initialized in time", cluster.Spec.ControlPlaneRef.Namespace, cluster.Spec.ControlPlaneRef.Name)
+		g.Expect(getter.Get(ctx, key, kubeadmControlPlane)).To(Succeed(), "Failed to get KubeadmControlPlane object %s/%s", cluster.Namespace, cluster.Spec.ControlPlaneRef.Name)
+		g.Expect(ptr.Equal(kubeadmControlPlane.Status.Initialization.ControlPlaneInitialized, ptr.To(true))).To(BeTrue(), "KubeadmControlPlane is not yet initialized")
+	}, input.WaitForControlPlaneIntervals...).Should(Succeed(), "KubeadmControlPlane object %s/%s was not initialized in time", cluster.Namespace, cluster.Spec.ControlPlaneRef.Name)
 
 	By("Ensuring API Server is reachable before querying Helm charts")
 	Eventually(func(g Gomega) {
