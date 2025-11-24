@@ -279,6 +279,94 @@ spec:
                   RepoURL is the URL of the Helm chart repository.
                   e.g. chart-path oci://repo-url/chart-name as repoURL: oci://repo-url and https://repo-url/chart-name as repoURL: https://repo-url
                 type: string
+              rollout:
+                description: |-
+                  Rollout is used to define install and upgrade level rollout options that
+                  will be used when rolling out HelmReleaseProxy resources changes. If
+                  undefined, it defaults to no rollout; i.e it applies changes to all
+                  matching clusters at once.
+                properties:
+                  install:
+                    description: |-
+                      Install rollout options. If left empty, it defaults to no rollout; i.e. it
+                      applies changes to all matching clusters at once.
+                    properties:
+                      stepIncrement:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          StepIncrement defines the increment to be added to existing stepSize
+                          during rollout.
+                          If StepIncrement is undefined, step size is set to stepInit.
+                          e.g. an int (5) or percentage of count of total matching clusters (25%)
+                        x-kubernetes-int-or-string: true
+                      stepInit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          StepInit defines the initial step to start from during rollout.
+                          e.g. an int (5) or percentage of count of total matching clusters (25%)
+                        x-kubernetes-int-or-string: true
+                      stepLimit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          StepLimit defines the upper limit on stepSize during rollout.
+                          If defined and computes to less than stepInit, step size can reach 100%;
+                          meaning that no upper limit is set.
+                          If stepIncrement is defined and stepLimit is omitted, step size can reach
+                          100%; meaning that no upper limit is set.
+                          If StepIncrement is undefined and if stepLimit is omitted, step size is
+                          defaulted to the value computed from stepInit.
+                          e.g. an int (5) or percentage of count of total matching clusters (25%)
+                        x-kubernetes-int-or-string: true
+                    required:
+                    - stepInit
+                    type: object
+                  upgrade:
+                    description: |-
+                      Upgrade rollout options. If left empty, it defaults to no rollout; i.e. it
+                      applies changes to all matching clusters at once.
+                    properties:
+                      stepIncrement:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          StepIncrement defines the increment to be added to existing stepSize
+                          during rollout.
+                          If StepIncrement is undefined, step size is set to stepInit.
+                          e.g. an int (5) or percentage of count of total matching clusters (25%)
+                        x-kubernetes-int-or-string: true
+                      stepInit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          StepInit defines the initial step to start from during rollout.
+                          e.g. an int (5) or percentage of count of total matching clusters (25%)
+                        x-kubernetes-int-or-string: true
+                      stepLimit:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          StepLimit defines the upper limit on stepSize during rollout.
+                          If defined and computes to less than stepInit, step size can reach 100%;
+                          meaning that no upper limit is set.
+                          If stepIncrement is defined and stepLimit is omitted, step size can reach
+                          100%; meaning that no upper limit is set.
+                          If StepIncrement is undefined and if stepLimit is omitted, step size is
+                          defaulted to the value computed from stepInit.
+                          e.g. an int (5) or percentage of count of total matching clusters (25%)
+                        x-kubernetes-int-or-string: true
+                    required:
+                    - stepInit
+                    type: object
+                type: object
               tlsConfig:
                 description: TLSConfig contains the TLS configuration for a HelmChartProxy.
                 properties:
@@ -424,6 +512,13 @@ spec:
                   by the controller.
                 format: int64
                 type: integer
+              rollout:
+                properties:
+                  count:
+                    type: integer
+                  stepSize:
+                    type: integer
+                type: object
             type: object
         type: object
     served: true
