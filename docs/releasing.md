@@ -21,7 +21,22 @@ This document describes the process for creating a new release of the Cluster AP
     export RELEASE_VERSION=v0.2.1  # Replace "v0.2.1" with the actual next version
     ```
 
-3. **Tag the code and push it upstream.**
+3. **Update metadata.yaml if needed**
+
+    If the new version is a minor or major release (e.g., v0.5.0 or v1.0.0), update the `metadata.yaml` file to reflect the new version:
+
+    ```yaml
+  - major: 0
+    minor: 4
+    contract: v1beta1
+  - major: 0
+    minor: 5
+    contract: v1beta2
+    ```
+
+    Once this change is committed to `main`, continue with the next step.
+
+4. **Tag the code and push it upstream.**
 
     ```shell
     git push upstream main
@@ -29,11 +44,11 @@ This document describes the process for creating a new release of the Cluster AP
     git push upstream $RELEASE_VERSION
     ```
 
-4. **Wait for a tagged image in the staging repository.**
+5. **Wait for a tagged image in the staging repository.**
 
     Pushing the new tag will trigger a [testgrid job](https://testgrid.k8s.io/sig-cluster-lifecycle-image-pushes#post-cluster-api-addon-provider-helm-push-images) to build and push a CAAPH image to the [staging repository](https://console.cloud.google.com/gcr/images/k8s-staging-cluster-api-helm?project=k8s-staging-cluster-api-helm). Wait for the job to complete and for the tagged image to be available before proceeding.
 
-5. **Promote the release image.**
+6. **Promote the release image.**
 
     Run the `make promote-images` command to promote the image from the staging repository to the production repository. If your git remotes don't use `https://` URLs, set the `USER_FORK` environment variable to your GitHub username.
 
@@ -45,7 +60,7 @@ This document describes the process for creating a new release of the Cluster AP
     
     See an [example PR](https://github.com/kubernetes/k8s.io/pull/6652).
 
-6. **Wait for the release image to be available.**
+7. **Wait for the release image to be available.**
 
     After the PR to promote the image has been approved and merged, wait for the CAAPH image to be available:
     
@@ -53,7 +68,7 @@ This document describes the process for creating a new release of the Cluster AP
     docker pull registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:${RELEASE_VERSION}
     ```
 
-7. **Update and publish the release on GitHub.**
+8. **Update and publish the release on GitHub.**
 
     Pushing the new tag also triggered a [GitHub Action](https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/actions/workflows/release.yml) which creates [a draft release](https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases).
 
@@ -63,6 +78,6 @@ This document describes the process for creating a new release of the Cluster AP
 
     Once you are satisfied with your changes, publish the release so it's no longer a draft.
 
-8. **Publicize the release.**
+9. **Publicize the release.**
 
     Announce the new release on the [CAPI Slack channel](https://kubernetes.slack.com/archives/C8TSNPY4T).
