@@ -23,7 +23,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/external"
@@ -31,24 +31,41 @@ import (
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// initializeBuiltins takes a map of keys to object references, attempts to get the referenced objects, and returns a map of keys to the actual objects.
-// These objects are a map[string]interface{} so that they can be used as values in the template.
-func initializeBuiltins(ctx context.Context, c ctrlClient.Client, referenceMap map[string]corev1.ObjectReference, cluster *clusterv1.Cluster) (map[string]interface{}, error) {
+// initializeBuiltins initializes built-in templating objects for a given cluster.
+// It retrieves the cluster, control plane, and infrastructure objects, converting them to unstructured maps for use in Helm chart value templates.
+func initializeBuiltins(ctx context.Context, c ctrlClient.Client, cluster *clusterv1.Cluster) (map[string]interface{}, error) {
 	log := ctrl.LoggerFrom(ctx)
+
+	log.V(2).Info("Initializing built-in templating objects for cluster", "cluster", cluster.GetName())
 
 	valueLookUp := make(map[string]interface{})
 
-	for name, ref := range referenceMap {
-		if ref.Namespace == "" {
-			ref.Namespace = cluster.Namespace
-		}
-		log.V(2).Info("Getting object for reference", "ref", ref)
-		obj, err := external.Get(ctx, c, &ref)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get object %s", ref.Name)
-		}
-		valueLookUp[name] = obj.Object
+	// Transform cluster to unstructured
+	clusterUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error converting cluster '%s' to unstructured", cluster.GetName())
 	}
+
+	valueLookUp["Cluster"] = clusterUnstructured
+
+	if cluster.Spec.ControlPlaneRef.Name != "" && cluster.Spec.ControlPlaneRef.Kind != "" {
+		objControlPlane, err := external.GetObjectFromContractVersionedRef(ctx, c, cluster.Spec.ControlPlaneRef, cluster.Namespace)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error getting ControlPlane object for cluster '%s'", cluster.GetName())
+		}
+		valueLookUp["ControlPlane"] = objControlPlane.Object
+	}
+
+	if cluster.Spec.InfrastructureRef.Name != "" && cluster.Spec.InfrastructureRef.Kind != "" {
+		objInfraCluster, err := external.GetObjectFromContractVersionedRef(ctx, c, cluster.Spec.InfrastructureRef, cluster.Namespace)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error getting Infrastructure object for cluster '%s'", cluster.GetName())
+		}
+
+		valueLookUp["InfraCluster"] = objInfraCluster.Object
+	}
+
+	// TODO: would we want to add ControlPlaneMachineTemplate?
 
 	return valueLookUp, nil
 }
@@ -58,34 +75,10 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 	log := ctrl.LoggerFrom(ctx)
 
 	log.V(2).Info("Rendering templating in values:", "values", spec.ValuesTemplate)
-	references := map[string]corev1.ObjectReference{
-		"Cluster": {
-			APIVersion: cluster.APIVersion,
-			Kind:       cluster.Kind,
-			Namespace:  cluster.Namespace,
-			Name:       cluster.Name,
-		},
-	}
 
-	if cluster.Spec.ControlPlaneRef.Name != "" && cluster.Spec.ControlPlaneRef.Kind != "" {
-		references["ControlPlane"] = corev1.ObjectReference{
-			APIVersion: cluster.Spec.ControlPlaneRef.APIGroup + "/" + cluster.GroupVersionKind().Version,
-			Kind:       cluster.Spec.ControlPlaneRef.Kind,
-			Name:       cluster.Spec.ControlPlaneRef.Name,
-		}
-	}
-	if cluster.Spec.InfrastructureRef.Name != "" && cluster.Spec.InfrastructureRef.Kind != "" {
-		references["InfraCluster"] = corev1.ObjectReference{
-			APIVersion: cluster.Spec.InfrastructureRef.APIGroup + "/" + cluster.GroupVersionKind().Version,
-			Kind:       cluster.Spec.InfrastructureRef.Kind,
-			Name:       cluster.Spec.InfrastructureRef.Name,
-		}
-	}
-	// TODO: would we want to add ControlPlaneMachineTemplate?
-
-	valueLookUp, err := initializeBuiltins(ctx, c, references, cluster)
+	valueLookUp, err := initializeBuiltins(ctx, c, cluster)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "error initializing built-in templating objects for cluster '%s'", cluster.GetName())
 	}
 
 	tmpl, err := template.New(spec.ChartName + "-" + cluster.GetName()).
