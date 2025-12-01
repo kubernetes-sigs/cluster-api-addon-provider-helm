@@ -47,6 +47,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+var errNoChartVersion = errors.New("Failed to resolve chart version of existing release")
+
 type Client interface {
 	InstallOrUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
 	GetHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
@@ -451,7 +453,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 	log := ctrl.LoggerFrom(ctx)
 
 	if existing.Chart == nil || existing.Chart.Metadata == nil {
-		return false, errors.New("Failed to resolve chart version of existing release")
+		return false, errNoChartVersion
 	}
 	if existing.Chart.Metadata.Version != chartRequested.Metadata.Version {
 		log.V(3).Info("Versions are different, upgrading")
@@ -473,7 +475,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 		helmRelease.StatusPendingRollback:
 	}
 
-	klog.V(2).Infof("Diff between values is:\n%s", cmp.Diff(existing.Config, values))
+	log.V(2).Info(fmt.Sprintf("Diff between values is:\n%s", cmp.Diff(existing.Config, values)))
 
 	// TODO: Comparing yaml is not ideal, but it's the best we can do since DeepEquals fails. This is because int64 types
 	// are converted to float64 when returned from the helm API.
