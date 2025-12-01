@@ -458,14 +458,19 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 		return true, nil
 	}
 
-	if existing.Info.Status == helmRelease.StatusFailed {
+	switch existing.Info.Status {
+	case helmRelease.StatusFailed:
 		log.Info("Release is in failed state, attempting upgrade to fix it")
 		return true, nil
-	}
-
-	if existing.Info.Status == helmRelease.StatusPendingInstall || existing.Info.Status == helmRelease.StatusPendingUpgrade {
+	case helmRelease.StatusPendingInstall, helmRelease.StatusPendingUpgrade:
 		log.Info("Release is in a pending state, upgrading")
 		return true, nil
+	case helmRelease.StatusUnknown,
+		helmRelease.StatusDeployed,
+		helmRelease.StatusUninstalled,
+		helmRelease.StatusSuperseded,
+		helmRelease.StatusUninstalling,
+		helmRelease.StatusPendingRollback:
 	}
 
 	klog.V(2).Infof("Diff between values is:\n%s", cmp.Diff(existing.Config, values))
