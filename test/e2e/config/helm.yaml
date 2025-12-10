@@ -3,22 +3,22 @@ managementClusterName: caaph-e2e
 images:
   - name: ${MANAGER_IMAGE}
     loadBehavior: mustLoad
-  - name: registry.k8s.io/cluster-api/cluster-api-controller:v1.11.3
+  - name: registry.k8s.io/cluster-api/cluster-api-controller:v1.11.4
     loadBehavior: tryLoad
-  - name: registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.11.3
+  - name: registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.11.4
     loadBehavior: tryLoad
-  - name: registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.11.3
+  - name: registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.11.4
     loadBehavior: tryLoad
   # Note: This pulls the CAPD image from the staging repo instead of the official registry.
-  - name: gcr.io/k8s-staging-cluster-api/capd-manager:v1.11.3
+  - name: gcr.io/k8s-staging-cluster-api/capd-manager:v1.11.4
     loadBehavior: tryLoad
 
 providers:
 - name: cluster-api
   type: CoreProvider
   versions:
-  - name: v1.10.8 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
-    value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.8/core-components.yaml
+  - name: v1.10.9 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.9/core-components.yaml
     type: url
     contract: v1beta1
     files:
@@ -26,8 +26,8 @@ providers:
     replacements:
       - old: --metrics-addr=127.0.0.1:8080
         new: --metrics-addr=:8080
-  - name: v1.11.3
-    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.3/core-components.yaml"
+  - name: v1.11.4
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.4/core-components.yaml"
     type: "url"
     contract: v1beta1
     files:
@@ -40,8 +40,8 @@ providers:
 - name: kubeadm
   type: BootstrapProvider
   versions:
-  - name: v1.10.8 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
-    value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.8/bootstrap-components.yaml
+  - name: v1.10.9 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.9/bootstrap-components.yaml
     type: url
     contract: v1beta1
     files:
@@ -49,8 +49,8 @@ providers:
     replacements:
     - old: --metrics-addr=127.0.0.1:8080
       new: --metrics-addr=:8080
-  - name: v1.11.3
-    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.3/bootstrap-components.yaml"
+  - name: v1.11.4
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.4/bootstrap-components.yaml"
     type: "url"
     contract: v1beta1
     files:
@@ -62,8 +62,8 @@ providers:
 - name: kubeadm
   type: ControlPlaneProvider
   versions:
-  - name: v1.10.8 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
-    value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.8/control-plane-components.yaml
+  - name: v1.10.9 # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.9/control-plane-components.yaml
     type: url
     contract: v1beta1
     files:
@@ -71,8 +71,8 @@ providers:
     replacements:
     - old: "imagePullPolicy: Always"
       new: "imagePullPolicy: IfNotPresent"
-  - name: v1.11.3
-    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.3/control-plane-components.yaml"
+  - name: v1.11.4
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.4/control-plane-components.yaml"
     type: "url"
     contract: v1beta1
     files:
@@ -84,8 +84,8 @@ providers:
 - name: docker
   type: InfrastructureProvider
   versions:
-  - name: "v1.10.8"  # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
-    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.8/infrastructure-components-development.yaml"
+  - name: "v1.10.9"  # latest patch of earliest minor in supported v1beta1 releases; this is used for v1beta1 old --> v1beta1 latest clusterctl upgrades test only.
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.10.9/infrastructure-components-development.yaml"
     type: "url"
     contract: v1beta1
     replacements:
@@ -97,8 +97,8 @@ providers:
     - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1beta1/cluster-template.yaml"
     - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1beta1/cluster-template-upgrades.yaml"
     - sourcePath: "${PWD}/test/e2e/data/addons-helm/v1beta1/clusterclass-quick-start.yaml"
-  - name: "v1.11.3" # latest published release in the v1beta2 series; this is used for v1beta1 --> main clusterctl upgrades test only.
-    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.3/infrastructure-components-development.yaml"
+  - name: "v1.11.4" # latest published release in the v1beta2 series; this is used for v1beta1 --> main clusterctl upgrades test only.
+    value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.11.4/infrastructure-components-development.yaml"
     type: "url"
     contract: v1beta1
     replacements:
@@ -168,7 +168,7 @@ variables:
   EXP_MACHINE_SET_PREFLIGHT_CHECKS: "true"
   CAPI_DIAGNOSTICS_ADDRESS: ":8080"
   CAPI_INSECURE_DIAGNOSTICS: "true"
-  OLD_CAPI_UPGRADE_VERSION: "v1.10.8"
+  OLD_CAPI_UPGRADE_VERSION: "v1.10.9"
   OLD_PROVIDER_UPGRADE_VERSION: "v0.2.6"
 
 intervals:
