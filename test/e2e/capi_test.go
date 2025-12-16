@@ -69,7 +69,7 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 
 	Context("API Version Upgrade", func() {
 
-		Context("upgrade from an old version of v1beta1 to current, and scale workload clusters created in the old version", func() {
+		Context("upgrade from an old version of v1beta2 to current, and scale workload clusters created in the old version", func() {
 
 			capi_e2e.ClusterctlUpgradeSpec(context.TODO(), func() capi_e2e.ClusterctlUpgradeSpecInput {
 				return capi_e2e.ClusterctlUpgradeSpecInput{
@@ -78,7 +78,7 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 					BootstrapClusterProxy:     bootstrapClusterProxy,
 					ArtifactFolder:            artifactFolder,
 					SkipCleanup:               skipCleanup,
-					InitWithProvidersContract: "v1beta1",
+					InitWithProvidersContract: "v1beta2",
 					ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
 						WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
 					},
