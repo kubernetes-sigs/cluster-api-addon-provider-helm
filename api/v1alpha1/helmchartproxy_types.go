@@ -293,8 +293,8 @@ func (c *HelmChartProxy) SetMatchingClusters(clusterList []clusterv1.Cluster) {
 	matchingClusters := make([]corev1.ObjectReference, 0, len(clusterList))
 	for _, cluster := range clusterList {
 		matchingClusters = append(matchingClusters, corev1.ObjectReference{
-			Kind:       cluster.Kind,
-			APIVersion: cluster.APIVersion,
+			Kind:       clusterv1.ClusterKind,
+			APIVersion: clusterv1.GroupVersion.String(),
 			Name:       cluster.Name,
 			Namespace:  cluster.Namespace,
 		})
