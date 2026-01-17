@@ -2,7 +2,7 @@ module sigs.k8s.io/cluster-api-addon-provider-helm
 
 go 1.24.0
 
-toolchain go1.24.11
+toolchain go1.24.12
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
