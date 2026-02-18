@@ -28,6 +28,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	helmRelease "helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -422,6 +423,272 @@ var _ = Describe("Workload cluster creation", func() {
 					HelmChartProxy:        hcp,
 				}
 				EnsureHelmReleaseInstallOrUpgrade(ctx, specName, bootstrapClusterProxy, installInput, nil, false)
+			})
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to finish install when Helm release is in pending-install status", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"MetalLBChart": "enabled",
+						},
+					},
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+				},
+			}
+
+			By("Waiting for controller to finish install when Helm release is in pending-install status", func() {
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusPendingInstall,
+					}
+				})
+			})
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to finish upgrade when Helm release is in pending-upgrade status", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"MetalLBChart": "enabled",
+						},
+					},
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+				},
+			}
+
+			By("Waiting for controller to finish upgrade when Helm release is in pending-upgrade status", func() {
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusPendingUpgrade,
+					}
+				})
+			})
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to finish upgrade when Helm release is in pending-rollback status", func() {
+			// A release can be in pending-rollback status is if it was upgraded with the Atomic option enabled,
+			// the upgrade failed, and the rollback also failed.
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"MetalLBChart": "enabled",
+						},
+					},
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+				},
+			}
+
+			By("Waiting for controller to finish upgrade when Helm release is in pending-rollback status", func() {
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusPendingRollback,
+					}
+				})
+			})
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to finish uninstall when Helm release is in any pending status", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			newHCP := func() addonsv1alpha1.HelmChartProxy {
+				return addonsv1alpha1.HelmChartProxy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "metallb",
+						Namespace: namespace.Name,
+					},
+					Spec: addonsv1alpha1.HelmChartProxySpec{
+						ClusterSelector: metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"MetalLBChart": "enabled",
+							},
+						},
+						ReleaseName:       "metallb-name",
+						ReleaseNamespace:  "metallb-namespace",
+						ChartName:         "metallb",
+						RepoURL:           "https://metallb.github.io/metallb",
+						Version:           "0.15.2",
+						ValuesTemplate:    metallbValues,
+						ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+					},
+				}
+			}
+
+			By("Waiting for controller to finish uninstall when Helm release is in uninstalling status", func() {
+				hcp := newHCP()
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        &hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusUninstalling,
+					}
+				})
+
+				By("Deleting the HelmChartProxy, so we can create it again for the next test case")
+				DeleteHelmChartProxy(ctx, bootstrapClusterProxy, &hcp)
+				WaitForHelmChartProxyDeleted(ctx, bootstrapClusterProxy, &hcp, specName)
+			})
+
+			By("Waiting for controller to finish uninstall when Helm release is in pending-install status", func() {
+				hcp := newHCP()
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        &hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusPendingInstall,
+					}
+				})
+
+				By("Deleting the HelmChartProxy, so we can create it again for the next test case")
+				DeleteHelmChartProxy(ctx, bootstrapClusterProxy, &hcp)
+				WaitForHelmChartProxyDeleted(ctx, bootstrapClusterProxy, &hcp, specName)
+			})
+
+			By("Waiting for controller to finish uninstall when Helm release is in pending-upgrade status", func() {
+				hcp := newHCP()
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        &hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusPendingUpgrade,
+					}
+				})
+
+				By("Deleting the HelmChartProxy, so we can create it again for the next test case")
+				DeleteHelmChartProxy(ctx, bootstrapClusterProxy, &hcp)
+				WaitForHelmChartProxyDeleted(ctx, bootstrapClusterProxy, &hcp, specName)
+			})
+
+			By("Waiting for controller to finish uninstall when Helm release is in pending-rollback status", func() {
+				hcp := newHCP()
+				HelmPendingSpec(ctx, func() HelmPendingInput {
+					return HelmPendingInput{
+						HelmInstallInput: HelmInstallInput{
+							BootstrapClusterProxy: bootstrapClusterProxy,
+							Namespace:             namespace,
+							ClusterName:           clusterName,
+							HelmChartProxy:        &hcp,
+						},
+						LastReleaseStatus: helmRelease.StatusPendingRollback,
+					}
+				})
 			})
 		})
 	})
