@@ -113,6 +113,14 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig
 		return nil, err
 	}
 
+	if existingRelease.Info.Status.IsPending() {
+		log.V(2).Info("Release status is pending, overwriting status to failed to recover by upgrade",
+			"previousStatus", existingRelease.Info.Status.String())
+		if err := c.updateLastReleaseStatus(ctx, restConfig, spec.ReleaseNamespace, spec.ReleaseName, helmRelease.StatusFailed); err != nil {
+			return nil, errors.Wrapf(err, "failed to overwrite status of last release")
+		}
+	}
+
 	return c.UpgradeHelmReleaseIfChanged(ctx, restConfig, credentialsPath, caFilePath, spec, existingRelease)
 }
 
@@ -561,4 +569,19 @@ func (c *HelmClient) RollbackHelmRelease(ctx context.Context, restConfig *rest.C
 	rollbackClient := helmAction.NewRollback(actionConfig)
 
 	return rollbackClient.Run(spec.ReleaseName)
+}
+
+func (c *HelmClient) updateLastReleaseStatus(ctx context.Context, restConfig *rest.Config, namespace string, name string, status helmRelease.Status) error {
+	_, actionConfig, err := HelmInit(ctx, namespace, restConfig)
+	if err != nil {
+		return err
+	}
+
+	last, err := actionConfig.Releases.Last(name)
+	if err != nil {
+		return err
+	}
+	last.Info.Status = status
+
+	return actionConfig.Releases.Update(last)
 }

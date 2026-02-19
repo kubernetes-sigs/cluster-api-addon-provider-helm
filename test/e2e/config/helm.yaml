@@ -195,6 +195,7 @@ intervals:
   default/wait-helm-release: ["10m", "10s"]
   default/wait-helm-release-deployed: ["10m", "10s"]
   default/wait-delete-helmreleaseproxy: ["3m", "10s"]
+  default/wait-delete-helmchartproxy: ["3m", "10s"]
   node-drain/wait-deployment-available: ["3m", "10s"]
   node-drain/wait-control-plane: ["15m", "10s"]
   node-drain/wait-machine-deleted: ["2m", "10s"]
