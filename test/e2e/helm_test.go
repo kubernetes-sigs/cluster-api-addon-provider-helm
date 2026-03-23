@@ -37,14 +37,15 @@ import (
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
-var metallbValues = `prometheus: 
+var metallbValues = `prometheus:
   scrapeAnnotations: false`
 
-var newMetallbValues = `prometheus: 
+var newMetallbValues = `prometheus:
   scrapeAnnotations: true`
 
 var _ = Describe("Workload cluster creation", func() {
@@ -217,6 +218,96 @@ var _ = Describe("Workload cluster creation", func() {
 					}
 				})
 			})
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to install metallb Helm chart and take ownership of existing resources", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			By("Creating pre-existing resources in the workload cluster without Helm annotations")
+			workloadClusterProxy := bootstrapClusterProxy.GetWorkloadCluster(ctx, namespace.Name, clusterName)
+			workloadClient := workloadClusterProxy.GetClient()
+
+			// Create the release namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metallb-namespace",
+				},
+			}
+			Expect(workloadClient.Create(ctx, ns)).To(Succeed())
+
+			// Create a ServiceAccount that the chart will try to create
+			sa := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb-name-controller",
+					Namespace: "metallb-namespace",
+				},
+			}
+			Expect(workloadClient.Create(ctx, sa)).To(Succeed())
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"MetalLBChart": "enabled",
+						},
+					},
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+					Options: addonsv1alpha1.HelmOptions{
+						TakeOwnership: true,
+					},
+				},
+			}
+
+			// Create new Helm chart
+			By("Creating new HelmChartProxy to install metallb with TakeOwnership", func() {
+				HelmInstallSpec(ctx, func() HelmInstallInput {
+					return HelmInstallInput{
+						BootstrapClusterProxy: bootstrapClusterProxy,
+						Namespace:             namespace,
+						ClusterName:           clusterName,
+						HelmChartProxy:        hcp,
+					}
+				})
+			})
+
+			By("Verifying that the pre-existing ServiceAccount is now owned by Helm")
+			Eventually(func() error {
+				err := workloadClient.Get(ctx, ctrlclient.ObjectKey{Name: "metallb-name-controller", Namespace: "metallb-namespace"}, sa)
+				if err != nil {
+					return err
+				}
+
+				labels := sa.GetLabels()
+				annotations := sa.GetAnnotations()
+
+				Expect(labels["app.kubernetes.io/managed-by"]).To(Equal("Helm"), "unexpected app.kubernetes.io/managed-by label")
+				Expect(annotations["meta.helm.sh/release-name"]).To(Equal("metallb-name"), "unexpected meta.helm.sh/release-name annotation")
+				Expect(annotations["meta.helm.sh/release-namespace"]).To(Equal("metallb-namespace"), "unexpected meta.helm.sh/release-namespace annotation")
+
+				return nil
+			}, 30*time.Second, 1*time.Second).Should(Succeed())
 		})
 	})
 
