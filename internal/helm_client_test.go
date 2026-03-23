@@ -26,7 +26,6 @@ import (
 	"github.com/onsi/gomega/types"
 	helmAction "helm.sh/helm/v3/pkg/action"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
