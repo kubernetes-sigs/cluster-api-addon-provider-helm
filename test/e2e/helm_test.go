@@ -438,6 +438,19 @@ var _ = Describe("Workload cluster creation", func() {
 				dumpSpecResourcesAndCleanup(ctx, cleanInput)
 			}()
 
+			// CAPI v1.12.4 changed ApplyClusterTemplateAndWait to use Create instead of
+			// CreateOrUpdate, so we have to clean up the calico HelmChartProxy before
+			// re-applying the template in the same namespace for the second cluster.
+			By("Deleting the calico HelmChartProxy before creating the second cluster")
+			calicoHCP := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "calico",
+					Namespace: namespace.Name,
+				},
+			}
+			DeleteHelmChartProxy(ctx, bootstrapClusterProxy, calicoHCP)
+			WaitForHelmChartProxyDeleted(ctx, bootstrapClusterProxy, calicoHCP, specName)
+
 			clusterName2 := fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
 				specName,
