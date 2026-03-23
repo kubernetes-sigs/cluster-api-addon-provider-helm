@@ -18,15 +18,12 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -36,8 +33,7 @@ var helmreleaseproxylog = logf.Log.WithName("helmreleaseproxy-resource")
 func (r *HelmReleaseProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	w := new(helmReleaseProxyWebhook)
 
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+	return ctrl.NewWebhookManagedBy(mgr, r).
 		WithDefaulter(w).
 		WithValidator(w).
 		Complete()
@@ -48,16 +44,12 @@ func (r *HelmReleaseProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 type helmReleaseProxyWebhook struct{}
 
 var (
-	_ webhook.CustomValidator = &helmReleaseProxyWebhook{}
-	_ webhook.CustomDefaulter = &helmReleaseProxyWebhook{}
+	_ admission.Validator[*HelmReleaseProxy] = &helmReleaseProxyWebhook{}
+	_ admission.Defaulter[*HelmReleaseProxy] = &helmReleaseProxyWebhook{}
 )
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type.
-func (*helmReleaseProxyWebhook) Default(_ context.Context, objRaw runtime.Object) error {
-	obj, ok := objRaw.(*HelmReleaseProxy)
-	if !ok {
-		return apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", objRaw))
-	}
+// Default implements admission.Defaulter so a webhook will be registered for the type.
+func (*helmReleaseProxyWebhook) Default(_ context.Context, obj *HelmReleaseProxy) error {
 	helmreleaseproxylog.Info("default", "name", obj.Name)
 
 	if obj.Spec.ReleaseNamespace == "" {
@@ -70,30 +62,17 @@ func (*helmReleaseProxyWebhook) Default(_ context.Context, objRaw runtime.Object
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-addons-cluster-x-k8s-io-v1alpha1-helmreleaseproxy,mutating=false,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=create;update,versions=v1alpha1,name=vhelmreleaseproxy.kb.io,admissionReviewVersions=v1
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (*helmReleaseProxyWebhook) ValidateCreate(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
-	newObj, ok := objRaw.(*HelmReleaseProxy)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", objRaw))
-	}
-
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type.
+func (*helmReleaseProxyWebhook) ValidateCreate(_ context.Context, newObj *HelmReleaseProxy) (admission.Warnings, error) {
 	helmreleaseproxylog.Info("validate create", "name", newObj.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (*helmReleaseProxyWebhook) ValidateUpdate(_ context.Context, oldRaw, newRaw runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type.
+func (*helmReleaseProxyWebhook) ValidateUpdate(_ context.Context, oldObj, newObj *HelmReleaseProxy) (admission.Warnings, error) {
 	var allErrs field.ErrorList
-	oldObj, ok := oldRaw.(*HelmReleaseProxy)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", oldRaw))
-	}
-	newObj, ok := newRaw.(*HelmReleaseProxy)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmReleaseProxy but got a %T", newRaw))
-	}
 
 	helmreleaseproxylog.Info("validate update", "name", newObj.Name)
 
@@ -134,12 +113,8 @@ func (*helmReleaseProxyWebhook) ValidateUpdate(_ context.Context, oldRaw, newRaw
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (*helmReleaseProxyWebhook) ValidateDelete(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
-	obj, ok := objRaw.(*HelmReleaseProxy)
-	if !ok {
-		return nil, fmt.Errorf("expected a HelmReleaseProxy object but got %T", objRaw)
-	}
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type.
+func (*helmReleaseProxyWebhook) ValidateDelete(_ context.Context, obj *HelmReleaseProxy) (admission.Warnings, error) {
 	helmreleaseproxylog.Info("validate delete", "name", obj.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
