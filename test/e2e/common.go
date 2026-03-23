@@ -35,14 +35,13 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	kubeadmv1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
 const (
@@ -192,7 +191,6 @@ func EnsureHelmReleaseInstallOrUpgrade(ctx context.Context, specName string, boo
 
 // EnsureHelmReleaseUnchanged ensures that a Helm release was not changed after the HelmChartProxy was updated.
 func EnsureHelmReleaseUnchanged(ctx context.Context, specName string, bootstrapClusterProxy framework.ClusterProxy, clusterName string, clusterNamespace string, existingRelease *release.Release) {
-
 	// Get workload Cluster proxy
 	By("creating a clusterctl proxy to the workload cluster")
 	workloadClusterProxy := bootstrapClusterProxy.GetWorkloadCluster(ctx, clusterNamespace, clusterName)

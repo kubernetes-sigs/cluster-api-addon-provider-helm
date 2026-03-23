@@ -30,7 +30,6 @@ import (
 )
 
 var _ = Describe("Running the Cluster API E2E tests", func() {
-
 	AfterEach(func() {
 		CheckTestBeforeCleanup()
 	})
@@ -68,9 +67,7 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 	})
 
 	Context("API Version Upgrade", func() {
-
 		Context("upgrade from an old version of v1beta2 to current, and scale workload clusters created in the old version", func() {
-
 			capi_e2e.ClusterctlUpgradeSpec(context.TODO(), func() capi_e2e.ClusterctlUpgradeSpecInput {
 				return capi_e2e.ClusterctlUpgradeSpecInput{
 					E2EConfig:                 e2eConfig,

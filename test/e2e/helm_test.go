@@ -32,14 +32,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
 
 var metallbValues = `prometheus:
@@ -437,6 +436,19 @@ var _ = Describe("Workload cluster creation", func() {
 				}
 				dumpSpecResourcesAndCleanup(ctx, cleanInput)
 			}()
+
+			// CAPI v1.12.4 changed ApplyClusterTemplateAndWait to use Create instead of
+			// CreateOrUpdate, so we have to clean up the calico HelmChartProxy before
+			// re-applying the template in the same namespace for the second cluster.
+			By("Deleting the calico HelmChartProxy before creating the second cluster")
+			calicoHCP := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "calico",
+					Namespace: namespace.Name,
+				},
+			}
+			DeleteHelmChartProxy(ctx, bootstrapClusterProxy, calicoHCP)
+			WaitForHelmChartProxyDeleted(ctx, bootstrapClusterProxy, calicoHCP, specName)
 
 			clusterName2 := fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
