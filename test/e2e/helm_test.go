@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
@@ -308,6 +309,102 @@ var _ = Describe("Workload cluster creation", func() {
 
 				return nil
 			}, 30*time.Second, 1*time.Second).Should(Succeed())
+		})
+	})
+
+	Context("Creating workload cluster [REQUIRED]", func() {
+		It("With default template to fail installing metallb Helm chart without TakeOwnership when conflicting resources exist", func() {
+			clusterName = fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+			clusterctl.ApplyClusterTemplateAndWait(ctx, createApplyClusterTemplateInput(
+				specName,
+				withNamespace(namespace.Name),
+				withClusterName(clusterName),
+				withControlPlaneMachineCount(1),
+				withWorkerMachineCount(1),
+				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+				}),
+			), result)
+
+			By("Creating pre-existing resources in the workload cluster without Helm annotations")
+			workloadClusterProxy := bootstrapClusterProxy.GetWorkloadCluster(ctx, namespace.Name, clusterName)
+			workloadClient := workloadClusterProxy.GetClient()
+
+			// Create the release namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "metallb-namespace",
+				},
+			}
+			Expect(workloadClient.Create(ctx, ns)).To(Succeed())
+
+			// Create a ServiceAccount that the chart will try to create
+			sa := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb-name-controller",
+					Namespace: "metallb-namespace",
+				},
+			}
+			Expect(workloadClient.Create(ctx, sa)).To(Succeed())
+
+			hcp := &addonsv1alpha1.HelmChartProxy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "metallb",
+					Namespace: namespace.Name,
+				},
+				Spec: addonsv1alpha1.HelmChartProxySpec{
+					ClusterSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"MetalLBChart": "enabled",
+						},
+					},
+					ReleaseName:       "metallb-name",
+					ReleaseNamespace:  "metallb-namespace",
+					ChartName:         "metallb",
+					RepoURL:           "https://metallb.github.io/metallb",
+					Version:           "0.15.2",
+					ValuesTemplate:    metallbValues,
+					ReconcileStrategy: string(addonsv1alpha1.ReconcileStrategyContinuous),
+					// TakeOwnership is intentionally not set (defaults to false)
+				},
+			}
+
+			By("Creating HelmChartProxy on management cluster")
+			mgmtClient := bootstrapClusterProxy.GetClient()
+			Expect(mgmtClient.Create(ctx, hcp)).To(Succeed())
+
+			By("Patching cluster labels to match HelmChartProxy selector")
+			workloadCluster := &clusterv1.Cluster{}
+			key := types.NamespacedName{Namespace: namespace.Name, Name: clusterName}
+			Expect(mgmtClient.Get(ctx, key, workloadCluster)).To(Succeed())
+			if workloadCluster.Labels == nil {
+				workloadCluster.Labels = make(map[string]string)
+			}
+			workloadCluster.Labels["MetalLBChart"] = "enabled"
+			Expect(mgmtClient.Update(ctx, workloadCluster)).To(Succeed())
+
+			By("Verifying that the HelmReleaseProxy reports a failure condition")
+			Eventually(func() bool {
+				hrpList := &addonsv1alpha1.HelmReleaseProxyList{}
+				labels := map[string]string{
+					clusterv1.ClusterNameLabel:             clusterName,
+					addonsv1alpha1.HelmChartProxyLabelName: hcp.Name,
+				}
+				if err := mgmtClient.List(ctx, hrpList, ctrlclient.InNamespace(namespace.Name), ctrlclient.MatchingLabels(labels)); err != nil {
+					return false
+				}
+				if len(hrpList.Items) != 1 {
+					return false
+				}
+
+				hrp := &hrpList.Items[0]
+				cond := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
+				if cond == nil {
+					return false
+				}
+
+				return cond.Status == metav1.ConditionFalse && cond.Reason == addonsv1alpha1.HelmInstallOrUpgradeFailedReason
+			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "expected HelmReleaseProxy to have a failure condition due to conflicting pre-existing resources")
 		})
 	})
 
