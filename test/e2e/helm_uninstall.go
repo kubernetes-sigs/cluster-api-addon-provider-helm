@@ -30,12 +30,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
-
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/test/framework"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // HelmUninstallInput specifies the input for uninstalling a Helm chart on a workload cluster and verifying that it was successful.
@@ -117,5 +115,4 @@ func HelmUninstallSpec(ctx context.Context, inputGetter func() HelmUninstallInpu
 			}
 		}, e2eConfig.GetIntervals(specName, "wait-helm-release")...).Should(Succeed())
 	}
-
 }
