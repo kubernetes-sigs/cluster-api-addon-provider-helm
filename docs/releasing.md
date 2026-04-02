@@ -46,7 +46,7 @@ This document describes the process for creating a new release of the Cluster AP
 
 5. **Wait for a tagged image in the staging repository.**
 
-    Pushing the new tag will trigger a [testgrid job](https://testgrid.k8s.io/sig-cluster-lifecycle-image-pushes#post-cluster-api-addon-provider-helm-push-images) to build and push a CAAPH image to the [staging repository](https://console.cloud.google.com/gcr/images/k8s-staging-cluster-api-helm?project=k8s-staging-cluster-api-helm). Wait for the job to complete and for the tagged image to be available before proceeding.
+    Pushing the new tag will trigger a [testgrid job](https://testgrid.k8s.io/sig-cluster-lifecycle-image-pushes#post-cluster-api-addon-provider-helm-push-images) to build and push a CAAPH image to the [staging repository](https://console.cloud.google.com/artifacts/docker/k8s-staging-cluster-api-helm/us/gcr.io/cluster-api-helm-controller). Wait for the job to complete and for the tagged image to be available before proceeding.
 
 6. **Promote the release image.**
 
