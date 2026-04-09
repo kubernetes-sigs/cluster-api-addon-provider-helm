@@ -24,11 +24,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -38,8 +36,7 @@ var helmchartproxylog = logf.Log.WithName("helmchartproxy-resource")
 func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	w := new(helmChartProxyWebhook)
 
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+	return ctrl.NewWebhookManagedBy(mgr, r).
 		WithDefaulter(w).
 		WithValidator(w).
 		Complete()
@@ -50,18 +47,14 @@ func (r *HelmChartProxy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 type helmChartProxyWebhook struct{}
 
 var (
-	_ webhook.CustomValidator = &helmChartProxyWebhook{}
-	_ webhook.CustomDefaulter = &helmChartProxyWebhook{}
+	_ admission.Validator[*HelmChartProxy] = &helmChartProxyWebhook{}
+	_ admission.Defaulter[*HelmChartProxy] = &helmChartProxyWebhook{}
 )
 
 const helmTimeout = 10 * time.Minute
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type.
-func (*helmChartProxyWebhook) Default(_ context.Context, objRaw runtime.Object) error {
-	newObj, ok := objRaw.(*HelmChartProxy)
-	if !ok {
-		return apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", objRaw))
-	}
+// Default implements admission.Defaulter so a webhook will be registered for the type.
+func (*helmChartProxyWebhook) Default(_ context.Context, newObj *HelmChartProxy) error {
 	helmchartproxylog.Info("default", "name", newObj.Name)
 
 	if newObj.Spec.ReleaseNamespace == "" {
@@ -82,13 +75,8 @@ func (*helmChartProxyWebhook) Default(_ context.Context, objRaw runtime.Object) 
 
 //+kubebuilder:webhook:path=/validate-addons-cluster-x-k8s-io-v1alpha1-helmchartproxy,mutating=false,failurePolicy=fail,sideEffects=None,groups=addons.cluster.x-k8s.io,resources=helmchartproxies,verbs=create;update,versions=v1alpha1,name=vhelmchartproxy.kb.io,admissionReviewVersions=v1
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (*helmChartProxyWebhook) ValidateCreate(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
-	newObj, ok := objRaw.(*HelmChartProxy)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", objRaw))
-	}
-
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type.
+func (*helmChartProxyWebhook) ValidateCreate(_ context.Context, newObj *HelmChartProxy) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate create", "name", newObj.Name)
 
 	if err := isUrlValid(newObj.Spec.RepoURL); err != nil {
@@ -98,17 +86,9 @@ func (*helmChartProxyWebhook) ValidateCreate(_ context.Context, objRaw runtime.O
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (*helmChartProxyWebhook) ValidateUpdate(_ context.Context, oldRaw, newRaw runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type.
+func (*helmChartProxyWebhook) ValidateUpdate(_ context.Context, oldObj, newObj *HelmChartProxy) (admission.Warnings, error) {
 	var allErrs field.ErrorList
-	oldObj, ok := oldRaw.(*HelmChartProxy)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", oldRaw))
-	}
-	newObj, ok := newRaw.(*HelmChartProxy)
-	if !ok {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a HelmChartProxy but got a %T", newRaw))
-	}
 
 	helmchartproxylog.Info("validate update", "name", newObj.Name)
 
@@ -133,13 +113,8 @@ func (*helmChartProxyWebhook) ValidateUpdate(_ context.Context, oldRaw, newRaw r
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (*helmChartProxyWebhook) ValidateDelete(_ context.Context, objRaw runtime.Object) (admission.Warnings, error) {
-	obj, ok := objRaw.(*HelmChartProxy)
-	if !ok {
-		return nil, fmt.Errorf("expected a HelmChartProxy object but got %T", objRaw)
-	}
-
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type.
+func (*helmChartProxyWebhook) ValidateDelete(_ context.Context, obj *HelmChartProxy) (admission.Warnings, error) {
 	helmchartproxylog.Info("validate delete", "name", obj.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
