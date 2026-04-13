@@ -37,3 +37,6 @@ _artifacts
 
 # Temp files
 tmp/
+
+# Locally generated files
+config/default/*.yaml-e
