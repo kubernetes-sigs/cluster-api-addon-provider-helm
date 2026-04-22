@@ -22,5 +22,4 @@ package tools
 
 import (
 	_ "github.com/hashicorp/go-multierror"
-	_ "sigs.k8s.io/cluster-api/hack/tools"
 )
