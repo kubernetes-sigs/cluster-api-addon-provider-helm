@@ -323,7 +323,7 @@ func (r *HelmReleaseProxyReconciler) reconcileNormal(ctx context.Context, helmRe
 
 	// TODO: add this here or in HelmChartProxy controller?
 	if helmReleaseProxy.Spec.ReleaseName == "" {
-		annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation] = "true"
+		annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation] = "true" //nolint:goconst
 		helmReleaseProxy.SetAnnotations(annotations)
 	}
 
