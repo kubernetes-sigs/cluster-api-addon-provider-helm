@@ -296,7 +296,7 @@ func shouldReinstallHelmRelease(ctx context.Context, existing *addonsv1alpha1.He
 	annotations := existing.GetAnnotations()
 	result, ok := annotations[addonsv1alpha1.IsReleaseNameGeneratedAnnotation]
 
-	isReleaseNameGenerated := ok && result == "true"
+	isReleaseNameGenerated := ok && result == "true" //nolint:goconst
 	switch {
 	case existing.Spec.ChartName != helmChartProxy.Spec.ChartName:
 		log.V(2).Info("ChartName changed", "existing", existing.Spec.ChartName, "helmChartProxy", helmChartProxy.Spec.ChartName)
