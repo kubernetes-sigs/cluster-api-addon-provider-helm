@@ -10,6 +10,7 @@ spec:
   namespace: tigera-operator
   releaseName: projectcalico
   repoURL: https://docs.tigera.io/calico/charts
+  version: v3.31.4
   valuesTemplate: |
     installation:
       cni:
