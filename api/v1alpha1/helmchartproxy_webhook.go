@@ -82,6 +82,9 @@ func (*helmChartProxyWebhook) ValidateCreate(_ context.Context, newObj *HelmChar
 	if err := isUrlValid(newObj.Spec.RepoURL); err != nil {
 		return nil, err
 	}
+	if allErrs := validateSecretReferences(newObj); len(allErrs) > 0 {
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmChartProxy").GroupKind(), newObj.Name, allErrs)
+	}
 
 	return nil, nil
 }
@@ -98,6 +101,7 @@ func (*helmChartProxyWebhook) ValidateUpdate(_ context.Context, oldObj, newObj *
 				newObj.Spec.ReleaseNamespace, err.Error()),
 		)
 	}
+	allErrs = append(allErrs, validateSecretReferences(newObj)...)
 
 	if newObj.Spec.ReconcileStrategy != oldObj.Spec.ReconcileStrategy {
 		allErrs = append(allErrs,
@@ -128,4 +132,33 @@ func isUrlValid(repoURL string) error {
 	}
 
 	return nil
+}
+
+// validateSecretReferences ensures that a HelmChartProxy can only reference
+// credential and CA Secrets in its own namespace.
+func validateSecretReferences(helmChartProxy *HelmChartProxy) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if credentials := helmChartProxy.Spec.Credentials; credentials != nil &&
+		credentials.Secret.Namespace != "" &&
+		credentials.Secret.Namespace != helmChartProxy.Namespace {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "credentials", "secret", "namespace"),
+			credentials.Secret.Namespace,
+			"must be empty or match metadata.namespace",
+		))
+	}
+
+	if tlsConfig := helmChartProxy.Spec.TLSConfig; tlsConfig != nil &&
+		tlsConfig.CASecretRef != nil &&
+		tlsConfig.CASecretRef.Namespace != "" &&
+		tlsConfig.CASecretRef.Namespace != helmChartProxy.Namespace {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "tlsConfig", "caSecret", "namespace"),
+			tlsConfig.CASecretRef.Namespace,
+			"must be empty or match metadata.namespace",
+		))
+	}
+
+	return allErrs
 }

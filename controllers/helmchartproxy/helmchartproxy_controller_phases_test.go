@@ -1103,7 +1103,7 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 			},
 		},
 		{
-			name:     "construct helm release proxy with secret and custom namespace",
+			name:     "construct helm release proxy replaces foreign secret namespace",
 			existing: nil,
 			helmChartProxy: &addonsv1alpha1.HelmChartProxy{
 				TypeMeta: metav1.TypeMeta{
@@ -1181,7 +1181,7 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 					Credentials: &addonsv1alpha1.Credentials{
 						Secret: corev1.SecretReference{
 							Name:      "test-secret",
-							Namespace: "my-namespace",
+							Namespace: "test-namespace",
 						},
 						Key: "config.json",
 					},
@@ -1364,6 +1364,62 @@ func TestConstructHelmReleaseProxy(t *testing.T) {
 			g.Expect(diff).To(BeEmpty())
 		})
 	}
+}
+
+func TestConstructHelmReleaseProxyRestrictsSecretNamespaces(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+
+	helmChartProxy := &addonsv1alpha1.HelmChartProxy{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "tenant-a"},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			Credentials: &addonsv1alpha1.Credentials{
+				Secret: corev1.SecretReference{Name: "credentials", Namespace: "tenant-b"},
+			},
+			TLSConfig: &addonsv1alpha1.TLSConfig{
+				CASecretRef: &corev1.SecretReference{Name: "ca", Namespace: "tenant-b"},
+			},
+		},
+	}
+	cluster := &clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+
+	result := constructHelmReleaseProxy(nil, helmChartProxy, "", cluster)
+
+	g.Expect(result.Spec.Credentials.Secret.Namespace).To(Equal(helmChartProxy.Namespace))
+	g.Expect(result.Spec.TLSConfig.CASecretRef.Namespace).To(Equal(helmChartProxy.Namespace))
+	g.Expect(helmChartProxy.Spec.Credentials.Secret.Namespace).To(Equal("tenant-b"))
+	g.Expect(helmChartProxy.Spec.TLSConfig.CASecretRef.Namespace).To(Equal("tenant-b"))
+}
+
+func TestConstructHelmReleaseProxyCorrectsExistingSecretNamespaces(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+
+	helmChartProxy := &addonsv1alpha1.HelmChartProxy{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "tenant-a"},
+		Spec: addonsv1alpha1.HelmChartProxySpec{
+			Credentials: &addonsv1alpha1.Credentials{
+				Secret: corev1.SecretReference{Name: "credentials", Namespace: "tenant-b"},
+			},
+			TLSConfig: &addonsv1alpha1.TLSConfig{
+				CASecretRef: &corev1.SecretReference{Name: "ca", Namespace: "tenant-b"},
+			},
+		},
+	}
+	existing := &addonsv1alpha1.HelmReleaseProxy{
+		ObjectMeta: metav1.ObjectMeta{Name: "release", Namespace: "tenant-a"},
+		Spec: addonsv1alpha1.HelmReleaseProxySpec{
+			Credentials: helmChartProxy.Spec.Credentials.DeepCopy(),
+			TLSConfig:   helmChartProxy.Spec.TLSConfig.DeepCopy(),
+		},
+	}
+	cluster := &clusterv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+
+	result := constructHelmReleaseProxy(existing, helmChartProxy, "", cluster)
+
+	g.Expect(result).NotTo(BeNil())
+	g.Expect(result.Spec.Credentials.Secret.Namespace).To(Equal(helmChartProxy.Namespace))
+	g.Expect(result.Spec.TLSConfig.CASecretRef.Namespace).To(Equal(helmChartProxy.Namespace))
 }
 
 func TestShouldReinstallHelmRelease(t *testing.T) {

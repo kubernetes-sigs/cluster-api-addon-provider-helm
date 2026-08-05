@@ -251,6 +251,13 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		if !cmp.Equal(existing.Spec.Values, parsedValues) {
 			changed = true
 		}
+		if existing.Spec.Credentials != nil && existing.Spec.Credentials.Secret.Namespace != helmChartProxy.Namespace {
+			changed = true
+		}
+		if existing.Spec.TLSConfig != nil && existing.Spec.TLSConfig.CASecretRef != nil &&
+			existing.Spec.TLSConfig.CASecretRef.Namespace != helmChartProxy.Namespace {
+			changed = true
+		}
 
 		if !changed {
 			return nil
@@ -261,13 +268,11 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 	helmReleaseProxy.Spec.Version = helmChartProxy.Spec.Version
 	helmReleaseProxy.Spec.Values = parsedValues
 	helmReleaseProxy.Spec.Options = helmChartProxy.Spec.Options
-	helmReleaseProxy.Spec.Credentials = helmChartProxy.Spec.Credentials
+	helmReleaseProxy.Spec.Credentials = helmChartProxy.Spec.Credentials.DeepCopy()
 
 	if helmReleaseProxy.Spec.Credentials != nil {
-		// If the namespace is not set, set it to the namespace of the HelmChartProxy
-		if helmReleaseProxy.Spec.Credentials.Secret.Namespace == "" {
-			helmReleaseProxy.Spec.Credentials.Secret.Namespace = helmChartProxy.Namespace
-		}
+		// Credentials Secrets are always resolved in the HelmChartProxy namespace.
+		helmReleaseProxy.Spec.Credentials.Secret.Namespace = helmChartProxy.Namespace
 
 		// If the key is not set, set it to the default key
 		if helmReleaseProxy.Spec.Credentials.Key == "" {
@@ -275,13 +280,11 @@ func constructHelmReleaseProxy(existing *addonsv1alpha1.HelmReleaseProxy, helmCh
 		}
 	}
 
-	helmReleaseProxy.Spec.TLSConfig = helmChartProxy.Spec.TLSConfig
+	helmReleaseProxy.Spec.TLSConfig = helmChartProxy.Spec.TLSConfig.DeepCopy()
 
 	if helmReleaseProxy.Spec.TLSConfig != nil && helmReleaseProxy.Spec.TLSConfig.CASecretRef != nil {
-		// If the namespace is not set, set it to the namespace of the HelmChartProxy
-		if helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace == "" {
-			helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace = helmChartProxy.Namespace
-		}
+		// CA Secrets are always resolved in the HelmChartProxy namespace.
+		helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace = helmChartProxy.Namespace
 	}
 
 	return helmReleaseProxy
