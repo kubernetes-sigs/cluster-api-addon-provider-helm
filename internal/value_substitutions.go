@@ -82,7 +82,7 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 	}
 
 	tmpl, err := template.New(spec.ChartName + "-" + cluster.GetName()).
-		Funcs(sprig.TxtFuncMap()).
+		Funcs(secureTxtFuncMap()).
 		Parse(spec.ValuesTemplate)
 	if err != nil {
 		return "", err
@@ -96,4 +96,25 @@ func ParseValues(ctx context.Context, c ctrlClient.Client, spec addonsv1alpha1.H
 	log.V(2).Info("Expanded values to", "result", expandedTemplate)
 
 	return expandedTemplate, nil
+}
+
+// unsafeTemplateFuncs contains Sprig functions that can read from or make
+// requests using controller-local state. HelmChartProxy values templates are
+// user-controlled, so exposing these functions would cross the boundary
+// between a template author and the controller process.
+var unsafeTemplateFuncs = [...]string{
+	"env",
+	"expandenv",
+	"getHostByName",
+}
+
+// secureTxtFuncMap preserves Sprig's text-template compatibility while
+// excluding functions that can expose controller-local state.
+func secureTxtFuncMap() template.FuncMap {
+	funcMap := sprig.TxtFuncMap()
+	for _, name := range unsafeTemplateFuncs {
+		delete(funcMap, name)
+	}
+
+	return funcMap
 }
