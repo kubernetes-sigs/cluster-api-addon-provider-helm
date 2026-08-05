@@ -130,12 +130,16 @@ func isUrlValid(repoURL string) error {
 	}
 
 	switch strings.ToLower(parsedURL.Scheme) {
-	case "https", "oci":
+	case "https":
+	case "oci":
+		if !strings.HasPrefix(repoURL, "oci://") {
+			return fmt.Errorf("specified repoURL %s must use the lowercase oci scheme", repoURL)
+		}
 	default:
 		return fmt.Errorf("specified repoURL %s uses unsupported scheme %q; supported schemes are https and oci", repoURL, parsedURL.Scheme)
 	}
 
-	if parsedURL.Host == "" {
+	if parsedURL.Hostname() == "" {
 		return fmt.Errorf("specified repoURL %s must include a host", repoURL)
 	}
 

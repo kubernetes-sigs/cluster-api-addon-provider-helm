@@ -66,7 +66,10 @@ func (*helmReleaseProxyWebhook) Default(_ context.Context, obj *HelmReleaseProxy
 func (*helmReleaseProxyWebhook) ValidateCreate(_ context.Context, newObj *HelmReleaseProxy) (admission.Warnings, error) {
 	helmreleaseproxylog.Info("validate create", "name", newObj.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
+	if err := isUrlValid(newObj.Spec.RepoURL); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 

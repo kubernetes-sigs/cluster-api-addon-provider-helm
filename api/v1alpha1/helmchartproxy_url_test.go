@@ -32,12 +32,15 @@ func TestRepoURLValidation(t *testing.T) {
 	}{
 		{name: "https is allowed", repoURL: "https://charts.example.com/stable"},
 		{name: "oci is allowed", repoURL: "oci://registry.example.com/charts"},
-		{name: "uppercase scheme is allowed", repoURL: "HTTPS://charts.example.com"},
+		{name: "uppercase https scheme is allowed", repoURL: "HTTPS://charts.example.com"},
+		{name: "uppercase oci scheme is rejected", repoURL: "OCI://registry.example.com/charts", expectErr: true},
 		{name: "http is rejected", repoURL: "http://charts.example.com", expectErr: true},
 		{name: "ftp is rejected", repoURL: "ftp://charts.example.com", expectErr: true},
 		{name: "file is rejected", repoURL: "file:///etc/passwd", expectErr: true},
 		{name: "bare path is rejected", repoURL: "/some/local/path", expectErr: true},
 		{name: "missing host is rejected", repoURL: "https:///charts", expectErr: true},
+		{name: "https port without host is rejected", repoURL: "https://:443/charts", expectErr: true},
+		{name: "oci port without host is rejected", repoURL: "oci://:443/charts", expectErr: true},
 		{name: "empty URL is rejected", repoURL: "", expectErr: true},
 	}
 
