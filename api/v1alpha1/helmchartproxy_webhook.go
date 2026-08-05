@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -121,10 +122,25 @@ func (*helmChartProxyWebhook) ValidateDelete(_ context.Context, obj *HelmChartPr
 	return nil, nil
 }
 
-// isUrlValid returns true if specified repoURL is valid as per go doc https://pkg.go.dev/net/url#ParseRequestURI.
+// isUrlValid returns an error unless repoURL is an absolute HTTPS or OCI URL.
 func isUrlValid(repoURL string) error {
-	if _, err := url.ParseRequestURI(repoURL); err != nil {
+	parsedURL, err := url.ParseRequestURI(repoURL)
+	if err != nil {
 		return fmt.Errorf("specified repoURL %s is not valid: %w", repoURL, err)
+	}
+
+	switch strings.ToLower(parsedURL.Scheme) {
+	case "https":
+	case "oci":
+		if !strings.HasPrefix(repoURL, "oci://") {
+			return fmt.Errorf("specified repoURL %s must use the lowercase oci scheme", repoURL)
+		}
+	default:
+		return fmt.Errorf("specified repoURL %s uses unsupported scheme %q; supported schemes are https and oci", repoURL, parsedURL.Scheme)
+	}
+
+	if parsedURL.Hostname() == "" {
+		return fmt.Errorf("specified repoURL %s must include a host", repoURL)
 	}
 
 	return nil
