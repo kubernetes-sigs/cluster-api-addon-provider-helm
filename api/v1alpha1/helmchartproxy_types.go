@@ -224,7 +224,7 @@ type HelmUninstallOptions struct {
 }
 
 type Credentials struct {
-	// Secret is a reference to a Secret containing the OCI credentials.
+	// Secret is a reference to a Secret containing the OCI credentials. The Secret must be in the same namespace as the proxy.
 	Secret corev1.SecretReference `json:"secret"`
 
 	// Key is the key in the Secret containing the OCI credentials.
@@ -233,7 +233,7 @@ type Credentials struct {
 
 // TLSConfig defines a TLS configuration.
 type TLSConfig struct {
-	// Secret is a reference to a Secret containing the TLS CA certificate at the key ca.crt.
+	// Secret is a reference to a Secret containing the TLS CA certificate at the key ca.crt. The Secret must be in the same namespace as the proxy.
 	// +optional
 	CASecretRef *corev1.SecretReference `json:"caSecret,omitempty"`
 
