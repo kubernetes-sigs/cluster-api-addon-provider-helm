@@ -29,7 +29,8 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
-	release "helm.sh/helm/v3/pkg/release"
+	release "helm.sh/helm/v4/pkg/release"
+	v1 "helm.sh/helm/v4/pkg/release/v1"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
@@ -59,10 +60,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetHelmRelease mocks base method.
-func (m *MockClient) GetHelmRelease(ctx context.Context, restConfig *rest.Config, spec v1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
+func (m *MockClient) GetHelmRelease(ctx context.Context, restConfig *rest.Config, spec v1alpha1.HelmReleaseProxySpec) (*v1.Release, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetHelmRelease", ctx, restConfig, spec)
-	ret0, _ := ret[0].(*release.Release)
+	ret0, _ := ret[0].(*v1.Release)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -74,10 +75,10 @@ func (mr *MockClientMockRecorder) GetHelmRelease(ctx, restConfig, spec any) *gom
 }
 
 // InstallOrUpgradeHelmRelease mocks base method.
-func (m *MockClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec v1alpha1.HelmReleaseProxySpec) (*release.Release, error) {
+func (m *MockClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec v1alpha1.HelmReleaseProxySpec) (*v1.Release, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InstallOrUpgradeHelmRelease", ctx, restConfig, credentialsPath, caFilePath, spec)
-	ret0, _ := ret[0].(*release.Release)
+	ret0, _ := ret[0].(*v1.Release)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

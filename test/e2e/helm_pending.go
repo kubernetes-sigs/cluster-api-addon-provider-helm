@@ -24,7 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	helmRelease "helm.sh/helm/v3/pkg/release"
+	helmRelease "helm.sh/helm/v4/pkg/release/common"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 

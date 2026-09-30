@@ -22,8 +22,8 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
+	helmRelease "helm.sh/helm/v4/pkg/release/common"
+	helmDriver "helm.sh/helm/v4/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -22,8 +22,10 @@ import (
 
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
+	helmReleaseAPI "helm.sh/helm/v4/pkg/release"
+	helmReleaseCommon "helm.sh/helm/v4/pkg/release/common"
+	helmRelease "helm.sh/helm/v4/pkg/release/v1"
+	helmDriver "helm.sh/helm/v4/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -99,7 +101,7 @@ var (
 			Credentials:       nil,
 		},
 		Status: addonsv1alpha1.HelmReleaseProxyStatus{
-			Status:   string(helmRelease.StatusDeployed),
+			Status:   string(helmReleaseCommon.StatusDeployed),
 			Revision: 1,
 			Conditions: []metav1.Condition{
 				{
@@ -284,7 +286,7 @@ func TestReconcileNormal(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
 			},
@@ -293,7 +295,7 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -308,7 +310,7 @@ func TestReconcileNormal(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
 			},
@@ -317,7 +319,7 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(ok).To(BeTrue())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -332,7 +334,7 @@ func TestReconcileNormal(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusPendingInstall,
+						Status: helmReleaseCommon.StatusPendingInstall,
 					},
 				}, nil).Times(1)
 			},
@@ -342,7 +344,7 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusPendingInstall))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusPendingInstall))
 
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
 				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
@@ -375,7 +377,7 @@ func TestReconcileNormal(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusFailed,
+						Status: helmReleaseCommon.StatusFailed,
 					},
 				}, nil).Times(1)
 			},
@@ -386,7 +388,7 @@ func TestReconcileNormal(t *testing.T) {
 				releaseReady := conditions.Get(hrp, addonsv1alpha1.HelmReleaseReadyCondition)
 				g.Expect(releaseReady.Status).To(Equal(metav1.ConditionFalse))
 				g.Expect(releaseReady.Reason).To(Equal(addonsv1alpha1.HelmInstallOrUpgradeFailedReason))
-				g.Expect(releaseReady.Message).To(Equal(fmt.Sprintf("Helm release is in a failed state: %s", helmRelease.StatusFailed)))
+				g.Expect(releaseReady.Message).To(Equal(fmt.Sprintf("Helm release is in a failed state: %s", helmReleaseCommon.StatusFailed)))
 			},
 			expectedError: "",
 		},
@@ -401,7 +403,7 @@ func TestReconcileNormal(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -416,7 +418,7 @@ func TestReconcileNormal(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
 			},
@@ -429,7 +431,7 @@ func TestReconcileNormal(t *testing.T) {
 
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -485,7 +487,7 @@ func TestReconcileNormalWithCredentialRef(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
 			},
@@ -494,7 +496,7 @@ func TestReconcileNormalWithCredentialRef(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -550,7 +552,7 @@ func TestReconcileNormalWithACertificateRef(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
 			},
@@ -559,7 +561,7 @@ func TestReconcileNormalWithACertificateRef(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -615,10 +617,10 @@ func TestReconcileDelete(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
-				c.UninstallHelmRelease(ctx, restConfig, defaultProxy.DeepCopy().Spec).Return(&helmRelease.UninstallReleaseResponse{}, nil).Times(1)
+				c.UninstallHelmRelease(ctx, restConfig, defaultProxy.DeepCopy().Spec).Return(&helmReleaseAPI.UninstallReleaseResponse{}, nil).Times(1)
 			},
 			expect: func(g *WithT, hrp *addonsv1alpha1.HelmReleaseProxy) {
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
@@ -718,7 +720,7 @@ func TestTLSSettings(t *testing.T) {
 					Name:    "test-release",
 					Version: 1,
 					Info: &helmRelease.Info{
-						Status: helmRelease.StatusDeployed,
+						Status: helmReleaseCommon.StatusDeployed,
 					},
 				}, nil).Times(1)
 			},
@@ -727,7 +729,7 @@ func TestTLSSettings(t *testing.T) {
 				g.Expect(ok).To(BeFalse())
 				g.Expect(hrp.Spec.ReleaseName).To(Equal("test-release"))
 				g.Expect(hrp.Status.Revision).To(Equal(1))
-				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmRelease.StatusDeployed))
+				g.Expect(hrp.Status.Status).To(BeEquivalentTo(helmReleaseCommon.StatusDeployed))
 
 				g.Expect(conditions.Has(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
 				g.Expect(conditions.IsTrue(hrp, addonsv1alpha1.HelmReleaseReadyCondition)).To(BeTrue())
