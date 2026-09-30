@@ -131,7 +131,7 @@ $ HELM_REGISTRY_CONFIG=/tmp/oci-creds.json helm login <my-registry>
 Then, create a secret containing the credentials:
 
 ```bash
-$ kubectl create secret generic oci-creds --from-file=/tmp/oci-creds.json -n caaph-system
+$ kubectl create secret generic oci-creds --from-file=/tmp/oci-creds.json -n default
 ```
 
 You can then use your OCI registry by setting the `repoURL` to `oci://<my-registry>` and the credentials secret reference to `oci-creds`. For example:
@@ -143,8 +143,9 @@ spec:
     key: config.json
     secret:
       name: oci-creds
-      namespace: caaph-system
 ```
+
+The credentials Secret is resolved in the same namespace as the `HelmChartProxy`.
 
 Note that in this case the credentials in the secret must be stored in a file named `config.json` at the root of the secret, e.g:
 
@@ -153,7 +154,7 @@ kind: Secret
 apiVersion: v1
 metadata:
   name: oci-creds
-  namespace: caaph-system
+  namespace: default
   data:
     config.json: <base64-encoded-credentials>
   type: Opaque
