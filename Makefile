@@ -386,6 +386,7 @@ verify-gen: generate  ## Verify go generated files are up to date
 
 .PHONY: verify-boilerplate
 verify-boilerplate: ## Verify boilerplate text exists in each file
+	python3 -B -m unittest discover -s hack/boilerplate -p '*_test.py'
 	TRACE=$(TRACE) ./hack/verify-boilerplate.sh
 
 .PHONY: verify-shellcheck

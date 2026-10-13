@@ -58,9 +58,9 @@ linters:
     goheader:
       values:
         regexp:
-          license-year: (202[0-9]|20[3-9][0-9])
+          license-year: '((201[4-9]|202[0-5]) )?'
       template: |-
-        Copyright {{license-year}} The Kubernetes Authors.
+        Copyright {{license-year}}The Kubernetes Authors.
 
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.

@@ -14,39 +14,81 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import boilerplate
-import unittest
-import StringIO
-import os
+import contextlib
+import io
+from pathlib import Path
 import sys
+import tempfile
+import unittest
+from unittest import mock
+
+# The verifier parses command-line arguments when imported.
+with mock.patch.object(sys, "argv", [sys.argv[0]]):
+    import boilerplate
+
 
 class TestBoilerplate(unittest.TestCase):
-  """
-  Note: run this test from the hack/boilerplate directory.
+    def test_boilerplate(self):
+        boilerplate_dir = Path(__file__).resolve().parent
+        args = boilerplate.parser.parse_args([
+            "--rootdir", str(boilerplate_dir / "test"),
+            "--boilerplate-dir", str(boilerplate_dir),
+        ])
+        output = io.StringIO()
 
-  $ python -m unittest boilerplate_test
-  """
+        # Fixtures are excluded from normal repository-wide verification.
+        with mock.patch.object(boilerplate, "args", args), \
+                mock.patch.object(boilerplate, "skipped_dirs", []), \
+                contextlib.redirect_stdout(output):
+            result = boilerplate.main()
 
-  def test_boilerplate(self):
-    os.chdir("test/")
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            sorted(Path(path).name for path in output.getvalue().splitlines()),
+            ["fail.go", "fail.py", "fail_2026.go"],
+        )
 
-    class Args(object):
-      def __init__(self):
-        self.filenames = []
-        self.rootdir = "."
-        self.boilerplate_dir = "../"
-        self.verbose = True
+    def test_copyright_headers(self):
+        refs = boilerplate.get_refs()
+        regexs = boilerplate.get_regexs()
+        cases = [("Copyright The Kubernetes Authors.", True)]
+        cases.extend(
+            (f"Copyright {year} The Kubernetes Authors.", True)
+            for year in range(2014, 2026)
+        )
+        cases.extend([
+            ("Copyright 2013 The Kubernetes Authors.", False),
+            ("Copyright 2026 The Kubernetes Authors.", False),
+            ("Copyright 2099 The Kubernetes Authors.", False),
+            ("Copyright YEAR The Kubernetes Authors.", False),
+            ("Copyright Other Authors.", False),
+        ])
+        formats = [
+            ("go", "source.go", "//go:build ignore\n\n"),
+            ("py", "source.py", "#!/usr/bin/env python3\n\n"),
+            ("sh", "source.sh", "#!/usr/bin/env bash\n\n"),
+            ("bzl", "source.bzl", ""),
+            ("Makefile", "Makefile", ""),
+            ("Dockerfile", "Dockerfile", ""),
+        ]
 
-    # capture stdout
-    old_stdout = sys.stdout
-    sys.stdout = StringIO.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            for extension, filename, prefix in formats:
+                header = "\n".join(refs[extension]) + "\n"
+                path = Path(directory) / filename
+                for notice, expected in cases:
+                    with self.subTest(format=extension, notice=notice):
+                        path.write_text(
+                            prefix + header.replace(
+                                "Copyright The Kubernetes Authors.", notice
+                            ),
+                            encoding="utf-8",
+                        )
+                        self.assertEqual(
+                            boilerplate.file_passes(str(path), refs, regexs),
+                            expected,
+                        )
 
-    boilerplate.args = Args()
-    ret = boilerplate.main()
 
-    output = sorted(sys.stdout.getvalue().split())
-
-    sys.stdout = old_stdout
-
-    self.assertEquals(
-        output, ['././fail.go', '././fail.py'])
+if __name__ == "__main__":
+    unittest.main()
