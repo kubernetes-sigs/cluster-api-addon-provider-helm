@@ -120,7 +120,8 @@ KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
 KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 
-CLUSTER_API_DIR := $(shell go list -m -f '{{.Dir}}' sigs.k8s.io/cluster-api)
+CLUSTER_API_VERSION := $(call get_go_version,sigs.k8s.io/cluster-api)
+CLUSTER_API_DIR = $(shell go env GOMODCACHE)/sigs.k8s.io/cluster-api@$(CLUSTER_API_VERSION)
 CLUSTER_API_CRD_LOCATION = tmp/cluster-api/crd
 
 MOCKGEN_PKG := go.uber.org/mock
