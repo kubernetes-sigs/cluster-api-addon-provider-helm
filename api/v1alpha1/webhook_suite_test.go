@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,9 +64,6 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: false,
-		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
-		},
 	}
 
 	cfg, err := testEnv.Start()
@@ -76,7 +74,7 @@ var _ = BeforeSuite(func() {
 	err = AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = admissionv1beta1.AddToScheme(scheme)
+	err = corev1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = admissionv1beta1.AddToScheme(scheme)
@@ -88,8 +86,15 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	By("persisting legacy HelmChartProxies before installing admission webhooks")
+	createLegacyHelmChartProxies()
+
 	// start webhook server using Manager
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
+	Expect(webhookInstallOptions.Cleanup()).To(Succeed())
+	webhookInstallOptions.Paths = []string{filepath.Join("..", "..", "config", "webhook")}
+	Expect(webhookInstallOptions.PrepWithoutInstalling()).To(Succeed())
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		WebhookServer: webhook.NewServer(
@@ -129,6 +134,24 @@ var _ = BeforeSuite(func() {
 
 		return conn.Close()
 	}).Should(Succeed())
+
+	By("installing the current admission webhooks")
+	Expect(webhookInstallOptions.Install(cfg)).To(Succeed())
+
+	// Configuration discovery alone does not guarantee that admission is active.
+	probe := &HelmChartProxy{}
+	Expect(k8sClient.Get(ctx, client.ObjectKey{
+		Namespace: legacySecretReferenceNamespace,
+		Name:      legacySecretReferenceCases[0].name + "-metadata",
+	}, probe)).To(Succeed())
+	Eventually(func() error {
+		invalid := probe.DeepCopy()
+		invalid.Spec.RepoURL = "not-a-url"
+
+		return k8sClient.Update(ctx, invalid, client.DryRunAll)
+	}, 10*time.Second, 100*time.Millisecond).Should(
+		MatchError(ContainSubstring(`admission webhook "vhelmchartproxy.kb.io" denied the request`)),
+	)
 })
 
 var _ = AfterSuite(func() {
