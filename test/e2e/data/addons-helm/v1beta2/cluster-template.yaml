@@ -10,7 +10,6 @@ spec:
   namespace: tigera-operator
   releaseName: projectcalico
   repoURL: https://docs.tigera.io/calico/charts
-  version: v3.31.4
   valuesTemplate: |
     installation:
       cni:
@@ -27,6 +26,7 @@ spec:
       registry: quay.io
     calicoctl:
       image: quay.io/calico/ctl
+  version: v3.31.4
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: KubeadmConfigTemplate
@@ -54,7 +54,7 @@ spec:
     name: ${CLUSTER_NAME}-control-plane
   infrastructureRef:
     apiGroup: infrastructure.cluster.x-k8s.io
-    kind: DockerCluster
+    kind: DevCluster
     name: ${CLUSTER_NAME}
 ---
 apiVersion: cluster.x-k8s.io/v1beta2
@@ -77,7 +77,7 @@ spec:
       failureDomain: fd4
       infrastructureRef:
         apiGroup: infrastructure.cluster.x-k8s.io
-        kind: DockerMachineTemplate
+        kind: DevMachineTemplate
         name: ${CLUSTER_NAME}-md-0
       version: ${KUBERNETES_VERSION}
 ---
@@ -100,54 +100,60 @@ spec:
     spec:
       infrastructureRef:
         apiGroup: infrastructure.cluster.x-k8s.io
-        kind: DockerMachineTemplate
+        kind: DevMachineTemplate
         name: ${CLUSTER_NAME}-control-plane
   replicas: ${CONTROL_PLANE_MACHINE_COUNT}
   version: ${KUBERNETES_VERSION}
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
-kind: DockerCluster
+kind: DevCluster
 metadata:
   name: ${CLUSTER_NAME}
 spec:
-  failureDomains:
-  - controlPlane: true
-    name: fd1
-  - controlPlane: true
-    name: fd2
-  - controlPlane: true
-    name: fd3
-  - controlPlane: false
-    name: fd4
-  - controlPlane: false
-    name: fd5
-  - controlPlane: false
-    name: fd6
-  - controlPlane: false
-    name: fd7
-  - controlPlane: false
-    name: fd8
+  backend:
+    docker:
+      failureDomains:
+      - controlPlane: true
+        name: fd1
+      - controlPlane: true
+        name: fd2
+      - controlPlane: true
+        name: fd3
+      - controlPlane: false
+        name: fd4
+      - controlPlane: false
+        name: fd5
+      - controlPlane: false
+        name: fd6
+      - controlPlane: false
+        name: fd7
+      - controlPlane: false
+        name: fd8
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
-kind: DockerMachineTemplate
+kind: DevMachineTemplate
 metadata:
   name: ${CLUSTER_NAME}-control-plane
 spec:
   template:
     spec:
-      extraMounts:
-      - containerPath: /var/run/docker.sock
-        hostPath: /var/run/docker.sock
-      preLoadImages: ${DOCKER_PRELOAD_IMAGES:-[]}
+      backend:
+        docker:
+          extraMounts:
+          - containerPath: /var/run/docker.sock
+            hostPath: /var/run/docker.sock
+          preLoadImages: ${DOCKER_PRELOAD_IMAGES:-[]}
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
-kind: DockerMachineTemplate
+kind: DevMachineTemplate
 metadata:
   name: ${CLUSTER_NAME}-md-0
 spec:
   template:
     spec:
-      extraMounts:
-      - containerPath: /var/run/docker.sock
-        hostPath: /var/run/docker.sock
-      preLoadImages: ${DOCKER_PRELOAD_IMAGES:-[]}
+      backend:
+        docker:
+          extraMounts:
+          - containerPath: /var/run/docker.sock
+            hostPath: /var/run/docker.sock
+          preLoadImages: ${DOCKER_PRELOAD_IMAGES:-[]}
