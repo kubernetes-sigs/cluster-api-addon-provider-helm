@@ -306,7 +306,3 @@ func (c *HelmChartProxy) SetMatchingClusters(clusterList []clusterv1.Cluster) {
 
 	c.Status.MatchingClusters = matchingClusters
 }
-
-func init() {
-	SchemeBuilder.Register(&HelmChartProxy{}, &HelmChartProxyList{})
-}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	helmRelease "helm.sh/helm/v3/pkg/release"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
@@ -37,6 +39,7 @@ import (
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
+	"sigs.k8s.io/cluster-api/util/kubeconfig"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,6 +49,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
+
+const remoteClientTimeout = 10 * time.Second
 
 // HelmReleaseProxyReconciler reconciles a HelmReleaseProxy object.
 type HelmReleaseProxyReconciler struct {
@@ -83,6 +88,23 @@ func (r *HelmReleaseProxyReconciler) SetupWithManager(ctx context.Context, mgr c
 				),
 			)).
 		Complete(r)
+}
+
+func restConfigForCluster(ctx context.Context, c client.Reader, cluster client.ObjectKey) (*rest.Config, error) {
+	kubeConfig, err := kubeconfig.FromSecret(ctx, c, cluster)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to retrieve kubeconfig secret for Cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create REST configuration for Cluster %s/%s", cluster.Namespace, cluster.Name)
+	}
+
+	restConfig.UserAgent = remote.DefaultClusterAPIUserAgent("caaph")
+	restConfig.Timeout = remoteClientTimeout
+
+	return restConfig, nil
 }
 
 // +kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=helmreleaseproxies,verbs=get;list;watch;create;update;patch;delete
@@ -155,7 +177,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// our finalizer is present, so lets handle any external dependency
 			if err := r.Get(ctx, clusterKey, cluster); err == nil {
 				log.V(2).Info("Getting kubeconfig for cluster", "cluster", cluster.Name)
-				restConfig, err := remote.RESTConfig(ctx, "caaph", r.Client, clusterKey)
+				restConfig, err := restConfigForCluster(ctx, r.Client, clusterKey)
 				if err != nil {
 					wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
 					conditions.Set(helmReleaseProxy, metav1.Condition{
@@ -234,7 +256,7 @@ func (r *HelmReleaseProxyReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.V(2).Info("Getting REST config for cluster", "cluster", cluster.Name)
-	restConfig, err := remote.RESTConfig(ctx, "caaph", r.Client, clusterKey)
+	restConfig, err := restConfigForCluster(ctx, r.Client, clusterKey)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to get kubeconfig for cluster")
 		conditions.Set(helmReleaseProxy, metav1.Condition{

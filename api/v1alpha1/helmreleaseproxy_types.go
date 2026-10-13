@@ -164,7 +164,3 @@ func (r *HelmReleaseProxy) SetReleaseName(name string) {
 		r.Spec.ReleaseName = name
 	}
 }
-
-func init() {
-	SchemeBuilder.Register(&HelmReleaseProxy{}, &HelmReleaseProxyList{})
-}
