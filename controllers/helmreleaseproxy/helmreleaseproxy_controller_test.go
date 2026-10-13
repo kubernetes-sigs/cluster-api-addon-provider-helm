@@ -25,6 +25,7 @@ import (
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -763,6 +764,34 @@ func TestTLSSettings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSecretReadsUseHelmReleaseProxyNamespace(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+
+	foreignSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-secret", Namespace: "tenant-b"},
+		Data: map[string][]byte{
+			"config.json": {},
+			"ca.crt":      {},
+		},
+	}
+	reconciler := &HelmReleaseProxyReconciler{
+		Client: fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(foreignSecret).Build(),
+	}
+
+	credentialsProxy := defaultProxyWithCredentialRef.DeepCopy()
+	credentialsProxy.Namespace = "tenant-a"
+	credentialsProxy.Spec.Credentials.Secret.Namespace = foreignSecret.Namespace
+	_, err := reconciler.getCredentials(ctx, credentialsProxy)
+	g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+	caProxy := defaultProxyWithCACertRef.DeepCopy()
+	caProxy.Namespace = "tenant-a"
+	caProxy.Spec.TLSConfig.CASecretRef.Namespace = foreignSecret.Namespace
+	_, err = reconciler.getCAFile(ctx, caProxy)
+	g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 }
 
 func init() {

@@ -490,11 +490,7 @@ func patchHelmReleaseProxy(ctx context.Context, patchHelper *patch.Helper, helmR
 func (r *HelmReleaseProxyReconciler) getCredentials(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) (string, error) {
 	credentialsPath := ""
 	if helmReleaseProxy.Spec.Credentials != nil && helmReleaseProxy.Spec.Credentials.Secret.Name != "" {
-		// By default, the secret is in the same namespace as the HelmReleaseProxy
-		if helmReleaseProxy.Spec.Credentials.Secret.Namespace == "" {
-			helmReleaseProxy.Spec.Credentials.Secret.Namespace = helmReleaseProxy.Namespace
-		}
-		credentialsValues, err := r.getCredentialsFromSecret(ctx, helmReleaseProxy.Spec.Credentials.Secret.Name, helmReleaseProxy.Spec.Credentials.Secret.Namespace, helmReleaseProxy.Spec.Credentials.Key)
+		credentialsValues, err := r.getCredentialsFromSecret(ctx, helmReleaseProxy.Spec.Credentials.Secret.Name, helmReleaseProxy.Namespace, helmReleaseProxy.Spec.Credentials.Key)
 		if err != nil {
 			return "", err
 		}
@@ -517,11 +513,7 @@ func (r *HelmReleaseProxyReconciler) getCAFile(ctx context.Context, helmReleaseP
 	if helmReleaseProxy.Spec.TLSConfig != nil &&
 		helmReleaseProxy.Spec.TLSConfig.CASecretRef != nil &&
 		helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name != "" {
-		// By default, the secret is in the same namespace as the HelmReleaseProxy
-		if helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace == "" {
-			helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace = helmReleaseProxy.Namespace
-		}
-		caSecretValues, err := r.getCACertificateFromSecret(ctx, helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name, helmReleaseProxy.Spec.TLSConfig.CASecretRef.Namespace)
+		caSecretValues, err := r.getCACertificateFromSecret(ctx, helmReleaseProxy.Spec.TLSConfig.CASecretRef.Name, helmReleaseProxy.Namespace)
 		if err != nil {
 			return "", err
 		}

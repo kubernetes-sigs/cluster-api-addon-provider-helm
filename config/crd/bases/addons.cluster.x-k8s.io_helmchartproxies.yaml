@@ -115,7 +115,8 @@ spec:
                     type: string
                   secret:
                     description: Secret is a reference to a Secret containing the
-                      OCI credentials.
+                      OCI credentials. The Secret must be in the same namespace as
+                      the proxy.
                     properties:
                       name:
                         description: name is unique within a namespace to reference
@@ -290,7 +291,8 @@ spec:
                 properties:
                   caSecret:
                     description: Secret is a reference to a Secret containing the
-                      TLS CA certificate at the key ca.crt.
+                      TLS CA certificate at the key ca.crt. The Secret must be in
+                      the same namespace as the proxy.
                     properties:
                       name:
                         description: name is unique within a namespace to reference
