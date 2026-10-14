@@ -444,10 +444,13 @@ func UpgradeHelmChart(_ context.Context, clusterProxy framework.ClusterProxy, na
 	Expect(stdout).To(HavePrefix("v4."), "Helm v4 is required")
 
 	// Set up the Helm command arguments.
+	// CAAPH applies server-side as field manager "manager". Without --force-conflicts, the CLI
+	// conflicts with it on atomic fields that the API server defaults, such as env valueFrom.fieldRef.
 	args := []string{
 		"upgrade", releaseName, chartName, "--install",
 		"--kubeconfig", clusterProxy.GetKubeconfigPath(),
 		"--create-namespace", "--namespace", namespace,
+		"--force-conflicts",
 	}
 	if repoURL != "" {
 		args = append(args, "--repo", repoURL)
