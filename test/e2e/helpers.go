@@ -434,14 +434,14 @@ type HelmOptions struct {
 
 // UpgradeHelmChart takes a Helm repo URL, a chart name, and release name, and upgrades an existing Helm release on the E2E workload cluster.
 func UpgradeHelmChart(_ context.Context, clusterProxy framework.ClusterProxy, namespace, repoURL, chartName, releaseName string, options *HelmOptions, version string) {
-	// Check that Helm v3 is installed
+	// Check that Helm v4 is installed
 	helm, err := exec.LookPath("helm")
 	Expect(err).NotTo(HaveOccurred(), "No helm binary found in PATH")
 	cmd := exec.Command(helm, "version", "--short") //nolint:gosec // Suppress G204: Subprocess launched with variable warning since this is a test file
 	stdout, err := cmd.Output()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("Helm version: %s", stdout)
-	Expect(stdout).To(HavePrefix("v3."), "Helm v3 is required")
+	Expect(stdout).To(HavePrefix("v4."), "Helm v4 is required")
 
 	// Set up the Helm command arguments.
 	args := []string{
