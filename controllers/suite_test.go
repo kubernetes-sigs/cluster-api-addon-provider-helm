@@ -28,7 +28,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
-	helmRelease "helm.sh/helm/v3/pkg/release"
+	helmReleaseAPI "helm.sh/helm/v4/pkg/release"
+	helmRelease "helm.sh/helm/v4/pkg/release/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -133,12 +134,12 @@ var _ = BeforeSuite(func() {
 
 	helmClient.EXPECT().InstallOrUpgradeHelmRelease(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(helmReleaseDeployed, nil).AnyTimes()
 	helmClient.EXPECT().GetHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).Return(&helmRelease.Release{}, nil).AnyTimes()
-	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_, _, _ any) (*helmRelease.UninstallReleaseResponse, error) {
+	helmClient.EXPECT().UninstallHelmRelease(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_, _, _ any) (*helmReleaseAPI.UninstallReleaseResponse, error) {
 		if failedHelmUninstall {
 			return nil, errors.New(releaseFailedMessage)
 		}
 
-		return &helmRelease.UninstallReleaseResponse{}, nil
+		return &helmReleaseAPI.UninstallReleaseResponse{}, nil
 	},
 	).AnyTimes()
 

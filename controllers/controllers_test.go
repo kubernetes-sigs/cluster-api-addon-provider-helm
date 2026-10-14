@@ -19,7 +19,8 @@ package controllers_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	helmrelease "helm.sh/helm/v3/pkg/release"
+	helmreleasecommon "helm.sh/helm/v4/pkg/release/common"
+	helmrelease "helm.sh/helm/v4/pkg/release/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -92,7 +93,7 @@ var (
 		Name:    "test-release",
 		Version: 1,
 		Info: &helmrelease.Info{
-			Status: helmrelease.StatusDeployed,
+			Status: helmreleasecommon.StatusDeployed,
 		},
 	}
 )

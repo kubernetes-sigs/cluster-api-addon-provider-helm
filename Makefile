@@ -210,7 +210,7 @@ GOVULNCHECK_VER := v1.3.0
 GOVULNCHECK := $(abspath $(TOOLS_BIN_DIR)/$(GOVULNCHECK_BIN)-$(GOVULNCHECK_VER))
 GOVULNCHECK_PKG := golang.org/x/vuln/cmd/govulncheck
 
-HELM_VER := $(call get_go_version,helm.sh/helm/v3)
+HELM_VER := $(call get_go_version,helm.sh/helm/v4)
 HELM_BIN := helm
 HELM := $(TOOLS_BIN_DIR)/$(HELM_BIN)-$(HELM_VER)
 
@@ -858,7 +858,7 @@ $(GINKGO): # Build ginkgo from tools folder.
 $(HELM): ## Put helm into tools folder.
 	mkdir -p $(TOOLS_BIN_DIR)
 	rm -f "$(TOOLS_BIN_DIR)/$(HELM_BIN)*"
-	curl --retry $(CURL_RETRIES) -fsSL -o $(TOOLS_BIN_DIR)/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+	curl --retry $(CURL_RETRIES) -fsSL -o $(TOOLS_BIN_DIR)/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
 	chmod 700 $(TOOLS_BIN_DIR)/get_helm.sh
 	USE_SUDO=false HELM_INSTALL_DIR=$(TOOLS_BIN_DIR) DESIRED_VERSION=$(HELM_VER) BINARY_NAME=$(HELM_BIN)-$(HELM_VER) $(TOOLS_BIN_DIR)/get_helm.sh
 	ln -sf $(HELM) $(TOOLS_BIN_DIR)/$(HELM_BIN)
