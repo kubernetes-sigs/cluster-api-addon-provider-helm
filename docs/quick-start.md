@@ -146,6 +146,10 @@ spec:
 ```
 
 The credentials Secret is resolved in the same namespace as the `HelmChartProxy`.
+Credential and CA Secret references must omit the namespace or use the `HelmChartProxy` namespace.
+
+After an upgrade, unchanged legacy cross-namespace references do not block metadata updates or finalizer removal.
+New or changed references must use the proxy namespace, and Secrets are always read from that namespace, even for legacy references.
 
 Note that in this case the credentials in the secret must be stored in a file named `config.json` at the root of the secret, e.g:
 
