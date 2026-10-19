@@ -151,6 +151,11 @@ Credential and CA Secret references must omit the namespace or use the `HelmChar
 After an upgrade, unchanged legacy cross-namespace references do not block metadata updates or finalizer removal.
 New or changed references must use the proxy namespace, and Secrets are always read from that namespace, even for legacy references.
 
+Before upgrading, copy any registry credential or CA Secrets stored in another namespace (such as `caaph-system`) into each referencing `HelmChartProxy`'s namespace.
+Preserve the Secret names and data keys: the configured `credentials.key` for registry credentials and `ca.crt` for CA certificates.
+Update explicit Secret-reference namespaces to the proxy namespace, or omit them.
+Without these namespace-local Secrets, reconciliation will fail after upgrading because cross-namespace Secret lookup is no longer supported.
+
 Note that in this case the credentials in the secret must be stored in a file named `config.json` at the root of the secret, e.g:
 
 ```yaml
