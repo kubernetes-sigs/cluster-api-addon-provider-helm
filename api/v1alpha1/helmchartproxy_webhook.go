@@ -83,6 +83,9 @@ func (*helmChartProxyWebhook) ValidateCreate(_ context.Context, newObj *HelmChar
 	if err := isUrlValid(newObj.Spec.RepoURL); err != nil {
 		return nil, err
 	}
+	if allErrs := validateSecretReferences(nil, newObj); len(allErrs) > 0 {
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("HelmChartProxy").GroupKind(), newObj.Name, allErrs)
+	}
 
 	return nil, nil
 }
@@ -99,6 +102,7 @@ func (*helmChartProxyWebhook) ValidateUpdate(_ context.Context, oldObj, newObj *
 				newObj.Spec.ReleaseNamespace, err.Error()),
 		)
 	}
+	allErrs = append(allErrs, validateSecretReferences(oldObj, newObj)...)
 
 	if newObj.Spec.ReconcileStrategy != oldObj.Spec.ReconcileStrategy {
 		allErrs = append(allErrs,
@@ -144,4 +148,42 @@ func isUrlValid(repoURL string) error {
 	}
 
 	return nil
+}
+
+// validateSecretReferences restricts new or changed Secret references to the proxy's
+// namespace. Unchanged legacy references are allowed so updates and deletion can proceed.
+func validateSecretReferences(oldObj, newObj *HelmChartProxy) field.ErrorList {
+	var allErrs field.ErrorList
+	var oldCredentials *Credentials
+	var oldTLSConfig *TLSConfig
+	if oldObj != nil {
+		oldCredentials = oldObj.Spec.Credentials
+		oldTLSConfig = oldObj.Spec.TLSConfig
+	}
+
+	if credentials := newObj.Spec.Credentials; credentials != nil &&
+		credentials.Secret.Namespace != "" &&
+		credentials.Secret.Namespace != newObj.Namespace &&
+		(oldCredentials == nil || credentials.Secret != oldCredentials.Secret) {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "credentials", "secret", "namespace"),
+			credentials.Secret.Namespace,
+			"must be empty or match metadata.namespace",
+		))
+	}
+
+	if tlsConfig := newObj.Spec.TLSConfig; tlsConfig != nil &&
+		tlsConfig.CASecretRef != nil &&
+		tlsConfig.CASecretRef.Namespace != "" &&
+		tlsConfig.CASecretRef.Namespace != newObj.Namespace &&
+		(oldTLSConfig == nil || oldTLSConfig.CASecretRef == nil ||
+			*tlsConfig.CASecretRef != *oldTLSConfig.CASecretRef) {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("spec", "tlsConfig", "caSecret", "namespace"),
+			tlsConfig.CASecretRef.Namespace,
+			"must be empty or match metadata.namespace",
+		))
+	}
+
+	return allErrs
 }

@@ -131,7 +131,7 @@ $ HELM_REGISTRY_CONFIG=/tmp/oci-creds.json helm login <my-registry>
 Then, create a secret containing the credentials:
 
 ```bash
-$ kubectl create secret generic oci-creds --from-file=/tmp/oci-creds.json -n caaph-system
+$ kubectl create secret generic oci-creds --from-file=/tmp/oci-creds.json -n default
 ```
 
 You can then use your OCI registry by setting the `repoURL` to `oci://<my-registry>` and the credentials secret reference to `oci-creds`. For example:
@@ -143,8 +143,18 @@ spec:
     key: config.json
     secret:
       name: oci-creds
-      namespace: caaph-system
 ```
+
+The credentials Secret is resolved in the same namespace as the `HelmChartProxy`.
+Credential and CA Secret references must omit the namespace or use the `HelmChartProxy` namespace.
+
+After an upgrade, unchanged legacy cross-namespace references do not block metadata updates or finalizer removal.
+New or changed references must use the proxy namespace, and Secrets are always read from that namespace, even for legacy references.
+
+Before upgrading, copy any registry credential or CA Secrets stored in another namespace (such as `caaph-system`) into each referencing `HelmChartProxy`'s namespace.
+Preserve the Secret names and data keys: the configured `credentials.key` for registry credentials and `ca.crt` for CA certificates.
+Update explicit Secret-reference namespaces to the proxy namespace, or omit them.
+Without these namespace-local Secrets, reconciliation will fail after upgrading because cross-namespace Secret lookup is no longer supported.
 
 Note that in this case the credentials in the secret must be stored in a file named `config.json` at the root of the secret, e.g:
 
@@ -153,7 +163,7 @@ kind: Secret
 apiVersion: v1
 metadata:
   name: oci-creds
-  namespace: caaph-system
+  namespace: default
   data:
     config.json: <base64-encoded-credentials>
   type: Opaque
