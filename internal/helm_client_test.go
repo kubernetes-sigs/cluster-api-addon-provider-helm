@@ -24,7 +24,8 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
-	helmAction "helm.sh/helm/v3/pkg/action"
+	helmAction "helm.sh/helm/v4/pkg/action"
+	helmKube "helm.sh/helm/v4/pkg/kube"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 )
@@ -124,7 +125,7 @@ func TestGenerateHelmInstallConfig(t *testing.T) {
 				g.Expect(install.CreateNamespace).To(BeTrue())
 				g.Expect(install.TakeOwnership).To(BeFalse())
 				g.Expect(install.DisableHooks).To(BeFalse())
-				g.Expect(install.Wait).To(BeFalse())
+				g.Expect(install.WaitStrategy).To(Equal(helmKube.HookOnlyStrategy))
 			},
 		},
 		{
@@ -146,6 +147,15 @@ func TestGenerateHelmInstallConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "Wait set to false",
+			helmOptions: &addonsv1alpha1.HelmOptions{
+				Wait: false,
+			},
+			assert: func(g *GomegaWithT, install *helmAction.Install) {
+				g.Expect(install.WaitStrategy).To(Equal(helmKube.HookOnlyStrategy))
+			},
+		},
+		{
 			name: "all options set",
 			helmOptions: &addonsv1alpha1.HelmOptions{
 				DisableHooks:             true,
@@ -164,13 +174,13 @@ func TestGenerateHelmInstallConfig(t *testing.T) {
 			},
 			assert: func(g *GomegaWithT, install *helmAction.Install) {
 				g.Expect(install.DisableHooks).To(BeTrue())
-				g.Expect(install.Wait).To(BeTrue())
+				g.Expect(install.WaitStrategy).To(Equal(helmKube.StatusWatcherStrategy))
 				g.Expect(install.WaitForJobs).To(BeTrue())
 				g.Expect(install.Timeout).To(Equal(5 * time.Minute))
 				g.Expect(install.SkipCRDs).To(BeTrue())
 				g.Expect(install.SubNotes).To(BeTrue())
 				g.Expect(install.DisableOpenAPIValidation).To(BeTrue())
-				g.Expect(install.Atomic).To(BeTrue())
+				g.Expect(install.RollbackOnFailure).To(BeTrue())
 				g.Expect(install.TakeOwnership).To(BeTrue())
 				g.Expect(install.CreateNamespace).To(BeTrue())
 				g.Expect(install.IncludeCRDs).To(BeTrue())
@@ -206,7 +216,7 @@ func TestGenerateHelmUpgradeConfig(t *testing.T) {
 			assert: func(g *GomegaWithT, upgrade *helmAction.Upgrade) {
 				g.Expect(upgrade.TakeOwnership).To(BeFalse())
 				g.Expect(upgrade.DisableHooks).To(BeFalse())
-				g.Expect(upgrade.Wait).To(BeFalse())
+				g.Expect(upgrade.WaitStrategy).To(Equal(helmKube.HookOnlyStrategy))
 			},
 		},
 		{
@@ -224,6 +234,15 @@ func TestGenerateHelmUpgradeConfig(t *testing.T) {
 			},
 			assert: func(g *GomegaWithT, upgrade *helmAction.Upgrade) {
 				g.Expect(upgrade.TakeOwnership).To(BeTrue())
+			},
+		},
+		{
+			name: "Wait set to false",
+			helmOptions: &addonsv1alpha1.HelmOptions{
+				Wait: false,
+			},
+			assert: func(g *GomegaWithT, upgrade *helmAction.Upgrade) {
+				g.Expect(upgrade.WaitStrategy).To(Equal(helmKube.HookOnlyStrategy))
 			},
 		},
 		{
@@ -249,15 +268,15 @@ func TestGenerateHelmUpgradeConfig(t *testing.T) {
 			},
 			assert: func(g *GomegaWithT, upgrade *helmAction.Upgrade) {
 				g.Expect(upgrade.DisableHooks).To(BeTrue())
-				g.Expect(upgrade.Wait).To(BeTrue())
+				g.Expect(upgrade.WaitStrategy).To(Equal(helmKube.StatusWatcherStrategy))
 				g.Expect(upgrade.WaitForJobs).To(BeTrue())
 				g.Expect(upgrade.Timeout).To(Equal(5 * time.Minute))
 				g.Expect(upgrade.SkipCRDs).To(BeTrue())
 				g.Expect(upgrade.SubNotes).To(BeTrue())
 				g.Expect(upgrade.DisableOpenAPIValidation).To(BeTrue())
-				g.Expect(upgrade.Atomic).To(BeTrue())
+				g.Expect(upgrade.RollbackOnFailure).To(BeTrue())
 				g.Expect(upgrade.TakeOwnership).To(BeTrue())
-				g.Expect(upgrade.Force).To(BeTrue())
+				g.Expect(upgrade.ForceReplace).To(BeTrue())
 				g.Expect(upgrade.ResetValues).To(BeTrue())
 				g.Expect(upgrade.ReuseValues).To(BeTrue())
 				g.Expect(upgrade.ResetThenReuseValues).To(BeTrue())
