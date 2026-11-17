@@ -17,6 +17,7 @@ limitations under the License.
 package helmchartproxy
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
@@ -31,6 +33,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -624,6 +627,54 @@ func TestReconcileForCluster(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcileForClusterWithStaleCache(t *testing.T) {
+	t.Parallel()
+	g := NewWithT(t)
+
+	// Hide each created HelmReleaseProxy from the next two reads, as a cache that has not caught up yet would.
+	staleReads := 0
+	c := fake.NewClientBuilder().
+		WithScheme(fakeScheme).
+		WithObjects(fakeHelmChartProxy1.DeepCopy(), fakeCluster1.DeepCopy()).
+		WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+		WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+		Build()
+	r := &HelmChartProxyReconciler{
+		Client: interceptor.NewClient(c, interceptor.Funcs{
+			Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+				if _, ok := obj.(*addonsv1alpha1.HelmReleaseProxy); ok {
+					staleReads = 2
+				}
+
+				return c.Create(ctx, obj, opts...)
+			},
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, ok := obj.(*addonsv1alpha1.HelmReleaseProxy); ok && staleReads > 0 {
+					staleReads--
+					return apierrors.NewNotFound(addonsv1alpha1.GroupVersion.WithResource("helmreleaseproxies").GroupResource(), key.Name)
+				}
+
+				return c.Get(ctx, key, obj, opts...)
+			},
+			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+				if _, ok := list.(*addonsv1alpha1.HelmReleaseProxyList); ok && staleReads > 0 {
+					staleReads--
+					return nil
+				}
+
+				return c.List(ctx, list, opts...)
+			},
+		}),
+	}
+
+	g.Expect(r.reconcileForCluster(ctx, fakeHelmChartProxy1.DeepCopy(), *fakeCluster1)).To(Succeed())
+	g.Expect(r.reconcileForCluster(ctx, fakeHelmChartProxy1.DeepCopy(), *fakeCluster1)).To(Succeed())
+
+	helmReleaseProxies := &addonsv1alpha1.HelmReleaseProxyList{}
+	g.Expect(c.List(ctx, helmReleaseProxies)).To(Succeed())
+	g.Expect(helmReleaseProxies.Items).To(HaveLen(1))
 }
 
 func TestConstructHelmReleaseProxy(t *testing.T) {

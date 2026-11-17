@@ -19,12 +19,14 @@ package helmchartproxy
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	addonsv1alpha1 "sigs.k8s.io/cluster-api-addon-provider-helm/api/v1alpha1"
 	"sigs.k8s.io/cluster-api-addon-provider-helm/internal"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -189,6 +191,11 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 		if err := r.Create(ctx, helmReleaseProxy); err != nil {
 			return errors.Wrapf(err, "failed to create HelmReleaseProxy '%s' for cluster: %s/%s", helmReleaseProxy.Name, cluster.Namespace, cluster.Name)
 		}
+		// The next reconcile looks for the HelmReleaseProxy in the cache. If the cache hasn't seen it yet,
+		// that reconcile finds none and creates a second one under another generated name.
+		if err := r.waitForHelmReleaseProxyInCache(ctx, helmReleaseProxy); err != nil {
+			return errors.Wrapf(err, "failed waiting for HelmReleaseProxy '%s' to be in the cache", helmReleaseProxy.Name)
+		}
 	} else {
 		// TODO: should this use patchHelmReleaseProxy() instead of Update() in case there's a race condition?
 		if err := r.Update(ctx, helmReleaseProxy); err != nil {
@@ -197,6 +204,21 @@ func (r *HelmChartProxyReconciler) createOrUpdateHelmReleaseProxy(ctx context.Co
 	}
 
 	return nil
+}
+
+// waitForHelmReleaseProxyInCache waits until the given HelmReleaseProxy can be read from the cache.
+func (r *HelmChartProxyReconciler) waitForHelmReleaseProxyInCache(ctx context.Context, helmReleaseProxy *addonsv1alpha1.HelmReleaseProxy) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(helmReleaseProxy), &addonsv1alpha1.HelmReleaseProxy{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+
+			return false, err
+		}
+
+		return true, nil
+	})
 }
 
 // deleteHelmReleaseProxy deletes the HelmReleaseProxy for the given cluster.
