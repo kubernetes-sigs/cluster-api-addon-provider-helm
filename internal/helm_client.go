@@ -27,18 +27,22 @@ import (
 	"path"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
-	helmAction "helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	helmLoader "helm.sh/helm/v3/pkg/chart/loader"
-	helmCli "helm.sh/helm/v3/pkg/cli"
-	helmVals "helm.sh/helm/v3/pkg/cli/values"
-	helmGetter "helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/registry"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
+	helmAction "helm.sh/helm/v4/pkg/action"
+	helmChart "helm.sh/helm/v4/pkg/chart/v2"
+	helmLoader "helm.sh/helm/v4/pkg/chart/v2/loader"
+	helmCli "helm.sh/helm/v4/pkg/cli"
+	helmVals "helm.sh/helm/v4/pkg/cli/values"
+	helmGetter "helm.sh/helm/v4/pkg/getter"
+	helmKube "helm.sh/helm/v4/pkg/kube"
+	"helm.sh/helm/v4/pkg/registry"
+	helmReleaseAPI "helm.sh/helm/v4/pkg/release"
+	helmReleaseCommon "helm.sh/helm/v4/pkg/release/common"
+	helmRelease "helm.sh/helm/v4/pkg/release/v1"
+	helmDriver "helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -50,7 +54,7 @@ import (
 type Client interface {
 	InstallOrUpgradeHelmRelease(ctx context.Context, restConfig *rest.Config, credentialsPath, caFilePath string, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
 	GetHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.Release, error)
-	UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error)
+	UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmReleaseAPI.UninstallReleaseResponse, error)
 }
 
 type HelmClient struct{}
@@ -60,6 +64,8 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	log := ctrl.LoggerFrom(ctx)
 	log.V(4).Info("Getting action config")
 	actionConfig := new(helmAction.Configuration)
+	// Helm discards its own output unless a handler is set.
+	actionConfig.SetLogger(logr.ToSlogHandler(log))
 	insecure := true
 	cliConfig := genericclioptions.NewConfigFlags(false)
 	cliConfig.APIServer = &config.Host
@@ -72,8 +78,7 @@ func GetActionConfig(ctx context.Context, namespace string, config *rest.Config)
 	}
 	cliConfig.WithWrapConfigFn(wrapper)
 	// cliConfig.Insecure = &insecure
-	// Note: can change this to klog.V(4) or use a debug level
-	if err := actionConfig.Init(cliConfig, namespace, "secret", klog.V(4).Infof); err != nil {
+	if err := actionConfig.Init(cliConfig, namespace, "secret"); err != nil {
 		return nil, err
 	}
 
@@ -116,7 +121,7 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig
 	if existingRelease.Info.Status.IsPending() {
 		log.V(2).Info("Release status is pending, overwriting status to failed to recover by upgrade",
 			"previousStatus", existingRelease.Info.Status.String())
-		if err := c.updateLastReleaseStatus(ctx, restConfig, spec.ReleaseNamespace, spec.ReleaseName, helmRelease.StatusFailed); err != nil {
+		if err := c.updateLastReleaseStatus(ctx, restConfig, spec.ReleaseNamespace, spec.ReleaseName, helmReleaseCommon.StatusFailed); err != nil {
 			return nil, errors.Wrapf(err, "failed to overwrite status of last release")
 		}
 	}
@@ -124,10 +129,33 @@ func (c *HelmClient) InstallOrUpgradeHelmRelease(ctx context.Context, restConfig
 	return c.UpgradeHelmReleaseIfChanged(ctx, restConfig, credentialsPath, caFilePath, spec, existingRelease)
 }
 
+// waitStrategy maps the wait option onto a Helm wait strategy. Helm rejects an unset strategy.
+func waitStrategy(wait bool) helmKube.WaitStrategy {
+	if wait {
+		return helmKube.StatusWatcherStrategy
+	}
+
+	return helmKube.HookOnlyStrategy
+}
+
+// asRelease asserts a Releaser to the concrete release type.
+func asRelease(releaser helmReleaseAPI.Releaser) (*helmRelease.Release, error) {
+	if releaser == nil {
+		return nil, nil
+	}
+	rel, ok := releaser.(*helmRelease.Release)
+	if !ok {
+		return nil, errors.Errorf("unexpected release type %T", releaser)
+	}
+
+	return rel, nil
+}
+
 // generateHelmInstallConfig generates default helm install config using helmOptions specified in HCP CR spec.
 func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Install {
 	installClient := helmAction.NewInstall(actionConfig)
 	installClient.CreateNamespace = true
+	installClient.WaitStrategy = waitStrategy(false)
 	if actionConfig.RegistryClient != nil {
 		installClient.SetRegistryClient(actionConfig.RegistryClient)
 	}
@@ -136,7 +164,7 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 	}
 
 	installClient.DisableHooks = helmOptions.DisableHooks
-	installClient.Wait = helmOptions.Wait
+	installClient.WaitStrategy = waitStrategy(helmOptions.Wait)
 	installClient.WaitForJobs = helmOptions.WaitForJobs
 	if helmOptions.Timeout != nil {
 		installClient.Timeout = helmOptions.Timeout.Duration
@@ -144,7 +172,7 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 	installClient.SkipCRDs = helmOptions.SkipCRDs
 	installClient.SubNotes = helmOptions.SubNotes
 	installClient.DisableOpenAPIValidation = helmOptions.DisableOpenAPIValidation
-	installClient.Atomic = helmOptions.Atomic
+	installClient.RollbackOnFailure = helmOptions.Atomic
 	installClient.IncludeCRDs = helmOptions.Install.IncludeCRDs
 	installClient.CreateNamespace = helmOptions.Install.CreateNamespace
 	installClient.TakeOwnership = helmOptions.TakeOwnership
@@ -155,6 +183,7 @@ func generateHelmInstallConfig(actionConfig *helmAction.Configuration, helmOptio
 // generateHelmUpgradeConfig generates default helm upgrade config using helmOptions specified in HCP CR spec.
 func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Upgrade {
 	upgradeClient := helmAction.NewUpgrade(actionConfig)
+	upgradeClient.WaitStrategy = waitStrategy(false)
 	if actionConfig.RegistryClient != nil {
 		upgradeClient.SetRegistryClient(actionConfig.RegistryClient)
 	}
@@ -163,7 +192,7 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 	}
 
 	upgradeClient.DisableHooks = helmOptions.DisableHooks
-	upgradeClient.Wait = helmOptions.Wait
+	upgradeClient.WaitStrategy = waitStrategy(helmOptions.Wait)
 	upgradeClient.WaitForJobs = helmOptions.WaitForJobs
 	if helmOptions.Timeout != nil {
 		upgradeClient.Timeout = helmOptions.Timeout.Duration
@@ -171,8 +200,8 @@ func generateHelmUpgradeConfig(actionConfig *helmAction.Configuration, helmOptio
 	upgradeClient.SkipCRDs = helmOptions.SkipCRDs
 	upgradeClient.SubNotes = helmOptions.SubNotes
 	upgradeClient.DisableOpenAPIValidation = helmOptions.DisableOpenAPIValidation
-	upgradeClient.Atomic = helmOptions.Atomic
-	upgradeClient.Force = helmOptions.Upgrade.Force
+	upgradeClient.RollbackOnFailure = helmOptions.Atomic
+	upgradeClient.ForceReplace = helmOptions.Upgrade.Force
 	upgradeClient.ResetValues = helmOptions.Upgrade.ResetValues
 	upgradeClient.ReuseValues = helmOptions.Upgrade.ReuseValues
 	upgradeClient.ResetThenReuseValues = helmOptions.Upgrade.ResetThenReuseValues
@@ -264,7 +293,13 @@ func (c *HelmClient) InstallHelmRelease(ctx context.Context, restConfig *rest.Co
 	}
 	log.V(1).Info("Installing with Helm", "chart", spec.ChartName, "repo", spec.RepoURL)
 
-	return installClient.RunWithContext(ctx, chartRequested, vals) // Can return error and a release
+	res, runErr := installClient.RunWithContext(ctx, chartRequested, vals) // Can return error and a release
+	release, err := asRelease(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return release, runErr
 }
 
 // newDefaultRegistryClient creates registry client object with default config which can be used to install/upgrade helm charts.
@@ -434,9 +469,13 @@ func (c *HelmClient) UpgradeHelmReleaseIfChanged(ctx context.Context, restConfig
 	}
 
 	log.V(1).Info("Upgrading with Helm", "release", spec.ReleaseName, "repo", spec.RepoURL)
-	release, err := upgradeClient.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
+	res, runErr := upgradeClient.RunWithContext(ctx, spec.ReleaseName, chartRequested, vals)
+	release, err := asRelease(res)
+	if err != nil {
+		return nil, err
+	}
 
-	return release, err
+	return release, runErr
 	// Should we force upgrade if it failed previously?
 }
 
@@ -457,7 +496,7 @@ func writeValuesToFile(ctx context.Context, spec addonsv1alpha1.HelmReleaseProxy
 }
 
 // shouldUpgradeHelmRelease determines if a Helm release should be upgraded.
-func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release, chartRequested *chart.Chart, values map[string]interface{}) (bool, error) {
+func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release, chartRequested *helmChart.Chart, values map[string]interface{}) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	if existing.Chart == nil || existing.Chart.Metadata == nil {
@@ -468,7 +507,7 @@ func shouldUpgradeHelmRelease(ctx context.Context, existing helmRelease.Release,
 		return true, nil
 	}
 
-	if existing.Info.Status == helmRelease.StatusFailed {
+	if existing.Info.Status == helmReleaseCommon.StatusFailed {
 		log.Info("Release is in failed state, attempting upgrade to fix it")
 		return true, nil
 	}
@@ -500,12 +539,12 @@ func (c *HelmClient) GetHelmRelease(ctx context.Context, restConfig *rest.Config
 		return nil, err
 	}
 	getClient := helmAction.NewGet(actionConfig)
-	release, err := getClient.Run(spec.ReleaseName)
+	res, err := getClient.Run(spec.ReleaseName)
 	if err != nil {
 		return nil, err
 	}
 
-	return release, nil
+	return asRelease(res)
 }
 
 // ListHelmReleases lists all Helm releases in a namespace.
@@ -515,9 +554,18 @@ func (c *HelmClient) ListHelmReleases(ctx context.Context, restConfig *rest.Conf
 		return nil, err
 	}
 	listClient := helmAction.NewList(actionConfig)
-	releases, err := listClient.Run()
+	res, err := listClient.Run()
 	if err != nil {
 		return nil, err
+	}
+
+	releases := make([]*helmRelease.Release, 0, len(res))
+	for _, releaser := range res {
+		release, err := asRelease(releaser)
+		if err != nil {
+			return nil, err
+		}
+		releases = append(releases, release)
 	}
 
 	return releases, nil
@@ -526,12 +574,13 @@ func (c *HelmClient) ListHelmReleases(ctx context.Context, restConfig *rest.Conf
 // generateHelmUninstallConfig generates default helm uninstall config using helmOptions specified in HCP CR spec.
 func generateHelmUninstallConfig(actionConfig *helmAction.Configuration, helmOptions *addonsv1alpha1.HelmOptions) *helmAction.Uninstall {
 	uninstallClient := helmAction.NewUninstall(actionConfig)
+	uninstallClient.WaitStrategy = waitStrategy(false)
 	if helmOptions == nil {
 		return uninstallClient
 	}
 
 	uninstallClient.DisableHooks = helmOptions.DisableHooks
-	uninstallClient.Wait = helmOptions.Wait
+	uninstallClient.WaitStrategy = waitStrategy(helmOptions.Wait)
 	if helmOptions.Timeout != nil {
 		uninstallClient.Timeout = helmOptions.Timeout.Duration
 	}
@@ -545,7 +594,7 @@ func generateHelmUninstallConfig(actionConfig *helmAction.Configuration, helmOpt
 }
 
 // UninstallHelmRelease uninstalls a Helm release.
-func (c *HelmClient) UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmRelease.UninstallReleaseResponse, error) {
+func (c *HelmClient) UninstallHelmRelease(ctx context.Context, restConfig *rest.Config, spec addonsv1alpha1.HelmReleaseProxySpec) (*helmReleaseAPI.UninstallReleaseResponse, error) {
 	_, actionConfig, err := HelmInit(ctx, spec.ReleaseNamespace, restConfig)
 	if err != nil {
 		return nil, err
@@ -573,13 +622,17 @@ func (c *HelmClient) RollbackHelmRelease(ctx context.Context, restConfig *rest.C
 	return rollbackClient.Run(spec.ReleaseName)
 }
 
-func (c *HelmClient) updateLastReleaseStatus(ctx context.Context, restConfig *rest.Config, namespace string, name string, status helmRelease.Status) error {
+func (c *HelmClient) updateLastReleaseStatus(ctx context.Context, restConfig *rest.Config, namespace string, name string, status helmReleaseCommon.Status) error {
 	_, actionConfig, err := HelmInit(ctx, namespace, restConfig)
 	if err != nil {
 		return err
 	}
 
-	last, err := actionConfig.Releases.Last(name)
+	res, err := actionConfig.Releases.Last(name)
+	if err != nil {
+		return err
+	}
+	last, err := asRelease(res)
 	if err != nil {
 		return err
 	}

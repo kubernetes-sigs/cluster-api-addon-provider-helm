@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -34,10 +35,12 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
-	helmAction "helm.sh/helm/v3/pkg/action"
-	helmCli "helm.sh/helm/v3/pkg/cli"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
+	helmAction "helm.sh/helm/v4/pkg/action"
+	helmCli "helm.sh/helm/v4/pkg/cli"
+	helmReleaseAPI "helm.sh/helm/v4/pkg/release"
+	helmReleaseCommon "helm.sh/helm/v4/pkg/release/common"
+	helmRelease "helm.sh/helm/v4/pkg/release/v1"
+	helmDriver "helm.sh/helm/v4/pkg/storage/driver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -173,6 +176,17 @@ func prettyPrint(v interface{}) string {
 	return string(b)
 }
 
+// asHelmRelease asserts a Releaser to the concrete release type.
+func asHelmRelease(releaser helmReleaseAPI.Releaser) *helmRelease.Release {
+	if releaser == nil {
+		return nil
+	}
+	rel, ok := releaser.(*helmRelease.Release)
+	Expect(ok).To(BeTrue(), "unexpected release type %T", releaser)
+
+	return rel
+}
+
 func getHelmActionConfigForTests(_ context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace string) *helmAction.Configuration {
 	workloadKubeconfigPath := workloadClusterProxy.GetKubeconfigPath()
 
@@ -181,7 +195,7 @@ func getHelmActionConfigForTests(_ context.Context, workloadClusterProxy framewo
 
 	actionConfig := new(helmAction.Configuration)
 	klog.Info("Initializing action config")
-	err := actionConfig.Init(settings.RESTClientGetter(), releaseNamespace, "secret", Logf)
+	err := actionConfig.Init(settings.RESTClientGetter(), releaseNamespace, "secret")
 	Expect(err).NotTo(HaveOccurred())
 
 	return actionConfig
@@ -199,12 +213,13 @@ func GetWaitForHelmReleaseDeployedInput(ctx context.Context, workloadClusterProx
 	var release *helmRelease.Release
 	Eventually(func() error {
 		getClient := helmAction.NewGet(actionConfig)
-		r, err := getClient.Run(releaseName)
+		res, err := getClient.Run(releaseName)
 		if err == helmDriver.ErrReleaseNotFound {
 			return errors.Wrapf(err, "Helm release `%s` not found", releaseName)
 		} else if err != nil {
 			return err
 		}
+		r := asHelmRelease(res)
 		if r == nil {
 			return errors.Errorf("Helm release `%s` is nil, this is unexpected", releaseName)
 		}
@@ -236,9 +251,10 @@ func WaitForHelmReleaseDeployed(ctx context.Context, input WaitForHelmReleaseDep
 
 	Log("starting to wait for Helm release to be deployed")
 	Eventually(func() bool {
-		release, err := getClient.Run(input.HelmRelease.Name)
+		res, err := getClient.Run(input.HelmRelease.Name)
+		release := asHelmRelease(res)
 		if err == nil {
-			if release != nil && release.Info.Status == helmRelease.StatusDeployed {
+			if release != nil && release.Info.Status == helmReleaseCommon.StatusDeployed {
 				return true
 			}
 		}
@@ -418,20 +434,23 @@ type HelmOptions struct {
 
 // UpgradeHelmChart takes a Helm repo URL, a chart name, and release name, and upgrades an existing Helm release on the E2E workload cluster.
 func UpgradeHelmChart(_ context.Context, clusterProxy framework.ClusterProxy, namespace, repoURL, chartName, releaseName string, options *HelmOptions, version string) {
-	// Check that Helm v3 is installed
+	// Check that Helm v4 is installed
 	helm, err := exec.LookPath("helm")
 	Expect(err).NotTo(HaveOccurred(), "No helm binary found in PATH")
 	cmd := exec.Command(helm, "version", "--short") //nolint:gosec // Suppress G204: Subprocess launched with variable warning since this is a test file
 	stdout, err := cmd.Output()
 	Expect(err).NotTo(HaveOccurred())
 	Logf("Helm version: %s", stdout)
-	Expect(stdout).To(HavePrefix("v3."), "Helm v3 is required")
+	Expect(stdout).To(HavePrefix("v4."), "Helm v4 is required")
 
 	// Set up the Helm command arguments.
+	// CAAPH applies server-side as field manager "manager". Without --force-conflicts, the CLI
+	// conflicts with it on atomic fields that the API server defaults, such as env valueFrom.fieldRef.
 	args := []string{
 		"upgrade", releaseName, chartName, "--install",
 		"--kubeconfig", clusterProxy.GetKubeconfigPath(),
 		"--create-namespace", "--namespace", namespace,
+		"--force-conflicts",
 	}
 	if repoURL != "" {
 		args = append(args, "--repo", repoURL)
@@ -461,17 +480,18 @@ func UpgradeHelmChart(_ context.Context, clusterProxy framework.ClusterProxy, na
 
 // SetHelmReleaseStatus overwrites the status of the latest Helm release secret in the workload cluster.
 // This is used by e2e tests to simulate a stuck release in pending-install (overwrite latest release status).
-func SetHelmReleaseStatus(ctx context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace, releaseName string, status helmRelease.Status) {
+func SetHelmReleaseStatus(ctx context.Context, workloadClusterProxy framework.ClusterProxy, releaseNamespace, releaseName string, status helmReleaseCommon.Status) {
 	secretInterface := workloadClusterProxy.GetClientSet().CoreV1().Secrets(releaseNamespace)
 	driver := helmDriver.NewSecrets(secretInterface)
-	driver.Log = Logf
+	driver.SetLogger(slog.NewTextHandler(GinkgoWriter, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	releases, err := driver.Query(map[string]string{"name": releaseName})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(releases).NotTo(BeEmpty(), "no release found for name %s in namespace %s", releaseName, releaseNamespace)
 
 	var current *helmRelease.Release
-	for _, r := range releases {
+	for _, res := range releases {
+		r := asHelmRelease(res)
 		if current == nil || r.Version > current.Version {
 			current = r
 		}
@@ -479,8 +499,9 @@ func SetHelmReleaseStatus(ctx context.Context, workloadClusterProxy framework.Cl
 	Expect(current).NotTo(BeNil())
 
 	key := fmt.Sprintf("sh.helm.release.v1.%s.v%s", releaseName, strconv.Itoa(current.Version))
-	rel, err := driver.Get(key)
+	res, err := driver.Get(key)
 	Expect(err).NotTo(HaveOccurred())
+	rel := asHelmRelease(res)
 	Expect(rel).NotTo(BeNil())
 
 	rel.Info.Status = status
