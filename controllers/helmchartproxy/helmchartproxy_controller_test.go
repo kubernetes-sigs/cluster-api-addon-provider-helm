@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -558,10 +559,32 @@ func TestReconcileNormal(t *testing.T) {
 		{
 			name:           "do not delete orphaned HelmReleaseProxies for InstallOnce strategy",
 			helmChartProxy: installOnceProxy,
-			objects:        []client.Object{hrpReady1, hrpReady2},
+			// The Clusters still exist, but they are no longer selected by the HelmChartProxy.
+			objects: []client.Object{hrpReady1, hrpReady2, withLabels(cluster1, nil), withLabels(cluster2, nil)},
 			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
 				g.Expect(hcp.Status.MatchingClusters).To(BeEmpty())
 				g.Expect(c.Get(ctx, client.ObjectKey{Namespace: hrpReady1.Namespace, Name: hrpReady1.Name}, &addonsv1alpha1.HelmReleaseProxy{})).To(Succeed())
+				g.Expect(c.Get(ctx, client.ObjectKey{Namespace: hrpReady2.Namespace, Name: hrpReady2.Name}, &addonsv1alpha1.HelmReleaseProxy{})).To(Succeed())
+
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, addonsv1alpha1.HelmReleaseProxiesReadyCondition)).To(BeTrue())
+				g.Expect(conditions.Has(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(conditions.IsTrue(hcp, clusterv1.ReadyCondition)).To(BeTrue())
+				g.Expect(hcp.Status.ObservedGeneration).To(Equal(hcp.Generation))
+			},
+			expectedError: "",
+		},
+		{
+			name:           "delete HelmReleaseProxies of deleted Clusters for InstallOnce strategy",
+			helmChartProxy: installOnceProxy,
+			// test-cluster-1 is gone, test-cluster-2 still exists but is no longer selected.
+			objects: []client.Object{hrpReady1, hrpReady2, withLabels(cluster2, nil)},
+			expect: func(g *WithT, c client.Client, hcp *addonsv1alpha1.HelmChartProxy) {
+				g.Expect(hcp.Status.MatchingClusters).To(BeEmpty())
+				err := c.Get(ctx, client.ObjectKey{Namespace: hrpReady1.Namespace, Name: hrpReady1.Name}, &addonsv1alpha1.HelmReleaseProxy{})
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 				g.Expect(c.Get(ctx, client.ObjectKey{Namespace: hrpReady2.Namespace, Name: hrpReady2.Name}, &addonsv1alpha1.HelmReleaseProxy{})).To(Succeed())
 
 				g.Expect(conditions.Has(hcp, addonsv1alpha1.HelmReleaseProxySpecsUpToDateCondition)).To(BeTrue())
@@ -728,6 +751,59 @@ func TestReconcileAfterMatchingClusterUnpaused(t *testing.T) {
 	hrpList = &addonsv1alpha1.HelmReleaseProxyList{}
 	g.Expect(c.List(ctx, hrpList, &client.ListOptions{Namespace: request.Namespace})).To(Succeed())
 	g.Expect(hrpList.Items).To(HaveLen(3))
+}
+
+func TestReconcileInstallOnceAfterClusterRecreated(t *testing.T) {
+	g := NewWithT(t)
+
+	request := reconcile.Request{
+		NamespacedName: util.ObjectKey(installOnceProxy),
+	}
+
+	// test-cluster-1 has been deleted, and the HelmReleaseProxy of its installed release is left.
+	c := fake.NewClientBuilder().
+		WithScheme(fakeScheme).
+		WithObjects(hrpReady1, installOnceProxy).
+		WithStatusSubresource(&addonsv1alpha1.HelmChartProxy{}).
+		WithStatusSubresource(&addonsv1alpha1.HelmReleaseProxy{}).
+		Build()
+
+	r := &HelmChartProxyReconciler{
+		Client: c,
+	}
+	result, err := r.Reconcile(ctx, request)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(reconcile.Result{}))
+
+	// The HelmReleaseProxy of the deleted Cluster should be deleted.
+	hrpList := &addonsv1alpha1.HelmReleaseProxyList{}
+	g.Expect(c.List(ctx, hrpList, &client.ListOptions{Namespace: request.Namespace})).To(Succeed())
+	g.Expect(hrpList.Items).To(BeEmpty())
+
+	// Create a new Cluster with the same name and reconcile again.
+	newCluster := cluster1.DeepCopy()
+	newCluster.ResourceVersion = ""
+	g.Expect(c.Create(ctx, newCluster)).To(Succeed())
+
+	result, err = r.Reconcile(ctx, request)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(reconcile.Result{}))
+
+	// The new Cluster should get a HelmReleaseProxy of its own, which has not been installed yet.
+	hrpList = &addonsv1alpha1.HelmReleaseProxyList{}
+	g.Expect(c.List(ctx, hrpList, &client.ListOptions{Namespace: request.Namespace})).To(Succeed())
+	g.Expect(hrpList.Items).To(HaveLen(1))
+	g.Expect(hrpList.Items[0].Name).NotTo(Equal(hrpReady1.Name))
+	g.Expect(hrpList.Items[0].Spec.ClusterRef.Name).To(Equal(cluster1.Name))
+	g.Expect(hrpList.Items[0].Annotations).NotTo(HaveKey(addonsv1alpha1.ReleaseSuccessfullyInstalledAnnotation))
+}
+
+// withLabels returns a copy of the given Cluster with its labels replaced by the given labels.
+func withLabels(cluster *clusterv1.Cluster, labels map[string]string) *clusterv1.Cluster {
+	cluster = cluster.DeepCopy()
+	cluster.Labels = labels
+
+	return cluster
 }
 
 func init() {

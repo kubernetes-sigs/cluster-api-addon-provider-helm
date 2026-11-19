@@ -62,6 +62,22 @@ func (r *HelmChartProxyReconciler) deleteOrphanedHelmReleaseProxies(ctx context.
 	return nil
 }
 
+// deleteHelmReleaseProxiesOfDeletedClusters deletes any HelmReleaseProxy resources that belong to a Cluster that no longer exists.
+// HelmReleaseProxies of Clusters that still exist are kept, whether or not their Cluster is selected by the parent HelmChartProxy.
+func (r *HelmChartProxyReconciler) deleteHelmReleaseProxiesOfDeletedClusters(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, helmReleaseProxies []addonsv1alpha1.HelmReleaseProxy) error {
+	if len(helmReleaseProxies) == 0 {
+		return nil
+	}
+
+	// An empty label selector matches every Cluster in the namespace.
+	existingClusters, err := r.listClustersWithLabels(ctx, helmChartProxy.Namespace, metav1.LabelSelector{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to list Clusters in namespace %s", helmChartProxy.Namespace)
+	}
+
+	return r.deleteOrphanedHelmReleaseProxies(ctx, helmChartProxy, existingClusters.Items, helmReleaseProxies)
+}
+
 // reconcileForCluster will create or update a HelmReleaseProxy for the given cluster.
 func (r *HelmChartProxyReconciler) reconcileForCluster(ctx context.Context, helmChartProxy *addonsv1alpha1.HelmChartProxy, cluster clusterv1.Cluster) error {
 	log := ctrl.LoggerFrom(ctx)
