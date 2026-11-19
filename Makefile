@@ -166,9 +166,10 @@ HADOLINT_FAILURE_THRESHOLD = warning
 
 SHELLCHECK_VER := v0.10.0
 
-KPROMO_VER := 5ab0dbc74b0228c22a93d240596dff77464aee8f
+KPROMO_VER := v4.8.1
 KPROMO_BIN := kpromo
 KPROMO :=  $(abspath $(TOOLS_BIN_DIR)/$(KPROMO_BIN)-$(KPROMO_VER))
+# KPROMO_PKG may have to be changed if KPROMO_VER increases its major version.
 KPROMO_PKG := sigs.k8s.io/promo-tools/v4/cmd/kpromo
 
 RELEASE_NOTES_VER := v0.18.0
@@ -645,9 +646,20 @@ release-notes: $(RELEASE_NOTES_DIR) $(RELEASE_NOTES)
 	rm -f $(RELEASE_NOTES_DIR)/tmp-release-notes.md; \
 	fi
 
+# Scope the GitHub credential helper to kpromo instead of modifying global git config.
 .PHONY: promote-images
 promote-images: $(KPROMO)
-	$(KPROMO) pr --project cluster-api-helm --tag $(RELEASE_TAG) --reviewers "$(IMAGE_REVIEWERS)" --fork $(USER_FORK) --image cluster-api-helm-controller
+	@set -euo pipefail; \
+	if [ -z "$${GITHUB_TOKEN:-}" ]; then \
+		GITHUB_TOKEN="$$(gh auth token --hostname github.com)"; \
+	fi; \
+	export GITHUB_TOKEN; \
+	GIT_CONFIG_COUNT=2 \
+	GIT_CONFIG_KEY_0=credential.https://github.com.helper \
+	GIT_CONFIG_VALUE_0= \
+	GIT_CONFIG_KEY_1=credential.https://github.com.helper \
+	GIT_CONFIG_VALUE_1='!gh auth git-credential' \
+	$(KPROMO) pr --use-ssh=false --project cluster-api-helm --tag $(RELEASE_TAG) --reviewers "$(IMAGE_REVIEWERS)" --fork $(USER_FORK) --image cluster-api-helm-controller
 
 ## --------------------------------------
 ## Docker
@@ -840,7 +852,7 @@ $(TILT_PREPARE): $(TOOLS_DIR)/go.mod # Build tilt-prepare from tools folder.
 	cd $(TOOLS_DIR); go build -tags=tools -o $(BIN_DIR)/tilt-prepare sigs.k8s.io/cluster-api-addon-provider-helm/hack/tools/tilt-prepare
 
 $(KPROMO):
-	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(KPROMO_PKG) $(KPROMO_BIN) ${KPROMO_VER}
+	GOTOOLCHAIN=auto GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(KPROMO_PKG) $(KPROMO_BIN) ${KPROMO_VER}
 
 $(RELEASE_NOTES): ## Build release notes from tools folder.
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) k8s.io/release/cmd/release-notes $(RELEASE_NOTES_BIN) $(RELEASE_NOTES_VER)

@@ -50,10 +50,10 @@ This document describes the process for creating a new release of the Cluster AP
 
 6. **Promote the release image.**
 
-    Run the `make promote-images` command to promote the image from the staging repository to the production repository. If your git remotes don't use `https://` URLs, set the `USER_FORK` environment variable to your GitHub username.
+    Ensure the GitHub CLI is authenticated to `github.com`, then run `make promote-images` to promote the image from the staging repository to the production repository. The command uses `GITHUB_TOKEN` if it is already set, otherwise it uses the active GitHub CLI account. If the owner of your `origin` remote is not the GitHub account that owns your `k8s.io` fork, set `USER_FORK` to that account.
 
     ```shell
-    USER_FORK=<username> make promote-images
+    make promote-images
     ```
 
     This command will create a Pull Request at [k8s.io](https://github.com/kubernetes/k8s.io/pulls) to promote the image to production. Double-check that the SHA added by the PR matches the SHA of the staging image.
