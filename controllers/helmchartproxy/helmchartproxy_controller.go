@@ -202,9 +202,17 @@ func (r *HelmChartProxyReconciler) reconcileNormal(ctx context.Context, helmChar
 
 	log.V(2).Info("Starting reconcileNormal for chart proxy", "name", helmChartProxy.Name, "strategy", helmChartProxy.Spec.ReconcileStrategy)
 
-	// If Reconcile strategy is not InstallOnce, delete orphaned HelmReleaseProxies
 	if helmChartProxy.Spec.ReconcileStrategy != string(addonsv1alpha1.ReconcileStrategyInstallOnce) {
+		// If Reconcile strategy is not InstallOnce, delete orphaned HelmReleaseProxies
 		err := r.deleteOrphanedHelmReleaseProxies(ctx, helmChartProxy, clusters, helmReleaseProxies)
+		if err != nil {
+			return err
+		}
+	} else {
+		// With the InstallOnce strategy, the HelmReleaseProxy of a Cluster that is no longer selected is kept so that its Helm
+		// release is left in place. A HelmReleaseProxy whose Cluster no longer exists has no Helm release to keep, and it would
+		// be taken for the release of a new Cluster created with the same name, so delete it.
+		err := r.deleteHelmReleaseProxiesOfDeletedClusters(ctx, helmChartProxy, helmReleaseProxies)
 		if err != nil {
 			return err
 		}
