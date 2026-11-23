@@ -25,8 +25,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	helmAction "helm.sh/helm/v3/pkg/action"
-	helmDriver "helm.sh/helm/v3/pkg/storage/driver"
+	helmAction "helm.sh/helm/v4/pkg/action"
+	helmDriver "helm.sh/helm/v4/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -111,7 +111,7 @@ func HelmUninstallSpec(ctx context.Context, inputGetter func() HelmUninstallInpu
 				}
 				return err
 			} else {
-				return errors.Errorf("Helm release %s still exists", r.Name)
+				return errors.Errorf("Helm release %s still exists", asHelmRelease(r).Name)
 			}
 		}, e2eConfig.GetIntervals(specName, "wait-helm-release")...).Should(Succeed())
 	}
